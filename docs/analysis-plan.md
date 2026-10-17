@@ -20,5 +20,5 @@
 - [ ] Division base level, finances (`3e9c`, `6e48`, `10c8:2b46`), transfers, coach sacking, half-time/extra time, cup details
 - [x] WebAssembly build + browser demo (4-division league, rounds, seasons) — `web/`
 - [x] Real teams from `.EFT` in the UI (local file picker; division assignment by level is an assumption)
-- [ ] How the original assigns teams to divisions at game start (`TselectCountriesDlg`/`TgetTeamsDlg` code)
+- [x] Division assignment and starting strengths at game start (verified against a real save)
 - [ ] Saves (own format + `.e98` import), PWA, user-controlled team (lineup, transfers)

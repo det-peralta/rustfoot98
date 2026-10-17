@@ -27,11 +27,23 @@
 - **Division base levels** (`1010:0b60`: `division+4 = index × −14 + 52`): **52, 38, 24, 10** for divisions 1–4 and −4 for the outside pool (index 4, never evolved). The evolution window of rank `r` is `base − 2r ± 5`.
 - **Evolution** after every round (see `match-engine.md`).
 
+## New game (verified against a real save)
+- **Division assignment** (`1028:002a`, `1028:0544`): the master team list is built by looping the EFT **level from 20 down to 1**,
+  taking the team files of that level (ties in directory order; on the host DOSBox lists files alphabetically, case-insensitive)
+  from the selected countries; entry `i` goes to division `min(4, i / 8)`, so the first 32 teams fill the four divisions and
+  the rest are the outside pool. The game needs 34–128 teams (`1028:18d9`). In the pre-match save the 52 teams appear in strictly
+  descending level order and the 4th division is the fourth group of eight (Sport, Waregem, Blumenau, Ceará, Cruzeiro,
+  Figueirense, Goiás, Guarani), which includes the round-1 opponent.
+- **Starting strength** (`1028:0373`): team at list position `i` gets `base(i) = max(5, round((1 − i/32)·50) − 1)` for `i ≤ 32`
+  and 1 beyond (49, 47, 46, 44, 43, 41, 40, 38 | 37 … 26 | 24 … 13 | 11, 10, 8, 7, 5, 5, 5, 5 | 1…), and every player gets
+  `clamp(base + 3 − Random(7), 1, 50)`. Figueirense (index 29, base 5) had a squad averaging 5.4, as observed.
+- **The human manager** is placed in a random one of the **bottom six** teams of the 4th division (`1028:0b26`: index `7 − Random(6)`).
+- Team finances are initialised from the position too (`team+0x71..0x7d`, ticket price etc.): not decoded.
+
 ## Assumed in the Rust port (`core/src/season.rs`)
 (3-1-0 points, morale and promotion/relegation are now verified and implemented.)
 - **4-4-2 auto line-up** — the original (`1010:4b73`) chooses a formation; ours is a stand-in.
 - **Auto line-up**: the strongest of the game's twelve formations (`FORMATIONS`, verified from the menu) by total strength; the original's rule (`1010:4b73`) is not decoded. Real squads are uneven (e.g. 3 defenders), so a fixed 4-4-2 does not work.
-- **Team to division assignment** with real `.EFT` teams: strongest 32 by level (random ties), 8 per division, rest in the pool. A real save shows the 4th division mixing levels 1–6, so the original's rule differs.
 - Ranks for evolution are taken after the round's results (the original sorts at `0c41` start; order not confirmed).
 
 ## What the simulation shows (`cargo run --release -p elifoot-core --example season -- 12 2000`)
@@ -45,6 +57,7 @@ finances and transfers (`3e9c`, `6e48`, team `+0x71..+0x79`); cup details (round
 the global `Real` at `10c8:2b46`; coach sacking rule (`8b5d`); what the new-season routine `2f3c` resets.
 
 ## World dynamics (core/src/world.rs, `cargo run --release -p elifoot-core --example world -- 12`)
-With the verified bases, a synthetic world stratifies by itself: mean squad strength settles near **30 / 23 / 13 / 5.7**
-for divisions 1..4 by about the tenth season. The 4th-division value matches the real squad in a real save (mean 5.4).
-Starting strength `level + Random(7) − 3` is inferred from the deviations seen in that save (uniform −3..+3), not decoded.
+A new world starts, by the verified rule, with mean squad strength about **43 / 31 / 18 / 7** for divisions 1..4. With the
+decoded evolution (starters drift down, reserves up, clamped to `base − 2·rank ± 5`) the means then erode slowly, to about
+**34 / 20 / 11 / 2** after twelve seasons. The original presumably counters this with mechanics not decoded yet
+(transfers, finances), so long runs of the demo drift weaker than the real game would.

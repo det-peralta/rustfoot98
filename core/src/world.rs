@@ -2,9 +2,11 @@
 //!
 //! Verified: division base levels `52, 38, 24, 10` (`1010:0b60` sets `division+4 = index * -14 + 52`; the outside
 //! pool is index 4 with base -4 and is never evolved), 14 league rounds, evolution after every round, and the
-//! season end of `1020:038e`. **Assumed:** squad composition (2 GK, 7 DEF, 6 MID, 5 ATT), starting strength
-//! `level + Random(7) - 3` (the deviations seen in a real save are uniform in -3..=3), club/player names are fictional,
-//! no cup (so only the champion's `K += 1.0` applies).
+//! season end of `1020:038e`. **New-game rules (verified):** teams are ordered by EFT level descending, ties in file-name order
+//! (`1028:002a` loops the level from 20 to 1), cut into divisions of eight (`1028:0544`: division `min(4, i/8)`), and the
+//! starting strength of every player is `clamp(base(i) + 3 - Random(7), 1, 50)` with `base(i) = max(5, round((1 - i/32) * 50) - 1)`
+//! for the first 33 teams and 1 for the rest (`1028:0373`). **Assumed:** squad composition of the fictional world
+//! (2 GK, 7 DEF, 6 MID, 5 ATT), fictional names, no cup (so only the champion's `K += 1.0` applies).
 use crate::eft::{EftTeam, Position};
 use crate::rng::DelphiRng;
 use crate::season::{end_of_round, end_of_season, play_round, standings, Club, MatchRecord};
@@ -134,13 +136,13 @@ fn player_name(rng: &mut DelphiRng) -> String {
     )
 }
 
-fn make_club(rng: &mut DelphiRng, name: String, level: i32) -> Club {
+fn make_club(rng: &mut DelphiRng, name: String, base: i32) -> Club {
     let mut slots = Vec::new();
     let mut names = Vec::new();
     for (position, count) in [(0u8, 2), (1, 7), (2, 6), (3, 5)] {
         for _ in 0..count {
             let n = player_name(rng);
-            let strength = (level + rng.random(7) as i32 - 3).clamp(1, 50) as u16;
+            let strength = player_strength(rng, base);
             slots.push(Slot::new(&n, position, strength, true, Status::Out));
             names.push(n);
         }
@@ -150,12 +152,33 @@ fn make_club(rng: &mut DelphiRng, name: String, level: i32) -> Club {
     club
 }
 
-/// Minimum clubs for a real-team world: 4 divisions of 8 plus an outside pool of at least 3 (`end_of_season`).
-pub const MIN_TEAMS: usize = 35;
+/// `1028:0373`: base strength of the team at position `i` of the master list (sorted by level, best first):
+/// `max(5, round((1 - i/32) * 50) - 1)` for `i <= 32`, else 1 (`FRNDINT` rounds half to even).
+pub fn base_strength(i: usize) -> i32 {
+    if i > 32 {
+        return 1;
+    }
+    let g = (1.0 - i as f64 / 32.0) * 50.0; // (c3 - i / c1 / c2) * c4 with c1 = 4, c2 = 8, c3 = 1, c4 = 50
+    (g.round_ties_even() as i32 - 1).max(5)
+}
 
-/// Builds a club from a `.EFT` team: real player names and positions, strength `level + Random(7) - 3`
-/// (inferred from a real save, not decoded). Errors when no formation of the game can be fielded.
-fn club_from_eft(rng: &mut DelphiRng, t: &EftTeam, name: String) -> Result<Club, String> {
+/// Player strength for a team of base `base`: `clamp(base + 3 - Random(7), 1, 50)`.
+fn player_strength(rng: &mut DelphiRng, base: i32) -> u16 {
+    (base + 3 - rng.random(7) as i32).clamp(1, 50) as u16
+}
+
+/// The game accepts 34 to 128 teams (`1028:18d9`: the OK button needs more than `0x21`, and it warns above `0x80`).
+pub const MIN_TEAMS: usize = 34;
+pub const MAX_TEAMS: usize = 128;
+
+/// Builds a club from a `.EFT` team: real player names and positions, strength from the team's list position
+/// (`base`). Errors when no formation of the game can be fielded.
+fn club_from_eft(
+    rng: &mut DelphiRng,
+    t: &EftTeam,
+    name: String,
+    base: i32,
+) -> Result<Club, String> {
     let mut slots = Vec::new();
     let mut names = Vec::new();
     let mut count = [0usize; 4];
@@ -167,7 +190,7 @@ fn club_from_eft(rng: &mut DelphiRng, t: &EftTeam, name: String) -> Result<Club,
             Position::Attacker => 3,
         };
         count[position as usize] += 1;
-        let strength = (t.level as i32 + rng.random(7) as i32 - 3).clamp(1, 50) as u16;
+        let strength = player_strength(rng, base);
         slots.push(Slot::new(
             &p.name,
             position,
@@ -189,10 +212,10 @@ fn club_from_eft(rng: &mut DelphiRng, t: &EftTeam, name: String) -> Result<Club,
 }
 
 impl World {
-    /// A world made of real teams: shuffled (ties between equal levels are random), the strongest 32 fill the
-    /// four divisions in level order (8 each), the rest form the outside pool.
-    /// **Assumption:** how the original assigns teams to divisions is not decoded; a real save shows the 4th division
-    /// mixing levels 1..6, so this is only an approximation.
+    /// A world made of real teams. **Pass the teams in directory order** (file names, case-insensitive): like the original,
+    /// the master list is ordered by level descending and ties keep that order. At most 128 teams are used.
+    /// The first 32 fill the four divisions (8 each), the rest form the outside pool. Verified against a real save, where the
+    /// 52 teams appear in strictly descending level order and the 4th division is the fourth group of eight.
     pub fn from_teams(seed: u32, teams: &[EftTeam]) -> Result<World, String> {
         if teams.len() < MIN_TEAMS {
             return Err(format!(
@@ -202,22 +225,23 @@ impl World {
         }
         let mut rng = DelphiRng::new(seed);
         let mut order: Vec<usize> = (0..teams.len()).collect();
-        // Fisher-Yates with the Delphi RNG, then a stable sort by level (descending)
-        for i in (1..order.len()).rev() {
-            let j = rng.random(i as u16 + 1) as usize;
-            order.swap(i, j);
-        }
-        order.sort_by_key(|&i| std::cmp::Reverse(teams[i].level));
+        order.sort_by_key(|&i| std::cmp::Reverse(teams[i].level)); // stable: ties keep the given (directory) order
+        order.truncate(MAX_TEAMS);
         let mut used = std::collections::HashSet::new();
         let mut clubs = Vec::new();
-        for &i in &order {
+        for (pos, &i) in order.iter().enumerate() {
             let mut name = teams[i].short_name.trim().to_string();
             let mut n = 2;
             while !used.insert(name.clone()) {
                 name = format!("{} ({n})", teams[i].short_name.trim());
                 n += 1;
             }
-            clubs.push(club_from_eft(&mut rng, &teams[i], name)?);
+            clubs.push(club_from_eft(
+                &mut rng,
+                &teams[i],
+                name,
+                base_strength(pos),
+            )?);
         }
         let mut it = clubs.into_iter();
         let mut divisions: [Vec<Club>; 4] = Default::default();
@@ -236,15 +260,10 @@ impl World {
         })
     }
 
-    /// A fictional world. Levels follow the real data: the 4th division holds levels 1..6 (read from a real save).
+    /// A fictional world with the original's starting strengths: the club at list position `i` (division `i / 8`) gets
+    /// `base_strength(i)`, so the first division starts around 49..38 and the fourth around 11..5.
     pub fn synthetic(seed: u32) -> World {
         let mut rng = DelphiRng::new(seed);
-        let levels: [[i32; 8]; 4] = [
-            [16, 15, 14, 13, 13, 12, 12, 11],
-            [10, 9, 9, 8, 8, 7, 7, 6],
-            [6, 5, 5, 4, 4, 4, 3, 3],
-            [6, 5, 3, 2, 2, 1, 1, 1],
-        ];
         let mut n = 0;
         let mut next_name = || {
             let i = n;
@@ -252,14 +271,13 @@ impl World {
             format!("{} {}", KINDS[i % KINDS.len()], CITIES[i % CITIES.len()])
         };
         let mut divisions: [Vec<Club>; 4] = Default::default();
-        for (d, lv) in levels.iter().enumerate() {
-            divisions[d] = lv
-                .iter()
-                .map(|&l| make_club(&mut rng, next_name(), l))
+        for (d, division) in divisions.iter_mut().enumerate() {
+            *division = (0..8)
+                .map(|j| make_club(&mut rng, next_name(), base_strength(d * 8 + j)))
                 .collect();
         }
         let pool = (0..6)
-            .map(|i| make_club(&mut rng, next_name(), 1 + i % 3))
+            .map(|i| make_club(&mut rng, next_name(), base_strength(32 + i)))
             .collect();
         World {
             divisions,
@@ -378,6 +396,53 @@ mod tests {
         assert!(w.divisions.iter().all(|d| d.len() == 8));
         assert_eq!(w.pool.len(), 6);
         assert!(w.divisions.iter().flatten().all(|c| c.slots.len() == 20));
+    }
+
+    #[test]
+    fn starting_strengths_follow_the_list_position() {
+        // computed from the binary's constants (1028:0373): max(5, round((1 - i/32) * 50) - 1), then 1 beyond i = 32
+        let expect = [
+            49, 47, 46, 44, 43, 41, 40, 38, 37, 35, 33, 32, 30, 29, 27, 26, 24, 22, 21, 19, 18, 16,
+            15, 13, 11, 10, 8, 7, 5, 5, 5, 5, 5, 1, 1, 1,
+        ];
+        for (i, e) in expect.iter().enumerate() {
+            assert_eq!(base_strength(i), *e, "position {i}");
+        }
+        // the real save: Figueirense is the 30th team (index 29) and its squad averaged 5.4
+        assert_eq!(base_strength(29), 5);
+    }
+
+    #[test]
+    fn division_assignment_matches_the_real_save() {
+        // levels of the 52 teams of a real save in file order (pre-match save): strictly descending, groups of 8
+        let levels = [
+            16u8, 14, 14, 13, 13, 13, 12, 12, 12, 12, 12, 11, 10, 10, 9, 9, 9, 9, 8, 7, 7, 7, 6, 6,
+            6, 6, 5, 5, 5, 5, 5, 5, 5, 4, 4, 4, 3, 3, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1,
+        ];
+        // shuffle the input: the world must sort it back by level (stable for ties)
+        let mut teams: Vec<EftTeam> = levels
+            .iter()
+            .enumerate()
+            .map(|(i, &l)| fake_team(i, l))
+            .collect();
+        teams.reverse();
+        teams.sort_by_key(|t| t.level); // not descending on purpose
+        let w = World::from_teams(1, &teams).unwrap();
+        let mean_level = |d: &Vec<Club>| d.len();
+        assert_eq!(mean_level(&w.divisions[3]), 8);
+        assert_eq!(w.pool.len(), 52 - 32);
+        // 4th division = positions 24..31 of the sorted list = levels 6,6,5,5,5,5,5,5
+        let d4: Vec<f64> = w.divisions[3]
+            .iter()
+            .map(|c| c.slots.iter().map(|s| s.strength as f64).sum::<f64>() / c.slots.len() as f64)
+            .collect();
+        assert!(d4.iter().all(|m| (3.0..=12.5).contains(m)), "{d4:?}");
+        // first division starts strong
+        let mins: Vec<u16> = w.divisions[0]
+            .iter()
+            .map(|c| c.slots.iter().map(|s| s.strength).min().unwrap())
+            .collect();
+        assert!(mins.iter().all(|&m| m >= 35), "{mins:?}");
     }
 
     fn fake_team(i: usize, level: u8) -> EftTeam {

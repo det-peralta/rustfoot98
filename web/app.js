@@ -44,6 +44,8 @@ function fail() {
 }
 
 async function loadEfts(files) {
+  // the original reads the folder in directory order (alphabetical on the host); equal levels keep that order
+  files = [...files].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   wasm.eft_clear();
   let ok = 0;
   for (const f of files) {
@@ -53,11 +55,11 @@ async function loadEfts(files) {
     ok += wasm.eft_add(bytes.length);
   }
   $("eft-status").textContent = `${ok} equipas válidas em ${files.length} ficheiros.`;
-  if (ok < 35) { $("eft-status").textContent += " São precisas pelo menos 35."; return; }
+  if (ok < 34) { $("eft-status").textContent += " São precisas pelo menos 34."; return; }
   useReal = true;
   $("use-fiction").hidden = false;
   newWorld();
-  if (useReal) $("eft-status").textContent = `${ok} equipas reais carregadas: as 32 de nível mais alto formam as 4 divisões, as restantes ficam fora da liga.`;
+  if (useReal) $("eft-status").textContent = `${ok} equipas reais carregadas: por nível (do mais alto para o mais baixo) as 32 primeiras formam as 4 divisões e as restantes ficam fora da liga (máx. 128).`;
 }
 
 function play(fn) {

@@ -42,7 +42,7 @@ try {
   const fs = await import('fs');
   const dir = 'original/elifoot98/EQUIPAS';
   if (fs.existsSync(dir)) {
-    const files = fs.readdirSync(dir).map((f) => dir + '/' + f);
+    const files = fs.readdirSync(dir).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase())).map((f) => dir + '/' + f);
     await p.setInputFiles('#eft', files);
     await p.waitForFunction(() => document.querySelector('#eft-status').textContent.includes('reais carregadas'), null, { timeout: 15000 });
     const names = await p.locator('#table tbody td.l').allTextContents();
