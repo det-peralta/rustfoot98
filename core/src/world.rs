@@ -172,7 +172,7 @@ impl World {
                 .collect();
         }
         let pool = (0..6)
-            .map(|i| make_club(&mut rng, next_name(), 1 + i as i32 % 3))
+            .map(|i| make_club(&mut rng, next_name(), 1 + i % 3))
             .collect();
         World {
             divisions,
