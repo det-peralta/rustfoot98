@@ -6,8 +6,8 @@
 //! assumed), morale `K = 0.85*K + 0.15*result` after every game (`1068:10d1`), evolution after every round with
 //! `level = base - 2 * rank`, and the season end (`1020:038e`): champion `K += 1.0`, cup winner `K += 0.5`, the top two
 //! and bottom two of adjacent divisions swap (`1020:02a6`) and two random outside teams join the lowest division.
-//! **Assumed (not yet decoded):** the 4-4-2 auto line-up (the real `1010:4b73` picks the formation), tie order, and that
-//! ranks are taken after the round's results.
+//! **Assumed (not yet decoded):** the auto line-up rule (the real `1010:4b73`; we pick the strongest of the game's twelve
+//! formations), tie order, and that ranks are taken after the round's results.
 use crate::evolution::{evolve_squad, level_for_rank};
 use crate::matchsim::{fixture_value, morale_results, update_morale, Event, Match};
 use crate::rng::DelphiRng;
@@ -79,27 +79,79 @@ pub struct MatchRecord {
     pub events: Vec<Event>,
 }
 
-/// Simplified 4-4-2 line-up (stand-in for `1010:4b73`): best fit players by strength per position,
-/// then a bench of one goalkeeper and the four best remaining outfield players; unavailable players are out.
+/// The twelve formations of the game's *Seleccionar* menu (verified from the main form's menu items), as
+/// `(defenders, midfielders, attackers)`; 4-4-2 comes first so that it wins ties.
+pub const FORMATIONS: [(u8, u8, u8); 12] = [
+    (4, 4, 2),
+    (3, 3, 4),
+    (3, 4, 3),
+    (4, 2, 4),
+    (4, 3, 3),
+    (4, 5, 1),
+    (5, 2, 3),
+    (5, 3, 2),
+    (5, 4, 1),
+    (5, 5, 0),
+    (6, 3, 1),
+    (6, 4, 0),
+];
+
+/// Whether some formation can be fielded with these available counts `[gk, def, mid, att]`.
+pub fn can_field(count: [usize; 4]) -> bool {
+    count[0] >= 1
+        && FORMATIONS.iter().any(|&(d, m, a)| {
+            count[1] >= d as usize && count[2] >= m as usize && count[3] >= a as usize
+        })
+}
+
+/// Stand-in for the auto line-up `1010:4b73` (its choice rule is not decoded): the formation whose starters have the
+/// largest total strength (ties go to the earlier entry of `FORMATIONS`), best players per position, a bench of one
+/// goalkeeper plus the four best remaining outfield players; unavailable players are out.
 pub fn auto_lineup(slots: &mut [Slot]) {
     for s in slots.iter_mut() {
         s.status = Status::Out;
     }
-    let take = |slots: &mut [Slot], pos: u8, n: usize, status: Status| {
+    let ranked = |slots: &[Slot], pos: u8| -> Vec<usize> {
         let mut idx: Vec<usize> = (0..slots.len())
-            .filter(|&i| {
-                slots[i].position == pos && slots[i].status == Status::Out && slots[i].available()
-            })
+            .filter(|&i| slots[i].position == pos && slots[i].available())
             .collect();
         idx.sort_by_key(|&i| std::cmp::Reverse(slots[i].strength));
-        for &i in idx.iter().take(n) {
-            slots[i].status = status;
-        }
+        idx
     };
-    for (pos, n) in [(0u8, 1), (1, 4), (2, 4), (3, 2)] {
-        take(slots, pos, n, Status::Starter);
+    let by_pos: Vec<Vec<usize>> = (0..4).map(|p| ranked(slots, p)).collect();
+    let top = |pos: usize, n: usize| -> i32 {
+        by_pos[pos]
+            .iter()
+            .take(n)
+            .map(|&i| slots[i].strength as i32)
+            .sum()
+    };
+    let best = FORMATIONS
+        .iter()
+        .filter(|&&(d, m, a)| {
+            by_pos[1].len() >= d as usize
+                && by_pos[2].len() >= m as usize
+                && by_pos[3].len() >= a as usize
+        })
+        .max_by_key(|&&(d, m, a)| {
+            (
+                top(1, d as usize) + top(2, m as usize) + top(3, a as usize),
+                std::cmp::Reverse(FORMATIONS.iter().position(|&f| f == (d, m, a)).unwrap()),
+            )
+        })
+        .copied();
+    if let Some(&g) = by_pos[0].first() {
+        slots[g].status = Status::Starter;
     }
-    take(slots, 0, 1, Status::Sub);
+    let Some((d, m, a)) = best else { return };
+    for (pos, n) in [(1usize, d as usize), (2, m as usize), (3, a as usize)] {
+        for &i in by_pos[pos].iter().take(n) {
+            slots[i].status = Status::Starter;
+        }
+    }
+    if let Some(&g) = by_pos[0].get(1) {
+        slots[g].status = Status::Sub;
+    }
     let mut rest: Vec<usize> = (0..slots.len())
         .filter(|&i| {
             slots[i].position != 0 && slots[i].status == Status::Out && slots[i].available()

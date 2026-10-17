@@ -2,7 +2,7 @@
 const ICON = { goal: "⚽", annulled: "⊘", red: "🟥", injury: "✚" };
 const LABEL = { goal: "Golo", annulled: "Golo anulado", red: "Expulsão", injury: "Lesão" };
 
-let wasm, state, division = 0, selectedMatch = null;
+let wasm, state, division = 0, selectedMatch = null, useReal = false;
 const $ = (id) => document.getElementById(id);
 
 async function boot() {
@@ -22,8 +22,42 @@ function read() {
 
 function newWorld() {
   selectedMatch = null;
+  const seed = Math.max(1, Number($("seed").value) | 0);
+  if (useReal) {
+    if (!wasm.world_new_from_efts(seed)) { fail(); return; }
+    read();
+  } else {
+    wasm.world_new(seed);
+    read();
+  }
+}
+
+// Reads the error the core published as {"error": "..."} and falls back to the fictional league.
+function fail() {
+  const ptr = wasm.world_json_ptr(), len = wasm.world_json_len();
+  const msg = JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, ptr, len))).error;
+  $("eft-status").textContent = "Não foi possível usar essas equipas: " + msg;
+  useReal = false;
+  $("use-fiction").hidden = true;
   wasm.world_new(Math.max(1, Number($("seed").value) | 0));
   read();
+}
+
+async function loadEfts(files) {
+  wasm.eft_clear();
+  let ok = 0;
+  for (const f of files) {
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const ptr = wasm.buf_resize(bytes.length);          // may grow memory: take the view afterwards
+    new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
+    ok += wasm.eft_add(bytes.length);
+  }
+  $("eft-status").textContent = `${ok} equipas válidas em ${files.length} ficheiros.`;
+  if (ok < 35) { $("eft-status").textContent += " São precisas pelo menos 35."; return; }
+  useReal = true;
+  $("use-fiction").hidden = false;
+  newWorld();
+  if (useReal) $("eft-status").textContent = `${ok} equipas reais carregadas: as 32 de nível mais alto formam as 4 divisões, as restantes ficam fora da liga.`;
 }
 
 function play(fn) {
@@ -103,6 +137,7 @@ function renderSeason() {
 }
 
 function render() {
+  $("mode").textContent = useReal ? "equipas e jogadores reais dos teus ficheiros .EFT" : "clubes e jogadores fictícios";
   $("year").textContent = state.year;
   $("round").textContent = `${state.round} / ${state.rounds}`;
   renderTabs();
@@ -116,4 +151,6 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 $("play-round").onclick = () => play("world_play_round");
 $("play-season").onclick = () => play("world_play_season");
 $("new-world").onclick = newWorld;
+$("eft").onchange = (e) => e.target.files.length && loadEfts([...e.target.files]);
+$("use-fiction").onclick = () => { useReal = false; $("use-fiction").hidden = true; $("eft").value = ""; $("eft-status").textContent = "Equipas fictícias."; newWorld(); };
 boot().catch((e) => { document.body.insertAdjacentHTML("afterbegin", `<p style="padding:16px;color:#b3261e">Falha ao carregar o WebAssembly: ${esc(e.message)}</p>`); });

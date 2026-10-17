@@ -1,5 +1,6 @@
 //! Plain C-ABI bindings: `world_new(seed)`, `world_play_round()`, `world_play_season()`, then read the state with
 //! `world_json_ptr()` / `world_json_len()` (UTF-8 JSON in WebAssembly memory, valid until the next call).
+use elifoot_core::eft::{self, EftTeam};
 use elifoot_core::matchsim::{Event, EventKind, Side};
 use elifoot_core::season::{standings, Club, MatchRecord};
 use elifoot_core::world::{World, DIVISION_BASE, DIVISION_NAMES, ROUNDS};
@@ -9,6 +10,8 @@ use std::fmt::Write;
 thread_local! {
     static WORLD: RefCell<Option<World>> = const { RefCell::new(None) };
     static OUT: RefCell<String> = const { RefCell::new(String::new()) };
+    static BUF: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    static TEAMS: RefCell<Vec<EftTeam>> = const { RefCell::new(Vec::new()) };
 }
 
 fn esc(s: &str) -> String {
@@ -164,6 +167,57 @@ pub extern "C" fn world_new(seed: u32) {
     publish();
 }
 
+/// Resizes the shared input buffer and returns its address; JavaScript writes a `.EFT` file there.
+#[no_mangle]
+pub extern "C" fn buf_resize(len: usize) -> *mut u8 {
+    BUF.with(|b| {
+        let mut b = b.borrow_mut();
+        b.resize(len, 0);
+        b.as_mut_ptr()
+    })
+}
+
+/// Forgets the team files added so far.
+#[no_mangle]
+pub extern "C" fn eft_clear() {
+    TEAMS.with(|t| t.borrow_mut().clear());
+}
+
+/// Parses the first `len` bytes of the buffer as a `.EFT` team; returns 1 when it was valid and added.
+#[no_mangle]
+pub extern "C" fn eft_add(len: usize) -> i32 {
+    let parsed = BUF.with(|b| eft::parse(&b.borrow()[..len.min(b.borrow().len())]).ok());
+    match parsed {
+        Some(team) => {
+            TEAMS.with(|t| t.borrow_mut().push(team));
+            1
+        }
+        None => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn eft_count() -> usize {
+    TEAMS.with(|t| t.borrow().len())
+}
+
+/// Builds the world from the added team files; returns 1 on success, 0 when it failed (the JSON is then `{"error":...}`).
+#[no_mangle]
+pub extern "C" fn world_new_from_efts(seed: u32) -> i32 {
+    let result = TEAMS.with(|t| World::from_teams(seed, &t.borrow()));
+    match result {
+        Ok(w) => {
+            WORLD.with(|cell| *cell.borrow_mut() = Some(w));
+            publish();
+            1
+        }
+        Err(e) => {
+            OUT.with(|o| *o.borrow_mut() = format!("{{\"error\":{}}}", esc(&e)));
+            0
+        }
+    }
+}
+
 #[no_mangle]
 pub extern "C" fn world_play_round() {
     WORLD.with(|w| {
@@ -234,6 +288,56 @@ mod tests {
             assert!(depth >= 0);
         }
         assert_eq!(depth, 0);
+    }
+
+    fn eft_bytes(i: usize) -> Vec<u8> {
+        use elifoot_core::cipher::encode;
+        let mut d = vec![0u8; 0x32];
+        d[..3].copy_from_slice(b"EFa");
+        d.extend(encode(format!("CLUBE NUMERO {i}").as_bytes()));
+        d.extend(encode(format!("CLUBE {i}").as_bytes()));
+        d.extend([0xff, 0xff, 0xff, 0, 0, 0, 0, 0]);
+        d.extend(encode(b"POR"));
+        let squad: Vec<(u8, usize)> = vec![(0, 2), (1, 6), (2, 6), (3, 5)];
+        d.extend([
+            1 + (i % 15) as u8,
+            squad.iter().map(|s| s.1).sum::<usize>() as u8,
+            0,
+        ]);
+        for (pos, n) in squad {
+            for k in 0..n {
+                d.extend(encode(b"POR"));
+                d.extend(encode(format!("Jogador {i} {pos} {k}").as_bytes()));
+                d.extend([pos, 0]);
+            }
+        }
+        d.extend(encode(b"Mister"));
+        d
+    }
+
+    fn add(bytes: &[u8]) -> i32 {
+        let ptr = buf_resize(bytes.len());
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len()) };
+        eft_add(bytes.len())
+    }
+
+    #[test]
+    fn real_team_files_can_be_loaded_through_the_abi() {
+        eft_clear();
+        assert_eq!(add(b"not a team"), 0);
+        for i in 0..20 {
+            assert_eq!(add(&eft_bytes(i)), 1);
+        }
+        assert_eq!(eft_count(), 20);
+        assert_eq!(world_new_from_efts(1), 0);
+        assert!(json().starts_with("{\"error\":\"need at least"));
+        for i in 20..40 {
+            assert_eq!(add(&eft_bytes(i)), 1);
+        }
+        assert_eq!(world_new_from_efts(1), 1);
+        assert!(json().starts_with("{\"year\":1998"));
+        world_play_season();
+        assert!(json().contains("\"lastSeason\":{"));
     }
 
     #[test]

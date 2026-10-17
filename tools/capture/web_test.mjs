@@ -38,6 +38,21 @@ try {
   await p.click('#new-world'); await p.click('#play-round');
   const c = await p.textContent('#table tbody');
   check('same seed gives the same round', a === c);
+  // real teams: upload the shipped .EFT files when they exist locally (they are git-ignored)
+  const fs = await import('fs');
+  const dir = 'original/elifoot98/EQUIPAS';
+  if (fs.existsSync(dir)) {
+    const files = fs.readdirSync(dir).map((f) => dir + '/' + f);
+    await p.setInputFiles('#eft', files);
+    await p.waitForFunction(() => document.querySelector('#eft-status').textContent.includes('reais carregadas'), null, { timeout: 15000 });
+    const names = await p.locator('#table tbody td.l').allTextContents();
+    check('real teams in the table', names.length === 8 && names.every((n) => !/^(Atlético|Sporting|União|Académica|Desportivo|Estrela) /.test(n)), names.join(', '));
+    await p.click('#play-season');
+    check('real season plays', (await p.textContent('#year')) === '1999');
+    await p.screenshot({ path: 'analysis/shots/web_real.png', fullPage: true });
+    await p.click('#use-fiction');
+    check('back to fiction', (await p.locator('#table tbody td.l').first().textContent()).match(/^(Atlético|Sporting|União|Académica|Desportivo|Estrela) /) !== null);
+  }
   check('no console errors', errors.length === 0, errors.join(' | '));
   await b.close();
 } finally { srv.kill(); }

@@ -11,7 +11,7 @@
 <header>
   <div class="brand">
     <h1>Elifoot 98 <span>núcleo nativo (Rust → WebAssembly)</span></h1>
-    <p class="sub">Regras decodificadas do executável original · clubes e jogadores fictícios</p>
+    <p class="sub">Regras decodificadas do executável original · <span id="mode">clubes e jogadores fictícios</span></p>
   </div>
   <div class="status" aria-live="polite">
     <div><span class="k">Época</span> <b id="year">–</b></div>
@@ -24,6 +24,15 @@
   <button id="play-season">Jogar época inteira</button>
   <label class="seed">Semente <input id="seed" type="number" value="1998" min="1"></label>
   <button id="new-world">Nova liga</button>
+</section>
+
+<section class="controls real">
+  <label class="file">
+    <span>Equipas reais</span>
+    <input id="eft" type="file" accept=".eft,.EFT" multiple>
+  </label>
+  <button id="use-fiction" hidden>Voltar às equipas fictícias</button>
+  <p id="eft-status" class="note" role="status">Opcional: escolhe os ficheiros <code>.EFT</code> da pasta <code>EQUIPAS</code> do teu Elifoot 98 (são lidos no teu browser, não são enviados nem incluídos aqui). São precisas pelo menos 35 equipas.</p>
 </section>
 
 <nav id="tabs" role="tablist" aria-label="Divisões"></nav>

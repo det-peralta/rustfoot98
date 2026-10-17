@@ -22,6 +22,11 @@ button:hover { border-color: var(--accent); }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 button:disabled { opacity: .5; cursor: default; }
+.controls.real { padding-top: 0; }
+.controls.real .note { margin: 0; flex: 1 1 320px; }
+.file { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: .9rem; }
+.file input { font: inherit; color: var(--ink); max-width: 16em; }
+code { background: var(--row); padding: 1px 5px; border-radius: 4px; }
 .seed { margin-left: auto; color: var(--muted); font-size: .9rem; display: flex; gap: 6px; align-items: center; }
 .seed input { width: 6em; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
 nav { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 0; }

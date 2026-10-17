@@ -19,4 +19,6 @@
 - [x] Points 3-1-0, per-game morale, season end: promotion/relegation, titles (verified, implemented)
 - [ ] Division base level, finances (`3e9c`, `6e48`, `10c8:2b46`), transfers, coach sacking, half-time/extra time, cup details
 - [x] WebAssembly build + browser demo (4-division league, rounds, seasons) — `web/`
-- [ ] Real teams from `.EFT` in the UI, saves (own format + `.e98` import), PWA, user-controlled team (lineup, transfers)
+- [x] Real teams from `.EFT` in the UI (local file picker; division assignment by level is an assumption)
+- [ ] How the original assigns teams to divisions at game start (`TselectCountriesDlg`/`TgetTeamsDlg` code)
+- [ ] Saves (own format + `.e98` import), PWA, user-controlled team (lineup, transfers)

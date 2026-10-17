@@ -5,6 +5,7 @@
 //! season end of `1020:038e`. **Assumed:** squad composition (2 GK, 7 DEF, 6 MID, 5 ATT), starting strength
 //! `level + Random(7) - 3` (the deviations seen in a real save are uniform in -3..=3), club/player names are fictional,
 //! no cup (so only the champion's `K += 1.0` applies).
+use crate::eft::{EftTeam, Position};
 use crate::rng::DelphiRng;
 use crate::season::{end_of_round, end_of_season, play_round, standings, Club, MatchRecord};
 use crate::sector::{Slot, Status};
@@ -112,6 +113,7 @@ pub struct SeasonSummary {
     pub moves: Vec<Move>,
 }
 
+#[derive(Debug)]
 pub struct World {
     pub divisions: [Vec<Club>; 4],
     pub pool: Vec<Club>,
@@ -148,7 +150,92 @@ fn make_club(rng: &mut DelphiRng, name: String, level: i32) -> Club {
     club
 }
 
+/// Minimum clubs for a real-team world: 4 divisions of 8 plus an outside pool of at least 3 (`end_of_season`).
+pub const MIN_TEAMS: usize = 35;
+
+/// Builds a club from a `.EFT` team: real player names and positions, strength `level + Random(7) - 3`
+/// (inferred from a real save, not decoded). Errors when no formation of the game can be fielded.
+fn club_from_eft(rng: &mut DelphiRng, t: &EftTeam, name: String) -> Result<Club, String> {
+    let mut slots = Vec::new();
+    let mut names = Vec::new();
+    let mut count = [0usize; 4];
+    for p in &t.players {
+        let position = match p.position {
+            Position::Goalkeeper => 0u8,
+            Position::Defender => 1,
+            Position::Midfielder => 2,
+            Position::Attacker => 3,
+        };
+        count[position as usize] += 1;
+        let strength = (t.level as i32 + rng.random(7) as i32 - 3).clamp(1, 50) as u16;
+        slots.push(Slot::new(
+            &p.name,
+            position,
+            strength,
+            p.nationality == t.country,
+            Status::Out,
+        ));
+        names.push(p.name.clone());
+    }
+    if !crate::season::can_field(count) {
+        return Err(format!(
+            "{}: cannot field any of the 12 formations (gk {}, def {}, mid {}, att {})",
+            t.short_name, count[0], count[1], count[2], count[3]
+        ));
+    }
+    let mut club = Club::new(&name, slots);
+    club.names = names;
+    Ok(club)
+}
+
 impl World {
+    /// A world made of real teams: shuffled (ties between equal levels are random), the strongest 32 fill the
+    /// four divisions in level order (8 each), the rest form the outside pool.
+    /// **Assumption:** how the original assigns teams to divisions is not decoded; a real save shows the 4th division
+    /// mixing levels 1..6, so this is only an approximation.
+    pub fn from_teams(seed: u32, teams: &[EftTeam]) -> Result<World, String> {
+        if teams.len() < MIN_TEAMS {
+            return Err(format!(
+                "need at least {MIN_TEAMS} teams, got {}",
+                teams.len()
+            ));
+        }
+        let mut rng = DelphiRng::new(seed);
+        let mut order: Vec<usize> = (0..teams.len()).collect();
+        // Fisher-Yates with the Delphi RNG, then a stable sort by level (descending)
+        for i in (1..order.len()).rev() {
+            let j = rng.random(i as u16 + 1) as usize;
+            order.swap(i, j);
+        }
+        order.sort_by_key(|&i| std::cmp::Reverse(teams[i].level));
+        let mut used = std::collections::HashSet::new();
+        let mut clubs = Vec::new();
+        for &i in &order {
+            let mut name = teams[i].short_name.trim().to_string();
+            let mut n = 2;
+            while !used.insert(name.clone()) {
+                name = format!("{} ({n})", teams[i].short_name.trim());
+                n += 1;
+            }
+            clubs.push(club_from_eft(&mut rng, &teams[i], name)?);
+        }
+        let mut it = clubs.into_iter();
+        let mut divisions: [Vec<Club>; 4] = Default::default();
+        for d in divisions.iter_mut() {
+            *d = it.by_ref().take(8).collect();
+        }
+        let pool: Vec<Club> = it.collect();
+        Ok(World {
+            divisions,
+            pool,
+            year: 1998,
+            round: 0,
+            rng,
+            last_round: Vec::new(),
+            last_season: None,
+        })
+    }
+
     /// A fictional world. Levels follow the real data: the 4th division holds levels 1..6 (read from a real save).
     pub fn synthetic(seed: u32) -> World {
         let mut rng = DelphiRng::new(seed);
@@ -291,6 +378,99 @@ mod tests {
         assert!(w.divisions.iter().all(|d| d.len() == 8));
         assert_eq!(w.pool.len(), 6);
         assert!(w.divisions.iter().flatten().all(|c| c.slots.len() == 20));
+    }
+
+    fn fake_team(i: usize, level: u8) -> EftTeam {
+        use crate::eft::EftPlayer;
+        let mut players = Vec::new();
+        for (pos, n) in [
+            (Position::Goalkeeper, 2),
+            (Position::Defender, 6),
+            (Position::Midfielder, 6),
+            (Position::Attacker, 5),
+        ] {
+            for k in 0..n {
+                players.push(EftPlayer {
+                    nationality: "POR".into(),
+                    name: format!("Jogador {i}-{k}-{}", pos as u8),
+                    position: pos,
+                });
+            }
+        }
+        EftTeam {
+            full_name: format!("Clube {i}"),
+            short_name: format!("Clube {}", i % 40),
+            background: [255; 3],
+            foreground: [0; 3],
+            country: "POR".into(),
+            level,
+            players,
+            coach: "Treinador".into(),
+        }
+    }
+
+    #[test]
+    fn real_teams_fill_divisions_by_level_and_a_season_runs() {
+        let teams: Vec<EftTeam> = (0..45).map(|i| fake_team(i, 1 + (i % 20) as u8)).collect();
+        let mut w = World::from_teams(5, &teams).unwrap();
+        assert!(w.divisions.iter().all(|d| d.len() == 8));
+        assert_eq!(w.pool.len(), 13);
+        // duplicate short names were made unique, so no club is lost when tracking moves
+        let mut names: Vec<&String> = w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .map(|c| &c.name)
+            .collect();
+        names.sort();
+        names.dedup();
+        assert_eq!(names.len(), 45);
+        let mean = |d: &Vec<Club>| {
+            d.iter()
+                .map(|c| {
+                    c.slots.iter().map(|s| s.strength as f64).sum::<f64>() / c.slots.len() as f64
+                })
+                .sum::<f64>()
+                / 8.0
+        };
+        assert!(mean(&w.divisions[0]) > mean(&w.divisions[3]));
+        w.play_season();
+        assert_eq!(w.year, 1999);
+    }
+
+    #[test]
+    fn real_teams_are_validated() {
+        let teams: Vec<EftTeam> = (0..10).map(|i| fake_team(i, 5)).collect();
+        assert!(World::from_teams(1, &teams)
+            .unwrap_err()
+            .contains("need at least"));
+        let mut teams: Vec<EftTeam> = (0..40).map(|i| fake_team(i, 5)).collect();
+        teams[3]
+            .players
+            .retain(|p| p.position != Position::Goalkeeper);
+        assert!(World::from_teams(1, &teams)
+            .unwrap_err()
+            .contains("cannot field"));
+    }
+
+    /// With the shipped game files present (git-ignored) several seasons of real teams must run.
+    #[test]
+    fn shipped_teams_play_seasons_if_available() {
+        let dir =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../original/elifoot98/EQUIPAS");
+        let Ok(rd) = std::fs::read_dir(dir) else {
+            return;
+        };
+        let teams: Vec<EftTeam> = rd
+            .flatten()
+            .filter_map(|e| crate::eft::parse(&std::fs::read(e.path()).ok()?).ok())
+            .collect();
+        assert!(teams.len() > 100);
+        let mut w = World::from_teams(1998, &teams).unwrap();
+        w.play_season();
+        w.play_season();
+        assert_eq!(w.year, 2000);
     }
 
     #[test]
