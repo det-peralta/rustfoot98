@@ -19,6 +19,7 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/classes.md](docs/classes.md) | Delphi class table |
 | [docs/match-engine.md](docs/match-engine.md) | Verified match-engine rules |
 | [docs/season.md](docs/season.md) | Season structure: fixtures, rounds, standings |
+| [docs/finance.md](docs/finance.md) | Economy index, player value, loans; transfer market map |
 | [docs/references.md](docs/references.md) | Third-party research (leads to verify) |
 
 ## Try it (browser demo)

@@ -17,7 +17,8 @@
 - [x] Decoded `aa11`/`ac72`, penalties, subs, `100b` weights, `c95c`, rating accumulator, per-round evolution, `K` morale
 - [x] Season fixtures (8-team double round-robin table), round driver, cup alternation, standings comparer (see docs/season.md)
 - [x] Points 3-1-0, per-game morale, season end: promotion/relegation, titles (verified, implemented)
-- [ ] Division base level, finances (`3e9c`, `6e48`, `10c8:2b46`), transfers, coach sacking, half-time/extra time, cup details
+- [x] Economy index walk, player value formula, loan interest (docs/finance.md)
+- [ ] Transfer market AI (`3e9c`), gate receipts (`35e1`), salaries, coach sacking (`8b5d`), half-time/extra time, cup details
 - [x] WebAssembly build + browser demo (4-division league, rounds, seasons) — `web/`
 - [x] Real teams from `.EFT` in the UI (local file picker; division assignment by level is an assumption)
 - [x] Division assignment and starting strengths at game start (verified against a real save)

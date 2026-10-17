@@ -142,6 +142,7 @@ function render() {
   $("mode").textContent = useReal ? "equipas e jogadores reais dos teus ficheiros .EFT" : "clubes e jogadores fictícios";
   $("year").textContent = state.year;
   $("round").textContent = `${state.round} / ${state.rounds}`;
+  $("economy").textContent = state.economy.toFixed(2);
   renderTabs();
   renderTable();
   renderResults();

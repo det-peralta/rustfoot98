@@ -19,6 +19,12 @@ impl DelphiRng {
         self.seed = self.seed.wrapping_mul(0x0808_8405).wrapping_add(1);
     }
 
+    /// `Random` without argument (`10c0:2167`): a real in `[0, 1)`: `(seed as i32 + 2^31) / 2^32` after advancing the seed.
+    pub fn random_real(&mut self) -> f64 {
+        self.advance();
+        (self.seed as i32 as f64 + 2147483648.0) / 4294967296.0
+    }
+
     /// `Random(range)`: uniform in `0..range`; `Random(0)` returns 0 like the original.
     pub fn random(&mut self, range: u16) -> u16 {
         self.advance();
@@ -66,6 +72,21 @@ mod tests {
             assert_eq!(advance_asm(s), plain, "seed {s:#x}");
             s = plain ^ s.rotate_left(7);
         }
+    }
+
+    #[test]
+    fn random_real_is_in_the_unit_interval_and_matches_the_formula() {
+        let mut r = DelphiRng::new(5);
+        let mut probe = DelphiRng::new(5);
+        let mut mean = 0.0;
+        for _ in 0..20_000 {
+            let x = r.random_real();
+            assert!((0.0..1.0).contains(&x));
+            mean += x;
+            probe.random(1); // advance the seed once per draw
+            assert_eq!(probe.seed(), r.seed());
+        }
+        assert!((mean / 20_000.0 - 0.5).abs() < 0.01);
     }
 
     #[test]

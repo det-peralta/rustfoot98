@@ -7,6 +7,7 @@
 //! starting strength of every player is `clamp(base(i) + 3 - Random(7), 1, 50)` with `base(i) = max(5, round((1 - i/32) * 50) - 1)`
 //! for the first 33 teams and 1 for the rest (`1028:0373`). **Assumed:** squad composition of the fictional world
 //! (2 GK, 7 DEF, 6 MID, 5 ATT), fictional names, no cup (so only the champion's `K += 1.0` applies).
+use crate::economy::{walk_index, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
 use crate::rng::DelphiRng;
 use crate::season::{end_of_round, end_of_season, play_round, standings, Club, MatchRecord};
@@ -120,6 +121,8 @@ pub struct World {
     pub divisions: [Vec<Club>; 4],
     pub pool: Vec<Club>,
     pub year: u16,
+    /// Global economy index (`10c8:2b46`), random-walked every round.
+    pub economy: f64,
     /// Rounds already played this season (0..=13); a new season starts after round 14.
     pub round: usize,
     pub rng: DelphiRng,
@@ -253,6 +256,7 @@ impl World {
             divisions,
             pool,
             year: 1998,
+            economy: INITIAL_INDEX,
             round: 0,
             rng,
             last_round: Vec::new(),
@@ -283,6 +287,7 @@ impl World {
             divisions,
             pool,
             year: 1998,
+            economy: INITIAL_INDEX,
             round: 0,
             rng,
             last_round: Vec::new(),
@@ -311,6 +316,7 @@ impl World {
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
             end_of_round(&mut self.rng, &mut self.divisions[d], DIVISION_BASE[d]);
         }
+        self.economy = walk_index(&mut self.rng, self.economy, self.year);
         self.round = round;
         if round == ROUNDS {
             self.finish_season();
