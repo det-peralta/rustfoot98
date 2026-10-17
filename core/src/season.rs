@@ -9,9 +9,10 @@
 //! **Assumed (not yet decoded):** the auto line-up rule (the real `1010:4b73`; we pick the strongest of the game's twelve
 //! formations), tie order, and that ranks are taken after the round's results.
 use crate::evolution::{evolve_squad, level_for_rank};
-use crate::matchsim::{fixture_value, morale_results, update_morale, Event, Match};
+use crate::matchsim::{fixture_value, morale_results, update_morale, Event, Match, Side, SubEvent};
 use crate::rng::DelphiRng;
 use crate::sector::{Slot, Status};
+use std::collections::HashMap;
 
 /// `DS:0x1838..`: `SCHEDULE[team][round-1]`, `|v| mod 8` = opponent index, negative = away.
 pub const SCHEDULE: [[i8; 14]; 8] = [
@@ -69,6 +70,144 @@ impl Club {
     }
 }
 
+/// A substitution planned by the user: at `minute`, `inn` (a bench player) replaces `out` (a starter).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlannedSub {
+    pub minute: u16,
+    pub out: usize,
+    pub inn: usize,
+}
+
+/// The user's line-up for a club: indices into the club's slots.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Plan {
+    pub starters: Vec<usize>,
+    pub bench: Vec<usize>,
+    pub subs: Vec<PlannedSub>,
+}
+
+/// Best line-up for one formation: the strongest available players per position, a bench of one goalkeeper and the four
+/// best remaining outfield players. `None` when the squad cannot field the formation.
+pub fn plan_for_formation(slots: &[Slot], formation: (u8, u8, u8)) -> Option<Plan> {
+    let ranked = |pos: u8| -> Vec<usize> {
+        let mut idx: Vec<usize> = (0..slots.len())
+            .filter(|&i| slots[i].position == pos && slots[i].available())
+            .collect();
+        idx.sort_by_key(|&i| std::cmp::Reverse(slots[i].strength));
+        idx
+    };
+    let by_pos: Vec<Vec<usize>> = (0..4).map(ranked).collect();
+    let (d, m, a) = (
+        formation.0 as usize,
+        formation.1 as usize,
+        formation.2 as usize,
+    );
+    if by_pos[0].is_empty() || by_pos[1].len() < d || by_pos[2].len() < m || by_pos[3].len() < a {
+        return None;
+    }
+    let mut starters = vec![by_pos[0][0]];
+    starters.extend(by_pos[1].iter().take(d));
+    starters.extend(by_pos[2].iter().take(m));
+    starters.extend(by_pos[3].iter().take(a));
+    let mut bench = Vec::new();
+    if let Some(&g) = by_pos[0].get(1) {
+        bench.push(g);
+    }
+    let mut rest: Vec<usize> = (0..slots.len())
+        .filter(|&i| slots[i].position != 0 && slots[i].available() && !starters.contains(&i))
+        .collect();
+    rest.sort_by_key(|&i| std::cmp::Reverse(slots[i].strength));
+    bench.extend(rest.into_iter().take(4));
+    Some(Plan {
+        starters,
+        bench,
+        subs: Vec::new(),
+    })
+}
+
+/// Applies a user plan to the squad statuses, repairing it like the game must when players are unavailable: invalid,
+/// duplicate or unavailable starters are replaced by the best available player of the same position; a missing goalkeeper
+/// is fixed; the bench is topped up to five from the best remaining players.
+pub fn apply_plan(slots: &mut [Slot], plan: &Plan) {
+    for s in slots.iter_mut() {
+        s.status = Status::Out;
+    }
+    let ok = |slots: &[Slot], i: usize| {
+        i < slots.len() && slots[i].available() && slots[i].status == Status::Out
+    };
+    let mut wanted = Vec::new();
+    for &i in &plan.starters {
+        if ok(slots, i) && !wanted.contains(&i) {
+            slots[i].status = Status::Starter;
+            wanted.push(i);
+        }
+    }
+    // replace the starters that were dropped, position by position
+    let positions: Vec<u8> = plan
+        .starters
+        .iter()
+        .filter_map(|&i| slots.get(i).map(|s| s.position))
+        .collect();
+    for pos in positions {
+        let have = slots
+            .iter()
+            .filter(|s| s.status == Status::Starter && s.position == pos)
+            .count();
+        let want = plan
+            .starters
+            .iter()
+            .filter(|&&i| slots.get(i).is_some_and(|s| s.position == pos))
+            .count();
+        if have < want {
+            let best = (0..slots.len())
+                .filter(|&i| {
+                    slots[i].position == pos
+                        && slots[i].available()
+                        && slots[i].status == Status::Out
+                })
+                .max_by_key(|&i| slots[i].strength);
+            if let Some(i) = best {
+                slots[i].status = Status::Starter;
+            }
+        }
+    }
+    // a plan entry that pointed nowhere cannot be repaired by position: top up with the best available outfield players
+    while slots.iter().filter(|s| s.starter()).count() < 11 {
+        let best = (0..slots.len())
+            .filter(|&i| {
+                slots[i].position != 0 && slots[i].available() && slots[i].status == Status::Out
+            })
+            .max_by_key(|&i| slots[i].strength);
+        match best {
+            Some(i) => slots[i].status = Status::Starter,
+            None => break,
+        }
+    }
+    if !slots.iter().any(|s| s.starter() && s.position == 0) {
+        if let Some(g) = (0..slots.len())
+            .filter(|&i| slots[i].position == 0 && slots[i].available())
+            .max_by_key(|&i| slots[i].strength)
+        {
+            slots[g].status = Status::Starter;
+        }
+    }
+    for &i in &plan.bench {
+        if ok(slots, i) && slots.iter().filter(|s| s.status == Status::Sub).count() < 5 {
+            slots[i].status = Status::Sub;
+        }
+    }
+    let mut rest: Vec<usize> = (0..slots.len())
+        .filter(|&i| slots[i].available() && slots[i].status == Status::Out)
+        .collect();
+    rest.sort_by_key(|&i| std::cmp::Reverse(slots[i].strength));
+    for i in rest {
+        if slots.iter().filter(|s| s.status == Status::Sub).count() >= 5 {
+            break;
+        }
+        slots[i].status = Status::Sub;
+    }
+}
+
 /// What happened in one game of a round (club indices refer to the slice passed to `play_round`).
 #[derive(Clone, Debug)]
 pub struct MatchRecord {
@@ -77,6 +216,7 @@ pub struct MatchRecord {
     pub home_goals: i32,
     pub away_goals: i32,
     pub events: Vec<Event>,
+    pub subs: Vec<SubEvent>,
 }
 
 /// The twelve formations of the game's *Seleccionar* menu (verified from the main form's menu items), as
@@ -102,6 +242,24 @@ pub fn can_field(count: [usize; 4]) -> bool {
         && FORMATIONS.iter().any(|&(d, m, a)| {
             count[1] >= d as usize && count[2] >= m as usize && count[3] >= a as usize
         })
+}
+
+/// Index into `FORMATIONS` of the strongest fieldable formation (ties to the earlier entry), as `auto_lineup` chooses.
+pub fn best_formation(slots: &[Slot]) -> Option<usize> {
+    let mut best: Option<(i32, usize)> = None;
+    for (k, &f) in FORMATIONS.iter().enumerate() {
+        if let Some(plan) = plan_for_formation(slots, f) {
+            let total: i32 = plan
+                .starters
+                .iter()
+                .map(|&i| slots[i].strength as i32)
+                .sum();
+            if best.is_none_or(|(t, _)| total > t) {
+                best = Some((total, k));
+            }
+        }
+    }
+    best.map(|(_, k)| k)
 }
 
 /// Stand-in for the auto line-up `1010:4b73` (its choice rule is not decoded): the formation whose starters have the
@@ -169,10 +327,14 @@ pub fn play_round(
     clubs: &mut [Club],
     round: usize,
     names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+    plans: &HashMap<usize, Plan>,
 ) -> Vec<MatchRecord> {
     let mut records = Vec::new();
-    for c in clubs.iter_mut() {
-        auto_lineup(&mut c.slots);
+    for (i, c) in clubs.iter_mut().enumerate() {
+        match plans.get(&i) {
+            Some(plan) => apply_plan(&mut c.slots, plan),
+            None => auto_lineup(&mut c.slots),
+        }
     }
     for (h, a) in fixtures(round) {
         let (division, hn, an) = names(h, a);
@@ -181,6 +343,16 @@ pub fn play_round(
         let mut m = Match::new(clubs[h].slots.clone(), clubs[a].slots.clone(), hb, ab);
         m.home.k = clubs[h].k;
         m.away.k = clubs[a].k;
+        for (club, side) in [(h, Side::Home), (a, Side::Away)] {
+            if let Some(plan) = plans.get(&club) {
+                m.planned.extend(
+                    plan.subs
+                        .iter()
+                        .take(3)
+                        .map(|s| (side, s.minute, s.out, s.inn)),
+                );
+            }
+        }
         m.play(rng);
         let (x, y) = m.score();
         // carry over what persists between matches: ratings, strength loss, bans, injuries
@@ -223,6 +395,7 @@ pub fn play_round(
             home_goals: x,
             away_goals: y,
             events: m.events,
+            subs: m.subs,
         });
     }
     records
@@ -462,7 +635,7 @@ mod tests {
             };
             (n(), n(), n())
         };
-        play_round(&mut rng, &mut clubs, 1, &mut names);
+        play_round(&mut rng, &mut clubs, 1, &mut names, &HashMap::new());
         for c in &clubs {
             assert_eq!(c.wins + c.draws + c.losses, 1);
             assert_eq!(c.points, c.wins * 3 + c.draws);
@@ -472,5 +645,69 @@ mod tests {
             clubs.iter().map(|c| c.losses).sum::<u16>()
         );
         assert!(clubs.iter().any(|c| (c.k - 1.0).abs() > 1e-9));
+    }
+
+    #[test]
+    fn a_plan_for_each_formation_has_the_right_shape() {
+        let mut rng = DelphiRng::new(11);
+        let slots = crate::matchsim::tests::squad(6, &mut rng);
+        for &f in FORMATIONS.iter() {
+            let Some(plan) = plan_for_formation(&slots, f) else {
+                continue;
+            };
+            assert_eq!(plan.starters.len(), 11);
+            let count = |pos: u8| {
+                plan.starters
+                    .iter()
+                    .filter(|&&i| slots[i].position == pos)
+                    .count()
+            };
+            assert_eq!(
+                (count(0), count(1), count(2), count(3)),
+                (1, f.0 as usize, f.1 as usize, f.2 as usize)
+            );
+            assert!(plan.bench.len() <= 5 && plan.bench.iter().all(|i| !plan.starters.contains(i)));
+        }
+        // 4-4-2 is feasible, 6-4-0 is not (only five defenders in this squad)
+        assert!(plan_for_formation(&slots, (4, 4, 2)).is_some());
+        assert!(plan_for_formation(&slots, (6, 4, 0)).is_none());
+        // the automatic choice agrees with the best formation
+        let best = best_formation(&slots).unwrap();
+        let mut auto = slots.clone();
+        auto_lineup(&mut auto);
+        let plan = plan_for_formation(&slots, FORMATIONS[best]).unwrap();
+        let mut by_plan = slots.clone();
+        apply_plan(&mut by_plan, &plan);
+        let starters = |v: &Vec<Slot>| {
+            v.iter()
+                .enumerate()
+                .filter(|(_, s)| s.starter())
+                .map(|(i, _)| i)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(starters(&auto), starters(&by_plan));
+    }
+
+    #[test]
+    fn applying_a_plan_repairs_unavailable_starters() {
+        let mut rng = DelphiRng::new(12);
+        let mut slots = crate::matchsim::tests::squad(6, &mut rng);
+        let plan = plan_for_formation(&slots, (4, 4, 2)).unwrap();
+        // a planned starter is injured, another index is bogus and one is listed twice
+        slots[plan.starters[3]].injured = 2;
+        let mut broken = plan.clone();
+        broken.starters[5] = 999;
+        broken.starters[6] = broken.starters[7];
+        apply_plan(&mut slots, &broken);
+        assert_eq!(slots.iter().filter(|s| s.starter()).count(), 11);
+        assert!(slots.iter().filter(|s| s.starter()).all(|s| s.available()));
+        assert_eq!(
+            slots
+                .iter()
+                .filter(|s| s.starter() && s.position == 0)
+                .count(),
+            1
+        );
+        assert!(slots.iter().filter(|s| s.status == Status::Sub).count() <= 5);
     }
 }

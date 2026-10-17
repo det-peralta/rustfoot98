@@ -27,7 +27,8 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 rustup target add wasm32-unknown-unknown     # once
 web/build.sh serve                            # builds the 143 KB WebAssembly core and serves http://localhost:8080
 ```
-Plays full seasons of a 4-division league using the decoded rules (no emulator): fictional clubs by default, or the
+Plays full seasons of a 4-division league using the decoded rules (no emulator), with **you managing one club**
+(formation, starters, bench and up to three planned substitutions per round): fictional clubs by default, or the
 real teams if you pick the `.EFT` files of your own Elifoot 98 install (read locally in the browser, never uploaded or bundled). Native checks:
 `cargo test`, `cargo run --release -p elifoot-core --example sim|season|world`, and the browser smoke test
 `node tools/capture/web_test.mjs`.

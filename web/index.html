@@ -61,6 +61,33 @@
     <div id="match" class="match" hidden></div>
   </section>
 
+  <section class="card wide" id="club-card" hidden aria-labelledby="c-title">
+    <h2 id="c-title">O meu clube</h2>
+    <div class="club-head">
+      <div><b id="club-name"></b> <span id="club-div" class="muted"></span></div>
+      <label>Formação <select id="formation"></select></label>
+      <button id="auto-plan">Escalar automaticamente</button>
+      <label>Mudar de clube <select id="change-club"></select></label>
+    </div>
+    <p id="club-msg" class="note" role="status"></p>
+    <div class="club-grid">
+      <div class="scroll">
+        <table id="squad">
+          <thead><tr><th class="l">Pos</th><th class="l">Jogador</th><th title="Força">F</th><th title="Craque: g ≥ 8 e não guarda-redes nem defesa">★</th><th class="l">Estado</th><th class="l">Papel</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Substituições planeadas <small>(máx. 3)</small></h3>
+        <div id="subs"></div>
+        <button id="add-sub">Adicionar substituição</button>
+        <p class="note">As lesões e expulsões continuam a ter substituição automática. O jogo original pára e pergunta-te; aqui cada jogo corre de uma vez.</p>
+        <h3>A minha jornada</h3>
+        <div id="my-match" class="empty">Ainda não jogaste.</div>
+      </div>
+    </div>
+  </section>
+
   <section class="card wide" id="season-card" hidden aria-labelledby="s-title">
     <h2 id="s-title">Fim de época</h2>
     <div id="season"></div>

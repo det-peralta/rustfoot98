@@ -19,12 +19,36 @@ try {
   check('economy index shown', /^\d+\.\d\d$/.test(await p.textContent('#economy')), await p.textContent('#economy'));
   check('8 rows in table', (await p.locator('#table tbody tr').count()) === 8);
   check('4 division tabs', (await p.locator('#tabs button').count()) === 4);
+  // the user's club (starts in the bottom six of the 4th division, tab opens on it)
+  check('club panel visible', await p.locator('#club-card').isVisible());
+  check('starts on the 4th division tab', (await p.getAttribute('#tabs button:nth-child(4)', 'aria-selected')) === 'true');
+  check('twelve formations', (await p.locator('#formation option').count()) === 12);
+  const rows = await p.locator('#squad tbody tr').count();
+  check('squad listed', rows >= 14, String(rows));
+  await p.selectOption('#formation', '2'); // 3-4-3
+  check('formation 3-4-3 applied', (await p.textContent('#club-msg')).includes('3-4-3'), await p.textContent('#club-msg'));
+  await p.selectOption('#formation', '0'); // back to 4-4-2
+  const startersBefore = await p.locator('#squad select.role').evaluateAll((els) => els.filter((e) => e.value === 'T').length);
+  check('11 starters', startersBefore === 11, String(startersBefore));
+  // bench a starter: the game repairs the plan to 11 starters again after the round
+  await p.locator('#squad select.role').evaluateAll((els) => { const e = els.find((x) => x.value === 'T' && x.closest('tr').children[0].textContent === 'A'); e.value = 'F'; e.dispatchEvent(new Event('change')); });
+  check('warning when the plan is short', (await p.textContent('#club-msg')).includes('corrige') || (await p.textContent('#club-msg')).includes('10'));
+  await p.click('#auto-plan');
+  await p.click('#add-sub');
+  check('substitution row added', (await p.locator('.subrow').count()) === 1);
   await p.click('#play-round');
   check('round 1 played', (await p.textContent('#round')).startsWith('1 /'));
   check('4 results shown', (await p.locator('#results li').count()) === 4);
+  check('my match shown', (await p.textContent('#my-match')).includes('–'), await p.textContent('#my-match'));
+  check('my match highlighted in the results', (await p.locator('#results li.mine').count()) === 1);
+  check('planned substitution consumed', (await p.locator('.subrow').count()) === 0);
   await p.locator('#results li button').first().click();
   check('match detail opens', await p.locator('#match').isVisible());
   await p.screenshot({ path: 'analysis/shots/web_round1.png', fullPage: true });
+  // switch club
+  const opts = await p.locator('#change-club option').allTextContents();
+  await p.selectOption('#change-club', { index: 0 });
+  check('changed to a first-division club', (await p.textContent('#club-div')).includes('1ª'), await p.textContent('#club-div'));
   await p.click('#tabs button:nth-child(4)');
   check('4th division tab selected', (await p.getAttribute('#tabs button:nth-child(4)', 'aria-selected')) === 'true');
   await p.click('#play-season');

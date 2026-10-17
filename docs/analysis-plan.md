@@ -22,4 +22,5 @@
 - [x] WebAssembly build + browser demo (4-division league, rounds, seasons) — `web/`
 - [x] Real teams from `.EFT` in the UI (local file picker; division assignment by level is an assumption)
 - [x] Division assignment and starting strengths at game start (verified against a real save)
-- [ ] Saves (own format + `.e98` import), PWA, user-controlled team (lineup, transfers)
+- [x] User-controlled club: formation, line-up, bench, planned substitutions (docs/season.md)
+- [ ] Saves (own format + `.e98` import), PWA, transfers for the user, finances for the user

@@ -2,7 +2,7 @@
 //! `world_json_ptr()` / `world_json_len()` (UTF-8 JSON in WebAssembly memory, valid until the next call).
 use elifoot_core::eft::{self, EftTeam};
 use elifoot_core::matchsim::{Event, EventKind, Side};
-use elifoot_core::season::{standings, Club, MatchRecord};
+use elifoot_core::season::{standings, Club, MatchRecord, Plan, PlannedSub, FORMATIONS};
 use elifoot_core::world::{World, DIVISION_BASE, DIVISION_NAMES, ROUNDS};
 use std::cell::RefCell;
 use std::fmt::Write;
@@ -59,14 +59,85 @@ fn match_json(division: usize, r: &MatchRecord, w: &World) -> String {
         &w.divisions[division][r.away],
     );
     let events: Vec<String> = r.events.iter().map(|e| event_json(e, home, away)).collect();
+    let name = |club: &Club, i: usize| esc(club.names.get(i).map(String::as_str).unwrap_or("?"));
+    let subs: Vec<String> = r
+        .subs
+        .iter()
+        .map(|s| {
+            let club = if s.side == Side::Home { home } else { away };
+            format!(
+                "{{\"m\":{},\"side\":{},\"out\":{},\"in\":{},\"auto\":{}}}",
+                s.minute,
+                if s.side == Side::Home { 0 } else { 1 },
+                name(club, s.out),
+                name(club, s.inn),
+                s.auto
+            )
+        })
+        .collect();
     format!(
-        "{{\"div\":{},\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"events\":[{}]}}",
+        "{{\"div\":{},\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"homeIdx\":{},\"awayIdx\":{},\"events\":[{}],\"subs\":[{}]}}",
         division,
         esc(&home.name),
         esc(&away.name),
         r.home_goals,
         r.away_goals,
-        events.join(",")
+        r.home,
+        r.away,
+        events.join(","),
+        subs.join(",")
+    )
+}
+
+fn human_json(w: &World) -> String {
+    let (Some(h), Some((d, i))) = (w.human.as_ref(), w.human_location()) else {
+        return "null".to_string();
+    };
+    let club = &w.divisions[d][i];
+    let squad: Vec<String> = club
+        .slots
+        .iter()
+        .enumerate()
+        .map(|(k, p)| {
+            format!(
+                "{{\"i\":{},\"name\":{},\"pos\":{},\"str\":{},\"star\":{},\"ban\":{},\"inj\":{}}}",
+                k,
+                esc(club.names.get(k).map(String::as_str).unwrap_or("?")),
+                p.position,
+                p.strength,
+                p.star(),
+                p.ban,
+                p.injured
+            )
+        })
+        .collect();
+    let list = |v: &[usize]| {
+        v.iter()
+            .map(|x| x.to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    };
+    let subs: Vec<String> = h
+        .plan
+        .subs
+        .iter()
+        .map(|s| format!("[{},{},{}]", s.minute, s.out, s.inn))
+        .collect();
+    let formations: Vec<String> = FORMATIONS
+        .iter()
+        .map(|f| format!("[{},{},{}]", f.0, f.1, f.2))
+        .collect();
+    format!(
+        "{{\"club\":{},\"div\":{},\"idx\":{},\"formation\":{},\"formations\":[{}],\"squad\":[{}],\"plan\":{{\"starters\":[{}],\"bench\":[{}],\"subs\":[{}]}},\"subsLeft\":3}}",
+        esc(&h.club),
+        d,
+        i,
+        h.formation,
+        formations.join(","),
+        squad.join(","),
+        list(&h.plan.starters),
+        list(&h.plan.bench),
+        subs.join(",")
     )
 }
 
@@ -107,7 +178,7 @@ fn world_json(w: &World) -> String {
             rows.join(",")
         );
     }
-    out.push_str("],\"lastRound\":[");
+    let _ = write!(out, "],\"human\":{},\"lastRound\":[", human_json(w));
     let ms: Vec<String> = w
         .last_round
         .iter()
@@ -216,6 +287,83 @@ pub extern "C" fn world_new_from_efts(seed: u32) -> i32 {
             0
         }
     }
+}
+
+/// Makes club `club` of division `division` the user's club.
+#[no_mangle]
+pub extern "C" fn human_set(division: u32, club: u32) {
+    WORLD.with(|w| {
+        if let Some(w) = w.borrow_mut().as_mut() {
+            if (division as usize) < 4 && (club as usize) < w.divisions[division as usize].len() {
+                w.set_human(division as usize, club as usize);
+            }
+        }
+    });
+    publish();
+}
+
+/// Position in the division list of the club whose name is in the buffer (`len` bytes), or -1.
+#[no_mangle]
+pub extern "C" fn club_index(division: u32, len: usize) -> i32 {
+    let name =
+        BUF.with(|b| String::from_utf8_lossy(&b.borrow()[..len.min(b.borrow().len())]).to_string());
+    WORLD.with(|w| {
+        w.borrow()
+            .as_ref()
+            .and_then(|w| {
+                w.divisions
+                    .get(division as usize)
+                    .and_then(|d| d.iter().position(|c| c.name == name))
+            })
+            .map_or(-1, |i| i as i32)
+    })
+}
+
+/// Picks the best line-up of formation number `k` (index into the twelve formations); returns 1 when it can be fielded.
+#[no_mangle]
+pub extern "C" fn human_formation(k: u32) -> i32 {
+    let ok = WORLD.with(|w| {
+        w.borrow_mut()
+            .as_mut()
+            .is_some_and(|w| w.set_formation(k as usize))
+    });
+    publish();
+    ok as i32
+}
+
+/// Sets the user's plan from the buffer: `[n, starters.., m, bench.., k, (minute, out, in)..]`, one byte per value.
+#[no_mangle]
+pub extern "C" fn human_plan(len: usize) -> i32 {
+    let bytes: Vec<u8> = BUF.with(|b| b.borrow()[..len.min(b.borrow().len())].to_vec());
+    let mut it = bytes.into_iter();
+    let mut take = |n: usize| -> Vec<u8> { (&mut it).take(n).collect() };
+    let n = take(1).first().copied().unwrap_or(0) as usize;
+    let starters: Vec<usize> = take(n).into_iter().map(usize::from).collect();
+    let m = take(1).first().copied().unwrap_or(0) as usize;
+    let bench: Vec<usize> = take(m).into_iter().map(usize::from).collect();
+    let k = take(1).first().copied().unwrap_or(0) as usize;
+    let raw = take(3 * k);
+    let subs: Vec<PlannedSub> = raw
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|c| PlannedSub {
+            minute: c[0] as u16,
+            out: c[1] as usize,
+            inn: c[2] as usize,
+        })
+        .collect();
+    WORLD.with(|w| {
+        if let Some(w) = w.borrow_mut().as_mut() {
+            w.set_plan(Plan {
+                starters,
+                bench,
+                subs,
+            });
+        }
+    });
+    publish();
+    1
 }
 
 #[no_mangle]
@@ -344,5 +492,54 @@ mod tests {
     #[test]
     fn escapes_special_characters() {
         assert_eq!(esc("a\"b\\c\n"), "\"a\\\"b\\\\c\\u000a\"");
+    }
+
+    fn send_plan(bytes: &[u8]) {
+        let ptr = buf_resize(bytes.len());
+        unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), ptr, bytes.len()) };
+        human_plan(bytes.len());
+    }
+
+    /// Extracts the integer list after `"key":[` in the human block.
+    fn list_after(json: &str, key: &str) -> Vec<u32> {
+        let i = json.find(key).expect(key) + key.len();
+        let j = json[i..].find(']').unwrap();
+        json[i..i + j]
+            .split(',')
+            .filter(|x| !x.is_empty())
+            .map(|x| x.parse().unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn the_users_club_can_be_controlled_through_the_abi() {
+        world_new(7);
+        let first = json();
+        assert!(first.contains("\"human\":{\"club\":"));
+        assert!(first.contains("\"formations\":[[4,4,2],[3,3,4]"));
+        // change formation to 3-4-3 (index 2): 11 starters
+        assert_eq!(human_formation(2), 1);
+        let starters = list_after(&json(), "\"starters\":[");
+        assert_eq!(starters.len(), 11);
+        assert_eq!(human_formation(99), 0);
+        // send a plan: the same starters and bench, one substitution at minute 46 (first outfield starter -> first bench player)
+        let j = json();
+        let bench = list_after(&j, "\"bench\":[");
+        let (out, inn) = (starters[1] as u8, bench[1] as u8);
+        let mut bytes = vec![starters.len() as u8];
+        bytes.extend(starters.iter().map(|&x| x as u8));
+        bytes.push(bench.len() as u8);
+        bytes.extend(bench.iter().map(|&x| x as u8));
+        bytes.extend([1, 46, out, inn]);
+        send_plan(&bytes);
+        assert!(json().contains("\"subs\":[[46,"));
+        world_play_round();
+        let after = json();
+        assert!(after.contains("\"subs\":[]}")); // planned subs are consumed
+        assert!(after.contains("\"homeIdx\":"));
+        // garbage input must not panic
+        send_plan(&[200, 1, 2]);
+        send_plan(&[]);
+        assert!(json().contains("\"human\":{"));
     }
 }

@@ -53,6 +53,16 @@ pub enum EventKind {
     Injury,
 }
 
+/// A substitution (planned by the user or automatic after an injury/red card): `inn` replaces `out`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SubEvent {
+    pub minute: u16,
+    pub side: Side,
+    pub out: usize,
+    pub inn: usize,
+    pub auto: bool,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Event {
     pub minute: u16,
@@ -163,6 +173,10 @@ pub struct Match {
     pub away: TeamState,
     pub minute: u16,
     pub events: Vec<Event>,
+    /// Substitutions made so far (kept apart from `events`: a substitution must not hide the last event of the minute).
+    pub subs: Vec<SubEvent>,
+    /// Substitutions planned by the user: `(side, minute, out, in)`.
+    pub planned: Vec<(Side, u16, usize, usize)>,
     /// Match object `+0x4c` / `+0x4e`: per-match bonus values (`c95c` + 2 for the home side).
     pub home_bonus: i32,
     pub away_bonus: i32,
@@ -175,6 +189,8 @@ impl Match {
             away: TeamState::new(away),
             minute: 0,
             events: Vec::new(),
+            subs: Vec::new(),
+            planned: Vec::new(),
             home_bonus,
             away_bonus,
         }
@@ -301,6 +317,42 @@ impl Match {
             t.slots[c].status = Status::Starter;
             t.subs_left -= 1;
             t.recompute();
+            let minute = self.minute;
+            self.subs.push(SubEvent {
+                minute,
+                side,
+                out: l,
+                inn: c,
+                auto: true,
+            });
+        }
+    }
+
+    /// A user-planned substitution at the current minute: the player must be a starter, the replacement a fit
+    /// substitute, and the team must have substitutions left. Invalid plans are ignored.
+    fn planned_sub(&mut self, side: Side, out: usize, inn: usize) {
+        let minute = self.minute;
+        let t = self.team_mut(side);
+        let valid = t.subs_left > 0
+            && out < t.slots.len()
+            && inn < t.slots.len()
+            && t.slots[out].starter()
+            && t.slots[inn].status == Status::Sub
+            && t.slots[inn].available()
+            // a goalkeeper may only be replaced by a goalkeeper (and the reverse), as in the automatic rule
+            && (t.slots[out].position == 0) == (t.slots[inn].position == 0);
+        if valid {
+            t.slots[out].status = Status::Out;
+            t.slots[inn].status = Status::Starter;
+            t.subs_left -= 1;
+            t.recompute();
+            self.subs.push(SubEvent {
+                minute,
+                side,
+                out,
+                inn,
+                auto: false,
+            });
         }
     }
 
@@ -409,6 +461,11 @@ impl Match {
     /// One minute of play (`1048:069b` body for a single game).
     pub fn step(&mut self, rng: &mut DelphiRng) {
         self.minute += 1;
+        for (side, minute, out, inn) in self.planned.clone() {
+            if minute == self.minute {
+                self.planned_sub(side, out, inn);
+            }
+        }
         let happened = self.chances(rng) || self.red_card(rng) || self.injury(rng);
         if !happened && self.minute != 46 && self.minute != 91 {
             self.annul(rng);
@@ -690,5 +747,43 @@ pub mod tests {
                 .count()
         };
         assert!(nobody(&stacked, &mut rng) > 5 * nobody(&lean, &mut rng).max(1));
+    }
+
+    #[test]
+    fn planned_substitutions_run_at_their_minute_and_invalid_ones_are_ignored() {
+        let mut rng = DelphiRng::new(13);
+        let mut m = Match::new(squad(6, &mut rng), squad(6, &mut rng), 8, 6);
+        let starter = m
+            .home
+            .slots
+            .iter()
+            .position(|s| s.starter() && s.position == 3)
+            .unwrap();
+        let bench = m
+            .home
+            .slots
+            .iter()
+            .position(|s| s.status == Status::Sub && s.position == 3)
+            .unwrap();
+        let keeper = m
+            .home
+            .slots
+            .iter()
+            .position(|s| s.starter() && s.position == 0)
+            .unwrap();
+        m.planned = vec![
+            (Side::Home, 30, starter, bench),
+            (Side::Home, 40, keeper, bench), // bench is already on the pitch by then: ignored
+            (Side::Home, 50, 999, bench),    // bogus index: ignored
+            (Side::Away, 60, starter, bench), // the away squad has its own numbering but this pair is also legal
+        ];
+        m.play(&mut rng);
+        let planned: Vec<&SubEvent> = m.subs.iter().filter(|s| !s.auto).collect();
+        assert!(planned
+            .iter()
+            .any(|s| s.side == Side::Home && s.minute == 30 && s.out == starter && s.inn == bench));
+        assert!(!planned.iter().any(|s| s.minute == 40 || s.minute == 50));
+        assert!(m.home.slots[bench].starter() || m.home.slots[bench].status == Status::Out);
+        assert!(m.home.subs_left <= 2);
     }
 }

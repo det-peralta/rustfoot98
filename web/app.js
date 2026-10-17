@@ -1,8 +1,9 @@
 // Loads the WebAssembly core and drives the UI. The core exposes a plain C ABI and returns the world as JSON.
-const ICON = { goal: "⚽", annulled: "⊘", red: "🟥", injury: "✚" };
+const ICON = { goal: "⚽", annulled: "⊘", red: "🟥", injury: "✚", sub: "🔁" };
+const POS = ["GR", "D", "M", "A"];
 const LABEL = { goal: "Golo", annulled: "Golo anulado", red: "Expulsão", injury: "Lesão" };
 
-let wasm, state, division = 0, selectedMatch = null, useReal = false;
+let wasm, state, division = 0, selectedMatch = null, useReal = false, needTab = true;
 const $ = (id) => document.getElementById(id);
 
 async function boot() {
@@ -17,11 +18,13 @@ async function boot() {
 function read() {
   const ptr = wasm.world_json_ptr(), len = wasm.world_json_len();
   state = JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, ptr, len)));
+  if (needTab && state.human) { division = state.human.div; needTab = false; }
   render();
 }
 
 function newWorld() {
   selectedMatch = null;
+  needTab = true;
   const seed = Math.max(1, Number($("seed").value) | 0);
   if (useReal) {
     if (!wasm.world_new_from_efts(seed)) { fail(); return; }
@@ -107,6 +110,7 @@ function renderResults() {
   }
   matches.forEach((m, i) => {
     const li = document.createElement("li");
+    if (isMine(m)) li.className = "mine";
     const b = document.createElement("button");
     b.setAttribute("aria-pressed", String(i === selectedMatch));
     b.innerHTML = `<span>${esc(m.home)}</span><span class="score">${m.hg} – ${m.ag}</span><span class="away">${esc(m.away)}</span>`;
@@ -118,11 +122,112 @@ function renderResults() {
   if (selectedMatch == null) { box.hidden = true; return; }
   const m = matches[selectedMatch];
   box.hidden = false;
-  const evs = m.events.length
-    ? m.events.map((e) => `<div class="ev ${e.side ? "away" : ""}"><span class="m">${e.m}'</span><span title="${LABEL[e.kind]}">${ICON[e.kind]}</span>` +
-        `<span>${esc(e.player)} <small>(${esc(e.side ? m.away : m.home)})</small></span></div>`).join("")
-    : `<p class="empty">Sem acontecimentos.</p>`;
+  const tl = timeline(m);
+  const evs = tl.length ? tl.map((e) => `<div class="ev ${e.away ? "away" : ""}"><span class="m">${e.m}'</span><span>${e.html}</span><span></span></div>`).join("") : `<p class="empty">Sem acontecimentos.</p>`;
   box.innerHTML = `<h3>${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</h3>${evs}`;
+}
+
+const isMine = (m) => state.human && m.div === state.human.div && (m.homeIdx === state.human.idx || m.awayIdx === state.human.idx) &&
+  (m.home === state.human.club || m.away === state.human.club);
+
+// events and substitutions of a match in time order
+function timeline(m) {
+  const evs = m.events.map((e) => ({ m: e.m, html: `${ICON[e.kind]} ${esc(e.player)} <small>(${esc(e.side ? m.away : m.home)})</small>`, away: !!e.side }));
+  const subs = (m.subs || []).map((s) => ({ m: s.m, html: `${ICON.sub} ${esc(s.in)} por ${esc(s.out)} <small>(${esc(s.side ? m.away : m.home)}${s.auto ? ", automática" : ""})</small>`, away: !!s.side }));
+  return [...evs, ...subs].sort((a, b) => a.m - b.m);
+}
+
+function subsHtml(m) {
+  if (!m.subs || !m.subs.length) return "";
+  return "<ul class=\"mm\">" + m.subs.map((s) => `<li>${s.m}' ${ICON.sub} ${esc(s.in)} por ${esc(s.out)} <small>(${esc(s.side ? m.away : m.home)}${s.auto ? ", automática" : ""})</small></li>`).join("") + "</ul>";
+}
+
+// ---- the user's club -------------------------------------------------------------------------------------------
+function fmt(f) { return f.join("-"); }
+
+function sendPlan(starters, bench, subs) {
+  const bytes = [starters.length, ...starters, bench.length, ...bench, subs.length, ...subs.flat()];
+  const ptr = wasm.buf_resize(bytes.length);
+  new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
+  wasm.human_plan(bytes.length);
+  read();
+}
+
+function planFromDom() {
+  const roles = [...document.querySelectorAll("#squad select.role")];
+  const pick = (v) => roles.filter((r) => r.value === v).map((r) => Number(r.dataset.i));
+  return { starters: pick("T"), bench: pick("B") };
+}
+
+function subsFromDom() {
+  return [...document.querySelectorAll(".subrow")].map((row) => {
+    const [minute, out, inn] = row.querySelectorAll("input, select");
+    return [Math.min(90, Math.max(1, Number(minute.value) | 0)), Number(out.value), Number(inn.value)];
+  });
+}
+
+function renderClub() {
+  const card = $("club-card"), h = state.human;
+  if (!h) { card.hidden = true; return; }
+  card.hidden = false;
+  $("club-name").textContent = h.club;
+  $("club-div").textContent = state.divisions[h.div].name;
+  const sel = $("formation");
+  if (!sel.options.length) h.formations.forEach((f, k) => sel.add(new Option(fmt(f), k)));
+  sel.value = h.formation;
+  const change = $("change-club");
+  change.innerHTML = "";
+  state.divisions.forEach((d, di) => d.table.forEach((r) => {
+    // table rows are sorted by points; the club index is not known here, so the option carries the name only
+    change.add(new Option(`${di + 1}ª · ${r.name}`, `${di}|${r.name}`));
+  }));
+  change.value = `${h.div}|${h.club}`;
+
+  const starters = new Set(h.plan.starters), bench = new Set(h.plan.bench);
+  const body = $("squad").querySelector("tbody");
+  body.innerHTML = "";
+  [...h.squad].sort((a, b) => a.pos - b.pos || b.str - a.str).forEach((p) => {
+    const unavailable = p.ban > 0 || p.inj > 0;
+    const state_ = p.inj > 0 ? `<span class="badge bad">Lesionado ${p.inj} j</span>` : p.ban > 0 ? `<span class="badge bad">Suspenso ${p.ban} j</span>` : "";
+    const role = starters.has(p.i) ? "T" : bench.has(p.i) ? "B" : "F";
+    const tr = document.createElement("tr");
+    tr.className = unavailable ? "out" : role === "T" ? "start" : "";
+    tr.innerHTML = `<td class="l">${POS[p.pos]}</td><td class="l">${esc(p.name)}</td><td>${p.str}</td><td>${p.star ? "★" : ""}</td><td class="l">${state_}</td>` +
+      `<td class="l"><select class="role" data-i="${p.i}" ${unavailable ? "disabled" : ""} aria-label="Papel de ${esc(p.name)}">` +
+      `<option value="T">Titular</option><option value="B">Banco</option><option value="F">Fora</option></select></td>`;
+    tr.querySelector("select").value = unavailable ? "F" : role;
+    tr.querySelector("select").onchange = () => { const p2 = planFromDom(); sendPlan(p2.starters, p2.bench, subsFromDom()); };
+    body.appendChild(tr);
+  });
+  const counts = [0, 0, 0, 0];
+  h.plan.starters.forEach((i) => counts[h.squad[i].pos]++);
+  const msg = [];
+  msg.push(`Em campo: ${counts[0]} GR · ${counts[1]}-${counts[2]}-${counts[3]}.`);
+  if (h.plan.starters.length !== 11 || counts[0] !== 1) msg.push("A equipa tem de ter 11 titulares e 1 guarda-redes; o jogo corrige o que faltar.");
+  $("club-msg").textContent = msg.join(" ");
+
+  const subsBox = $("subs");
+  subsBox.innerHTML = "";
+  const opt = (list) => list.map((i) => `<option value="${i}">${esc(h.squad[i].name)}</option>`).join("");
+  h.plan.subs.forEach(([minute, out, inn], k) => {
+    const row = document.createElement("div");
+    row.className = "subrow";
+    row.innerHTML = `<input type="number" min="1" max="90" value="${minute}" aria-label="Minuto"><select aria-label="Sai">${opt(h.plan.starters)}</select><select aria-label="Entra">${opt(h.plan.bench)}</select><button aria-label="Remover">✕</button>`;
+    const [mi, so, si] = row.querySelectorAll("input, select");
+    so.value = out; si.value = inn;
+    const update = () => sendPlan(h.plan.starters, h.plan.bench, subsFromDom());
+    mi.onchange = so.onchange = si.onchange = update;
+    row.querySelector("button").onclick = () => { row.remove(); update(); };
+    subsBox.appendChild(row);
+  });
+  $("add-sub").disabled = h.plan.subs.length >= 3 || !h.plan.bench.length;
+
+  const mine = state.lastRound.find(isMine);
+  const box = $("my-match");
+  if (!mine) { box.className = "empty"; box.textContent = "Ainda não jogaste."; return; }
+  box.className = "";
+  const evs = timeline(mine).map((e) => `<li>${e.m}' ${e.html}</li>`).join("");
+  box.innerHTML = `<p><b>${esc(mine.home)} ${mine.hg} – ${mine.ag} ${esc(mine.away)}</b></p><ul class="mm">${evs || "<li class=\"empty\">Sem acontecimentos.</li>"}</ul>`;
 }
 
 function renderSeason() {
@@ -146,11 +251,41 @@ function render() {
   renderTabs();
   renderTable();
   renderResults();
+  renderClub();
   renderSeason();
+}
+
+// The tables are sorted by points while the core addresses clubs by position in the division list. The JSON carries the
+// position of each club in `idx` for the user's club and in `homeIdx`/`awayIdx` for matches; for an arbitrary club we ask
+// the core by name instead.
+function indexInList(di, name, fallback) {
+  const enc = new TextEncoder().encode(name);
+  const ptr = wasm.buf_resize(enc.length);
+  new Uint8Array(wasm.memory.buffer, ptr, enc.length).set(enc);
+  const i = wasm.club_index(di, enc.length);
+  return i >= 0 ? i : fallback;
 }
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+$("add-sub").onclick = () => {
+  const h = state.human;
+  if (!h || h.plan.subs.length >= 3 || !h.plan.bench.length) return;
+  const outfield = h.plan.starters.filter((i) => h.squad[i].pos !== 0);
+  const subs = subsFromDom();
+  subs.push([60, outfield[0] ?? h.plan.starters[0], h.plan.bench.find((i) => h.squad[i].pos !== 0) ?? h.plan.bench[0]]);
+  sendPlan(h.plan.starters, h.plan.bench, subs);
+};
+$("formation").onchange = (e) => { if (!wasm.human_formation(Number(e.target.value))) $("club-msg").textContent = "Essa formação não pode ser montada com o plantel disponível."; read(); };
+$("auto-plan").onclick = () => { wasm.human_formation(Number($("formation").value)); read(); };
+$("change-club").onchange = (e) => {
+  const [di, name] = e.target.value.split("|");
+  // the table is sorted by points, so find the club index by asking the squad order of the division list
+  const idx = state.divisions[Number(di)].table.findIndex((r) => r.name === name);
+  wasm.human_set(Number(di), indexInList(Number(di), name, idx));
+  division = Number(di);
+  read();
+};
 $("play-round").onclick = () => play("world_play_round");
 $("play-season").onclick = () => play("world_play_season");
 $("new-world").onclick = newWorld;

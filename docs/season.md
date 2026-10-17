@@ -61,3 +61,13 @@ A new world starts, by the verified rule, with mean squad strength about **43 / 
 decoded evolution (starters drift down, reserves up, clamped to `base − 2·rank ± 5`) the means then erode slowly, to about
 **34 / 20 / 11 / 2** after twelve seasons. The original presumably counters this with mechanics not decoded yet
 (transfers, finances), so long runs of the demo drift weaker than the real game would.
+
+## The user's club (core/src/world.rs, web/)
+- **Start**: a random one of the bottom six clubs of the 4th division (`7 − Random(6)`, `1028:0b26`); the demo also lets you pick any club.
+- **Controls**: formation (the twelve of the game's menu), the role of every player (starter / bench / out) and up to three planned
+  substitutions (minute, who leaves, who comes on; a goalkeeper may only be replaced by a goalkeeper, as in the automatic rule).
+  Injuries and red cards still trigger the automatic replacement (`67f7`); the original stops the game and asks the user, the
+  demo plays each match in one go. Planned substitutions last for one round.
+- **Repairs**: unavailable (injured/suspended) or missing starters are replaced by the best available player of the same
+  position before the match, and the repaired line-up is written back into the displayed plan.
+- If the user's club ever leaves the league (relegated to the outside pool) the game hands them another one (`4f40`).

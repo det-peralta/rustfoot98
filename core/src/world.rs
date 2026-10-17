@@ -10,8 +10,13 @@
 use crate::economy::{walk_index, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
 use crate::rng::DelphiRng;
-use crate::season::{end_of_round, end_of_season, play_round, standings, Club, MatchRecord};
+use crate::season::apply_plan;
+use crate::season::{
+    best_formation, end_of_round, end_of_season, plan_for_formation, play_round, standings, Club,
+    MatchRecord, Plan, FORMATIONS,
+};
 use crate::sector::{Slot, Status};
+use std::collections::HashMap;
 
 pub const DIVISION_BASE: [i32; 4] = [52, 38, 24, 10];
 pub const DIVISION_NAMES: [&str; 4] = ["1ª Divisão", "2ª Divisão", "3ª Divisão", "4ª Divisão"];
@@ -116,6 +121,15 @@ pub struct SeasonSummary {
     pub moves: Vec<Move>,
 }
 
+/// The club the user manages: found by name (it changes division at season ends), with the chosen formation and plan.
+#[derive(Clone, Debug)]
+pub struct Human {
+    pub club: String,
+    /// Index into `FORMATIONS`.
+    pub formation: usize,
+    pub plan: Plan,
+}
+
 #[derive(Debug)]
 pub struct World {
     pub divisions: [Vec<Club>; 4],
@@ -129,6 +143,7 @@ pub struct World {
     /// Matches of the last round played, tagged with their division.
     pub last_round: Vec<(usize, MatchRecord)>,
     pub last_season: Option<SeasonSummary>,
+    pub human: Option<Human>,
 }
 
 fn player_name(rng: &mut DelphiRng) -> String {
@@ -252,7 +267,7 @@ impl World {
             *d = it.by_ref().take(8).collect();
         }
         let pool: Vec<Club> = it.collect();
-        Ok(World {
+        let mut w = World {
             divisions,
             pool,
             year: 1998,
@@ -261,7 +276,10 @@ impl World {
             rng,
             last_round: Vec::new(),
             last_season: None,
-        })
+            human: None,
+        };
+        w.pick_human();
+        Ok(w)
     }
 
     /// A fictional world with the original's starting strengths: the club at list position `i` (division `i / 8`) gets
@@ -283,7 +301,7 @@ impl World {
         let pool = (0..6)
             .map(|i| make_club(&mut rng, next_name(), base_strength(32 + i)))
             .collect();
-        World {
+        let mut w = World {
             divisions,
             pool,
             year: 1998,
@@ -292,6 +310,94 @@ impl World {
             rng,
             last_round: Vec::new(),
             last_season: None,
+            human: None,
+        };
+        w.pick_human();
+        w
+    }
+
+    /// Where the user's club is: `(division 0..=3, index)`, or `None` when it is in the outside pool.
+    pub fn human_location(&self) -> Option<(usize, usize)> {
+        let name = &self.human.as_ref()?.club;
+        self.divisions
+            .iter()
+            .enumerate()
+            .find_map(|(d, v)| v.iter().position(|c| &c.name == name).map(|i| (d, i)))
+    }
+
+    /// Makes `club` of `division` the user's club with the automatic line-up.
+    pub fn set_human(&mut self, division: usize, club: usize) {
+        let c = &self.divisions[division][club];
+        let formation = best_formation(&c.slots).unwrap_or(0);
+        let plan = plan_for_formation(&c.slots, FORMATIONS[formation]).unwrap_or_default();
+        self.human = Some(Human {
+            club: c.name.clone(),
+            formation,
+            plan,
+        });
+    }
+
+    /// The original's start rule (`1028:0b26`): a random one of the bottom six clubs of the 4th division (`7 - Random(6)`).
+    pub fn pick_human(&mut self) {
+        let club = 7 - self.rng.random(6) as usize;
+        self.set_human(3, club);
+    }
+
+    /// Writes the line-up the game would actually field next round back into the user's plan (injured, suspended or
+    /// missing players replaced), so the displayed plan is the truth. Also updates the formation label.
+    fn refresh_plan(&mut self) {
+        let Some((d, i)) = self.human_location() else {
+            return;
+        };
+        let Some(h) = self.human.as_mut() else { return };
+        let mut slots = self.divisions[d][i].slots.clone();
+        apply_plan(&mut slots, &h.plan);
+        let with = |st: Status| -> Vec<usize> {
+            (0..slots.len())
+                .filter(|&k| slots[k].status == st)
+                .collect()
+        };
+        h.plan.starters = with(Status::Starter);
+        h.plan.bench = with(Status::Sub);
+        let count = |pos: u8| {
+            h.plan
+                .starters
+                .iter()
+                .filter(|&&k| slots[k].position == pos)
+                .count() as u8
+        };
+        if let Some(k) = FORMATIONS
+            .iter()
+            .position(|&f| f == (count(1), count(2), count(3)))
+        {
+            h.formation = k;
+        }
+    }
+
+    /// Picks the best line-up for formation number `formation` (index into `FORMATIONS`); false when it cannot be fielded.
+    pub fn set_formation(&mut self, formation: usize) -> bool {
+        let Some((d, i)) = self.human_location() else {
+            return false;
+        };
+        let Some(&f) = FORMATIONS.get(formation) else {
+            return false;
+        };
+        match plan_for_formation(&self.divisions[d][i].slots, f) {
+            Some(plan) => {
+                if let Some(h) = self.human.as_mut() {
+                    h.formation = formation;
+                    h.plan = plan;
+                }
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Replaces the user's plan (starters, bench and up to three planned substitutions).
+    pub fn set_plan(&mut self, plan: Plan) {
+        if let Some(h) = self.human.as_mut() {
+            h.plan = plan;
         }
     }
 
@@ -312,11 +418,27 @@ impl World {
                     team_names[a].clone(),
                 )
             };
-            let records = play_round(&mut self.rng, &mut self.divisions[d], round, &mut names);
+            let mut plans = HashMap::new();
+            if let (Some((hd, hi)), Some(h)) = (self.human_location(), self.human.as_ref()) {
+                if hd == d {
+                    plans.insert(hi, h.plan.clone());
+                }
+            }
+            let records = play_round(
+                &mut self.rng,
+                &mut self.divisions[d],
+                round,
+                &mut names,
+                &plans,
+            );
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
             end_of_round(&mut self.rng, &mut self.divisions[d], DIVISION_BASE[d]);
         }
         self.economy = walk_index(&mut self.rng, self.economy, self.year);
+        if let Some(h) = self.human.as_mut() {
+            h.plan.subs.clear(); // planned substitutions are for one round only
+        }
+        self.refresh_plan();
         self.round = round;
         if round == ROUNDS {
             self.finish_season();
@@ -355,6 +477,10 @@ impl World {
             .chain(self.pool.iter().map(|c| (c.name.clone(), 4)))
             .collect();
         end_of_season(&mut self.rng, &mut self.divisions, &mut self.pool, None);
+        if self.human_location().is_none() {
+            self.pick_human(); // the user's club left the league: the game hands them another one (`4f40`)
+        }
+        self.refresh_plan();
         let after: Vec<(String, usize)> = self
             .divisions
             .iter()
@@ -590,5 +716,95 @@ mod tests {
             .iter()
             .flatten()
             .all(|c| c.slots.iter().all(|s| (1..=50).contains(&s.strength))));
+    }
+
+    #[test]
+    fn the_user_starts_in_the_bottom_six_of_the_fourth_division() {
+        for seed in 1..40 {
+            let w = World::synthetic(seed);
+            let (d, i) = w.human_location().unwrap();
+            assert_eq!(d, 3);
+            assert!((2..=7).contains(&i), "seed {seed} gave index {i}");
+            assert_eq!(w.human.as_ref().unwrap().plan.starters.len(), 11);
+        }
+    }
+
+    #[test]
+    fn the_user_can_change_formation_and_play_with_a_planned_substitution() {
+        use crate::season::PlannedSub;
+        let mut w = World::synthetic(7);
+        let (d, i) = w.human_location().unwrap();
+        assert!(w.set_formation(2)); // 3-4-3
+        let plan = w.human.as_ref().unwrap().plan.clone();
+        let count = |pos: u8| {
+            plan.starters
+                .iter()
+                .filter(|&&k| w.divisions[d][i].slots[k].position == pos)
+                .count()
+        };
+        assert_eq!((count(1), count(2), count(3)), (3, 4, 3));
+        // plan one substitution: the first starter outfield player for the first outfield bench player
+        let out = *plan
+            .starters
+            .iter()
+            .find(|&&k| w.divisions[d][i].slots[k].position == 3)
+            .unwrap();
+        let inn = *plan
+            .bench
+            .iter()
+            .find(|&&k| w.divisions[d][i].slots[k].position != 0)
+            .unwrap();
+        let mut p = plan.clone();
+        p.subs.push(PlannedSub {
+            minute: 46,
+            out,
+            inn,
+        });
+        w.set_plan(p);
+        w.play_round();
+        assert!(
+            w.human.as_ref().unwrap().plan.subs.is_empty(),
+            "planned subs are consumed"
+        );
+        // the human club's match was played with its plan: it appears in the last round
+        let name = w.human.as_ref().unwrap().club.clone();
+        let (d2, i2) = w.human_location().unwrap();
+        assert!(
+            w.last_round
+                .iter()
+                .any(|(dd, r)| *dd == d2 && (r.home == i2 || r.away == i2)),
+            "{name} played"
+        );
+        assert!(!w.set_formation(99));
+    }
+
+    #[test]
+    fn the_user_keeps_a_club_across_seasons() {
+        let mut w = World::synthetic(8);
+        for _ in 0..6 {
+            w.play_season();
+            assert!(
+                w.human_location().is_some(),
+                "the user always has a club in the league"
+            );
+        }
+    }
+
+    #[test]
+    fn the_displayed_plan_is_repaired_after_a_round() {
+        let mut w = World::synthetic(21);
+        for _ in 0..5 {
+            w.play_round();
+            let h = w.human.as_ref().unwrap();
+            let (d, i) = w.human_location().unwrap();
+            let slots = &w.divisions[d][i].slots;
+            assert_eq!(h.plan.starters.len(), 11);
+            assert!(
+                h.plan.starters.iter().all(|&k| slots[k].available()),
+                "an unavailable player is still listed"
+            );
+            assert!(h.plan.bench.iter().all(|&k| slots[k].available()));
+            assert!(h.plan.bench.len() <= 5);
+        }
     }
 }

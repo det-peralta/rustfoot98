@@ -63,3 +63,21 @@ td.down { box-shadow: inset 3px 0 var(--down); }
 .up-t { color: var(--up); } .down-t { color: var(--down); }
 footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 @media (max-width: 800px) { main { grid-template-columns: 1fr; } .card { border-radius: 12px; } nav button { border-radius: 8px; border-bottom: 1px solid var(--line); } }
+
+.muted { color: var(--muted); font-size: .9rem; }
+.club-head { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; margin-bottom: 8px; }
+.club-head label { color: var(--muted); font-size: .9rem; display: flex; gap: 6px; align-items: center; }
+select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); }
+.club-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; align-items: start; }
+.club-grid h3 { margin: 0 0 6px; font-size: .95rem; }
+#squad td, #squad th { padding: 5px 8px; }
+#squad tr.out { color: var(--muted); }
+#squad tr.start td:first-child { box-shadow: inset 3px 0 var(--accent); }
+.badge { font-size: .75rem; padding: 1px 6px; border-radius: 10px; border: 1px solid var(--line); }
+.badge.bad { color: var(--down); border-color: var(--down); }
+.subrow { display: grid; grid-template-columns: 5em 1fr 1fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.subrow input { width: 100%; padding: 6px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+.results li.mine button { font-weight: 700; box-shadow: inset 3px 0 var(--accent); }
+.mm { margin: 0; padding: 0; list-style: none; }
+.mm li { padding: 2px 0; }
+@media (max-width: 800px) { .club-grid { grid-template-columns: 1fr; } }
