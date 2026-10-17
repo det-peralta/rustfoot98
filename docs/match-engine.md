@@ -146,12 +146,13 @@ After a processed game `038e` adds **+1.0 to the user's team and +0.5 to its opp
 `(K/2)^(1/4)`, so a long-serving coach's team scores more. `038e` addresses the user's game pair (list index 0), so
 AI-vs-AI games leave `K` untouched.
 
-## Still unknown (next)
-- What `c95c` really compares (byte strings at `calEntry+0x0b+4` vs `team+0x2d`), and the `+3` condition (it gates cards, annulments and the 6000/7000 rolls).
+## Still unknown
+- Identity of the two strings fed to `c95c` (division/country name vs a team string); the formula itself is decoded.
 - Role of the global `Real` at `10c8:2b46` that `0c41` random-walks every round (likely a finance/economy index).
-- Which of the two teams of a game is `puVar8` (+1.0) in `038e`; whether AI games ever change `K`.
-- What `team+0x59` counts exactly (goals?) and `team+0x4f` (shots).
-- `1010:100b` weights, `1038:39b6` shooter selection, `1010:818c` attacker force.
+- Which of the two teams of a game is `puVar8` (+1.0 morale) in `038e`; whether AI-vs-AI games ever change `K`.
+- Half-time (minute 45) and extra-time (minute 90 -> 120) routines; the penalty shoot-out UI path; human-controlled chance path (`1038:328b`).
+- Where `division.base` (division `+4`) comes from, and the auto line-up formation choice in `1010:4b73`.
+- Season calendar generation, standings, finances (`1010:6e48` and the `+0x71..+0x79` team fields), transfers.
 
 ## Minute loop — `1048:069b`
 Per minute (`match+0x18e`), for every game of the round in turn: `a6eb` (goal chances); if no goal, `aa11`
