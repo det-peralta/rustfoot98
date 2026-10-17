@@ -77,7 +77,7 @@ fn match_json(division: usize, r: &MatchRecord, w: &World) -> String {
         })
         .collect();
     format!(
-        "{{\"div\":{},\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"homeIdx\":{},\"awayIdx\":{},\"events\":[{}],\"subs\":[{}]}}",
+        "{{\"div\":{},\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"homeIdx\":{},\"awayIdx\":{},\"att\":{},\"gate\":{},\"events\":[{}],\"subs\":[{}]}}",
         division,
         esc(&home.name),
         esc(&away.name),
@@ -85,6 +85,8 @@ fn match_json(division: usize, r: &MatchRecord, w: &World) -> String {
         r.away_goals,
         r.home,
         r.away,
+        r.attendance,
+        r.gate,
         events.join(","),
         subs.join(",")
     )
@@ -128,9 +130,29 @@ fn human_json(w: &World) -> String {
         .iter()
         .map(|f| format!("[{},{},{}]", f.0, f.1, f.2))
         .collect();
+    let fin = &club.fin;
+    let money = w.money_ctx(d);
+    let wage = elifoot_core::finance::wage_bill(&club.slots, fin.f, w.economy, w.scale);
+    let finance = format!(
+        "{{\"cash\":{},\"loan\":{},\"f\":{:.4},\"stadium\":{},\"capacity\":{},\"gate\":{},\"sales\":{},\"purchases\":{},\"wages\":{},\"interest\":{},\"wageBill\":{},\"price\":{},\"scale\":{}}}",
+        fin.cash,
+        fin.loan,
+        fin.f,
+        fin.stadium,
+        fin.capacity(),
+        fin.gate,
+        fin.sales,
+        fin.purchases,
+        fin.wages,
+        fin.interest,
+        wage,
+        money.price,
+        w.scale
+    );
     format!(
-        "{{\"club\":{},\"div\":{},\"idx\":{},\"formation\":{},\"formations\":[{}],\"squad\":[{}],\"plan\":{{\"starters\":[{}],\"bench\":[{}],\"subs\":[{}]}},\"subsLeft\":3}}",
+        "{{\"club\":{},\"finance\":{},\"div\":{},\"idx\":{},\"formation\":{},\"formations\":[{}],\"squad\":[{}],\"plan\":{{\"starters\":[{}],\"bench\":[{}],\"subs\":[{}]}},\"subsLeft\":3}}",
         esc(&h.club),
+        finance,
         d,
         i,
         h.formation,
@@ -188,13 +210,14 @@ fn cup_json(w: &World) -> String {
                 })
                 .collect();
             format!(
-                "{{\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"extraTime\":{},\"shootout\":{},\"winner\":{},\"events\":[{}],\"subs\":[{}]}}",
+                "{{\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"extraTime\":{},\"shootout\":{},\"att\":{},\"winner\":{},\"events\":[{}],\"subs\":[{}]}}",
                 esc(&m.home),
                 esc(&m.away),
                 m.home_goals,
                 m.away_goals,
                 m.extra_time,
                 m.shootout,
+                m.attendance,
                 esc(&m.winner),
                 events.join(","),
                 subs.join(",")

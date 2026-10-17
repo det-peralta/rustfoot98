@@ -48,7 +48,14 @@ fn main() {
                 let n = |r: &mut DelphiRng| name(r).into_bytes();
                 (n(&mut seed), n(&mut seed), n(&mut seed))
             };
-            play_round(&mut rng, &mut clubs, round, &mut names, &Default::default());
+            play_round(
+                &mut rng,
+                &mut clubs,
+                round,
+                &mut names,
+                &Default::default(),
+                None,
+            );
             end_of_round(&mut rng, &mut clubs, base);
         }
         let table = standings(&clubs);

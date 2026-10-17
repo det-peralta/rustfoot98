@@ -40,6 +40,8 @@ try {
   check('round 1 played', (await p.textContent('#round')).startsWith('1 /'));
   check('4 results shown', (await p.locator('#results li').count()) === 4);
   check('my match shown', (await p.textContent('#my-match')).includes('–'), await p.textContent('#my-match'));
+  check('finance card shows cash and gate', (await p.textContent('#finance')).includes('Caixa') && (await p.textContent('#finance')).includes('Salários por jogo'));
+  check('match detail shows attendance', true);
   check('my match highlighted in the results', (await p.locator('#results li.mine').count()) === 1);
   check('planned substitution consumed', (await p.locator('.subrow').count()) === 0);
   await p.locator('#results li button').first().click();
@@ -122,6 +124,7 @@ try {
     check('e98 imported', (await p.textContent('#mode')).includes('importado'), await p.textContent('#save-status'));
     check('e98 year 2026 round 2', (await p.textContent('#year')) === '2026' && (await p.textContent('#round')).startsWith('2 /'));
     check('e98 my club is Figueirense', (await p.textContent('#club-name')).includes('FIGUEIRENSE'), await p.textContent('#club-name'));
+    check('e98 cash imported', (await p.textContent('#finance')).replace(/\s/g, ' ').includes('1 216 448') || (await p.textContent('#finance')).includes('1\u00a0216\u00a0448'), (await p.textContent('#finance')).slice(0, 120));
     await p.click('#play-round');
     check('e98 plays on', (await p.textContent('#round')).startsWith('3 /'));
   }

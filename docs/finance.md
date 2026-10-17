@@ -1,7 +1,8 @@
 # Finances and transfers
 
-Status: **partly decoded.** The verified pieces are implemented in `core/src/economy.rs`; the rest is mapped below so the
-next pass can start from the right functions.
+Status: **partly decoded.** The verified pieces are implemented in `core/src/economy.rs` and `core/src/finance.rs` (wages, gate,
+ticket price, new-game cash, stadium, ledger; the browser shows the user's finances); the rest is mapped below so the next pass can
+start from the right functions.
 
 ## Verified and implemented
 - **Economy index `E`** (global extended at `10c8:2b46`, saved in the `.e98` header at offset `0x28`; **2.0** in a new game, read from a real
@@ -71,7 +72,9 @@ auctions, sell, loans, tickets, salaries) is the missing gameplay layer and need
 - **Gate** (game record `+0x40` attendance, `+0x36` ticket price): `gate = attendance * price` to the home club (cup games: split).
   `price` for a division comes from `1040:35e1(avgF, flag, avgRating)` called by `1010:0875`:
   `a = max(avgF, 0.1)`; `price = round( (G*E/sqrt(a)) * avgRating / 5 * (1 + 0.5*[flag==1]) ) / 2`, floored at `G/2` and rounded to a
-  multiple of the setting `DS:2d9b` (sign of the helper direction unverified).
+  multiple of the setting `DS:2d9b`. Against the sample save the flag-less price is within 3 % for divisions 1-3 (44 / 32 / 18
+  recovered from the gates) and ~15 % low for division 4 (7 against ~8; the sample shows per-game variation there, so the price
+  may also depend on the game); the `flag == 1` factor 1.5 overshot by 30 % when applied to the user's division, so the port omits it.
   `attendance` (`1010:b0a1`): `w = 3*rating(home) + rating(away)`; `p = (w + 3*rand) * sqrt(K_home) * sqrt(K_away) * 200`;
   `att = round(p^1.04 * (1 + 0.3*[cup]))`, then clamped to the stadium capacity.
 - **Stadium** (team `+0x12` object): `+4` level (0..24), capacity = level * 5000, initial level `max(1, round(base * 0.3))`; `+5` Real48 is
@@ -82,4 +85,12 @@ auctions, sell, loans, tickets, salaries) is the missing gameplay layer and need
   the market is **not** user-only: AI clubs buy through the auction too (the earlier conclusion came from not finding a direct
   AI-AI routine). The routines that decide who buys (`3aad`, `5b37`, `63fa`) still need to be decoded for the port to
   reproduce the strength drift this causes.
+
+### Implemented in the port (`core/src/finance.rs`, `world.rs`, `season.rs`)
+Every club has cash, ledger totals, a stadium level and `F`. Per league game (order of `1010:9396`): attendance (one `Random` real), gate to
+the home club, then each club pays its wage bill. Cup ties split the gate. `F` is smoothed each round with
+`ratio = cash of the AI clubs / division total at the previous round` — this is an approximation of `6e48` (the sample's fourth division
+could not be reproduced exactly). Not modelled: transfers (purchases/sales), loans, stadium expansion, the user's price setting, prizes.
+New games and imported `.e98` saves start with the original's cash (the import also reads cash, loan, `F` and the season ledger).
+Checked against the sample save: first-division gates 2.0-2.9 M (sample 2.2-2.6 M), wages -532 k per game for the best club (sample -471 k).
 

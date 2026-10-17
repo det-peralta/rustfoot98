@@ -9,6 +9,7 @@
 //! **Assumed (not yet decoded):** the auto line-up rule (the real `1010:4b73`; we pick the strongest of the game's twelve
 //! formations), tie order, and that ranks are taken after the round's results.
 use crate::evolution::{evolve_squad, level_for_rank};
+use crate::finance::{self, Category, Finance};
 use crate::matchsim::{fixture_value, morale_results, update_morale, Event, Match, Side, SubEvent};
 use crate::rng::DelphiRng;
 use crate::sector::{Slot, Status};
@@ -51,6 +52,7 @@ pub struct Club {
     pub goals_against: i32,
     /// Games played by the current coach (`coach+0x0c`, saturating at `i16::MAX`); reset when the coach is sacked.
     pub coach_games: u16,
+    pub fin: Finance,
 }
 
 /// Coach sacking (`1010:8b5d`): an AI coach with at least this many games ...
@@ -86,6 +88,7 @@ impl Club {
             goals_for: 0,
             goals_against: 0,
             coach_games: 0,
+            fin: Finance::default(),
         }
     }
 }
@@ -237,6 +240,17 @@ pub struct MatchRecord {
     pub away_goals: i32,
     pub events: Vec<Event>,
     pub subs: Vec<SubEvent>,
+    /// Attendance and gate receipts of the home club (0 when finances are not simulated).
+    pub attendance: i64,
+    pub gate: i64,
+}
+
+/// What a round needs to book the money: the division's ticket price, the economy index and the currency scale.
+#[derive(Clone, Copy, Debug)]
+pub struct MoneyCtx {
+    pub price: f64,
+    pub e: f64,
+    pub g: i64,
 }
 
 /// The twelve formations of the game's *Seleccionar* menu (verified from the main form's menu items), as
@@ -424,6 +438,7 @@ pub fn play_round(
     round: usize,
     names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
     plans: &HashMap<usize, Plan>,
+    money: Option<MoneyCtx>,
 ) -> Vec<MatchRecord> {
     let mut records = Vec::new();
     for (i, c) in clubs.iter_mut().enumerate() {
@@ -437,6 +452,21 @@ pub fn play_round(
         let hb = fixture_value(&division, &hn, true) + 2;
         let ab = fixture_value(&division, &an, true);
         let (hc, ac) = two_mut(clubs, h, a);
+        let (attendance, gate) = match money {
+            Some(m) => {
+                let att = finance::attendance(
+                    rng,
+                    finance::rating(&hc.slots),
+                    finance::rating(&ac.slots),
+                    hc.k,
+                    ac.k,
+                    false,
+                    hc.fin.capacity(),
+                );
+                (att, (att as f64 * m.price).round_ties_even() as i64)
+            }
+            None => (0, 0),
+        };
         let g = play_game(rng, hc, ac, hb, ab, plans.get(&h), plans.get(&a), false);
         let (x, y) = (g.home_goals, g.away_goals);
         hc.goals_for += x;
@@ -461,6 +491,13 @@ pub fn play_round(
                 ac.draws += 1;
             }
         }
+        if let Some(m) = money {
+            hc.fin.book(gate, Category::Gate);
+            for c in [&mut *hc, &mut *ac] {
+                let wages = finance::wage_bill(&c.slots, c.fin.f, m.e, m.g);
+                c.fin.book(-wages, Category::Wages);
+            }
+        }
         let (rh, ra) = morale_results(x, y);
         hc.maybe_sack_coach();
         ac.maybe_sack_coach();
@@ -475,6 +512,8 @@ pub fn play_round(
             away_goals: y,
             events: g.events,
             subs: g.subs,
+            attendance,
+            gate,
         });
     }
     records
@@ -717,7 +756,7 @@ mod tests {
             };
             (n(), n(), n())
         };
-        play_round(&mut rng, &mut clubs, 1, &mut names, &HashMap::new());
+        play_round(&mut rng, &mut clubs, 1, &mut names, &HashMap::new(), None);
         for c in &clubs {
             assert_eq!(c.wins + c.draws + c.losses, 1);
             assert_eq!(c.points, c.wins * 3 + c.draws);

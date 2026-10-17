@@ -8,14 +8,15 @@
 //! for the first 33 teams and 1 for the rest (`1028:0373`). **Assumed:** squad composition of the fictional world
 //! (2 GK, 7 DEF, 6 MID, 5 ATT), fictional names, no cup (so only the champion's `K += 1.0` applies).
 use crate::cup;
-use crate::economy::{walk_index, INITIAL_INDEX};
+use crate::economy::{walk_index, DEFAULT_SCALE, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
+use crate::finance::{self, Finance};
 use crate::matchsim::{Event, SubEvent};
 use crate::rng::DelphiRng;
 use crate::season::{apply_plan, auto_lineup, play_game};
 use crate::season::{
     best_formation, end_of_round, end_of_season, plan_for_formation, play_round, standings, Club,
-    MatchRecord, Plan, FORMATIONS,
+    MatchRecord, MoneyCtx, Plan, FORMATIONS,
 };
 use crate::sector::{Slot, Status};
 use std::collections::HashMap;
@@ -132,6 +133,7 @@ pub struct CupMatch {
     /// Player names of the two squads, so that the events can be shown.
     pub home_players: Vec<String>,
     pub away_players: Vec<String>,
+    pub attendance: i64,
 }
 
 #[derive(Clone, Debug)]
@@ -166,6 +168,10 @@ pub struct World {
     pub year: u16,
     /// Global economy index (`10c8:2b46`), random-walked every round.
     pub economy: f64,
+    /// Currency scale `G` (`10c8:2d87`).
+    pub scale: i64,
+    /// Total cash of each division at the last `1010:7067` (the denominator of the economic-factor update).
+    pub cash_ref: [i64; 4],
     /// Rounds already played this season (0..=13); a new season starts after round 14.
     pub round: usize,
     pub rng: DelphiRng,
@@ -201,6 +207,7 @@ fn make_club(rng: &mut DelphiRng, name: String, base: i32) -> Club {
     }
     let mut club = Club::new(&name, slots);
     club.names = names;
+    club.fin = Finance::new_game(base, DEFAULT_SCALE);
     club
 }
 
@@ -260,6 +267,7 @@ fn club_from_eft(
     }
     let mut club = Club::new(&name, slots);
     club.names = names;
+    club.fin = Finance::new_game(base, DEFAULT_SCALE);
     Ok(club)
 }
 
@@ -306,6 +314,8 @@ impl World {
             pool,
             year: 1998,
             economy: INITIAL_INDEX,
+            scale: DEFAULT_SCALE,
+            cash_ref: [0; 4],
             round: 0,
             rng,
             last_round: Vec::new(),
@@ -316,6 +326,7 @@ impl World {
             cup_champion: None,
         };
         w.reset_cup();
+        w.refresh_cash_ref();
         w.pick_human();
         Ok(w)
     }
@@ -333,6 +344,8 @@ impl World {
             pool,
             year,
             economy: INITIAL_INDEX,
+            scale: DEFAULT_SCALE,
+            cash_ref: [0; 4],
             round,
             rng: DelphiRng::new(seed),
             last_round: Vec::new(),
@@ -343,6 +356,7 @@ impl World {
             cup_champion: None,
         };
         w.reset_cup();
+        w.refresh_cash_ref();
         w
     }
 
@@ -370,6 +384,8 @@ impl World {
             pool,
             year: 1998,
             economy: INITIAL_INDEX,
+            scale: DEFAULT_SCALE,
+            cash_ref: [0; 4],
             round: 0,
             rng,
             last_round: Vec::new(),
@@ -380,6 +396,7 @@ impl World {
             cup_champion: None,
         };
         w.reset_cup();
+        w.refresh_cash_ref();
         w.pick_human();
         w
     }
@@ -406,6 +423,47 @@ impl World {
     }
 
     /// Starts a new cup: every club of the world is in.
+    /// For games saved before finances existed: the cash a new game would give each club, by list position.
+    pub fn give_new_game_finances(&mut self) {
+        let order: Vec<(usize, usize)> = (0..4)
+            .flat_map(|d| (0..self.divisions[d].len()).map(move |i| (d, i)))
+            .collect();
+        for (pos, (d, i)) in order.into_iter().enumerate() {
+            self.divisions[d][i].fin = Finance::new_game(base_strength(pos), self.scale);
+        }
+        for (j, c) in self.pool.iter_mut().enumerate() {
+            c.fin = Finance::new_game(base_strength(32 + j), self.scale);
+        }
+        self.refresh_cash_ref();
+    }
+
+    /// `1010:7067` for every division: remembers the total cash.
+    pub fn refresh_cash_ref(&mut self) {
+        for d in 0..4 {
+            self.cash_ref[d] = self.divisions[d].iter().map(|c| c.fin.cash).sum();
+        }
+    }
+
+    /// `1010:6e48`, once per round and division: `F = 0.8 F + 0.2 ratio`, `ratio` = cash of the computer-managed clubs over the
+    /// division total remembered earlier (floor 0.1). The reference total is refreshed afterwards. (How the original
+    /// times the total and the human exclusion could not be reproduced exactly; see `docs/finance.md`.)
+    fn update_factors(&mut self) {
+        let human = self.human.as_ref().map(|h| h.club.clone());
+        for d in 0..4 {
+            let ai: i64 = self.divisions[d]
+                .iter()
+                .filter(|c| Some(&c.name) != human.as_ref())
+                .map(|c| c.fin.cash)
+                .sum();
+            let reference = self.cash_ref[d].max(1) as f64;
+            let ratio = (ai as f64 / reference).max(0.1);
+            for c in &mut self.divisions[d] {
+                c.fin.f = 0.8 * c.fin.f + 0.2 * ratio;
+            }
+        }
+        self.refresh_cash_ref();
+    }
+
     pub fn reset_cup(&mut self) {
         self.cup = self
             .divisions
@@ -454,6 +512,7 @@ impl World {
             let (Some(hl), Some(al)) = (self.locate(&hn), self.locate(&an)) else {
                 continue;
             };
+            let money = self.money_ctx(hl.0.min(3));
             let placeholder = || Club::new("", Vec::new());
             let mut home = std::mem::replace(self.club_at(hl), placeholder());
             let mut away = std::mem::replace(self.club_at(al), placeholder());
@@ -470,6 +529,15 @@ impl World {
                 }
             };
             let (hp, ap) = (plan_of(&mut home), plan_of(&mut away));
+            let attendance = finance::attendance(
+                &mut self.rng,
+                finance::rating(&home.slots),
+                finance::rating(&away.slots),
+                home.k,
+                away.k,
+                true,
+                home.fin.capacity(),
+            );
             let hb = crate::matchsim::fixture_value(b"TACA", home.name.as_bytes(), true) + 2;
             let ab = crate::matchsim::fixture_value(b"TACA", away.name.as_bytes(), true);
             let g = play_game(
@@ -492,6 +560,13 @@ impl World {
             } else {
                 g.home_goals < g.away_goals
             };
+            // cup gate receipts are shared (`1010:9396`, game type 1), wages are paid as in the league
+            let half = (attendance as f64 * money.price / 2.0).round_ties_even() as i64;
+            for c in [&mut home, &mut away] {
+                c.fin.book(half, finance::Category::Gate);
+                let wages = finance::wage_bill(&c.slots, c.fin.f, money.e, money.g);
+                c.fin.book(-wages, finance::Category::Wages);
+            }
             let (mh, ma) = cup::morale_results(!home_out);
             home.k = crate::matchsim::update_morale(home.k, mh);
             away.k = crate::matchsim::update_morale(away.k, ma);
@@ -512,6 +587,7 @@ impl World {
                 subs: g.subs,
                 home_players: home.names.clone(),
                 away_players: away.names.clone(),
+                attendance,
             });
             losers.push(loser);
             *self.club_at(hl) = home;
@@ -592,6 +668,20 @@ impl World {
         }
     }
 
+    /// The ticket price of division `d` and the constants a round needs to book money (`1040:35e1` via `1010:0875`).
+    pub fn money_ctx(&self, d: usize) -> MoneyCtx {
+        let clubs = &self.divisions[d];
+        let n = clubs.len().max(1) as f64;
+        let avg_f = clubs.iter().map(|c| c.fin.f).sum::<f64>() / n;
+        let avg_rating = (clubs.iter().map(|c| finance::rating(&c.slots)).sum::<i64>() as f64 / n)
+            .round_ties_even() as i64;
+        MoneyCtx {
+            price: finance::ticket_price(avg_f, avg_rating, self.economy, self.scale),
+            e: self.economy,
+            g: self.scale,
+        }
+    }
+
     /// Plays the next round of every division, evolves the squads, and runs the season end after round 14.
     pub fn play_round(&mut self) {
         self.last_round.clear();
@@ -615,17 +705,20 @@ impl World {
                     plans.insert(hi, h.plan.clone());
                 }
             }
+            let money = self.money_ctx(d);
             let records = play_round(
                 &mut self.rng,
                 &mut self.divisions[d],
                 round,
                 &mut names,
                 &plans,
+                Some(money),
             );
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
             end_of_round(&mut self.rng, &mut self.divisions[d], DIVISION_BASE[d]);
         }
         self.economy = walk_index(&mut self.rng, self.economy, self.year);
+        self.update_factors();
         self.round = round;
         self.last_cup = None;
         if round.is_multiple_of(2) {
@@ -709,6 +802,7 @@ impl World {
         self.year += 1;
         self.round = 0;
         self.reset_cup();
+        self.refresh_cash_ref();
     }
 
     pub fn play_season(&mut self) {

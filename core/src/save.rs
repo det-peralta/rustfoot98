@@ -4,7 +4,8 @@
 //! everything needed to continue a game identically: the clubs with their squads and standings, the outside pool, the year,
 //! round and economy index, the user's plan, and the RNG seed. The results of the last round and the last season summary
 //! are not stored.
-use crate::economy::INITIAL_INDEX;
+use crate::economy::{DEFAULT_SCALE, INITIAL_INDEX};
+use crate::finance::Finance;
 use crate::rng::DelphiRng;
 use crate::season::{Club, Plan, PlannedSub};
 use crate::sector::{Slot, Status};
@@ -34,11 +35,16 @@ impl World {
         out.push_str(MAGIC);
         out.push('\n');
         out.push_str(&format!(
-            "year|{}\neconomy|{:?}\nround|{}\nseed|{}\n",
+            "year|{}\neconomy|{:?}\nround|{}\nseed|{}\nscale|{}\ncashref|{}|{}|{}|{}\n",
             self.year,
             self.economy,
             self.round,
-            self.rng.seed()
+            self.rng.seed(),
+            self.scale,
+            self.cash_ref[0],
+            self.cash_ref[1],
+            self.cash_ref[2],
+            self.cash_ref[3]
         ));
         if let Some(h) = &self.human {
             let subs: Vec<String> = h
@@ -64,7 +70,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -74,7 +80,16 @@ impl World {
                 c.losses,
                 c.goals_for,
                 c.goals_against,
-                c.coach_games
+                c.coach_games,
+                c.fin.cash,
+                c.fin.loan,
+                c.fin.f,
+                c.fin.stadium,
+                c.fin.gate,
+                c.fin.sales,
+                c.fin.purchases,
+                c.fin.wages,
+                c.fin.interest
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -114,6 +129,9 @@ impl World {
         let mut cup: Vec<String> = Vec::new();
         let mut cup_champion: Option<String> = None;
         let mut has_cup = false;
+        let mut has_finance = false;
+        let mut scale = DEFAULT_SCALE;
+        let mut cash_ref = [0i64; 4];
         let mut divisions: [Vec<Club>; 4] = Default::default();
         let mut pool: Vec<Club> = Vec::new();
         let mut current: Option<(usize, Club)> = None;
@@ -156,6 +174,12 @@ impl World {
                         .ok_or(format!("line {}: bad economy", n + 1))?
                 }
                 "round" => round = num(n, &f, 1)? as usize,
+                "scale" => scale = num(n, &f, 1)?.max(1),
+                "cashref" => {
+                    for (i, r) in cash_ref.iter_mut().enumerate() {
+                        *r = num(n, &f, 1 + i)?;
+                    }
+                }
                 "seed" => seed = Some(num(n, &f, 1)? as u32),
                 "cup" => {
                     has_cup = true;
@@ -207,6 +231,22 @@ impl World {
                     c.goals_against = num(n, &f, 9)? as i32;
                     // older saves have no coach counter
                     c.coach_games = f.get(10).and_then(|x| x.parse().ok()).unwrap_or(0);
+                    // older saves carry no finances: they keep the defaults and are given a new-game state below
+                    if f.len() >= 20 {
+                        let int = |i: usize| f[i].parse::<i64>().unwrap_or(0);
+                        c.fin = Finance {
+                            cash: int(11),
+                            loan: int(12),
+                            f: f[13].parse().unwrap_or(1.0),
+                            stadium: int(14).clamp(1, 24) as u8,
+                            gate: int(15),
+                            sales: int(16),
+                            purchases: int(17),
+                            wages: int(18),
+                            interest: int(19),
+                        };
+                        has_finance = true;
+                    }
                     c.names.clear();
                     current = Some((num(n, &f, 1)? as usize, c));
                 }
@@ -249,6 +289,8 @@ impl World {
             pool,
             year: year.ok_or("missing year")?,
             economy,
+            scale,
+            cash_ref,
             round,
             rng: DelphiRng::new(seed.ok_or("missing seed")?),
             last_round: Vec::new(),
@@ -260,6 +302,9 @@ impl World {
         };
         if !has_cup {
             w.reset_cup();
+        }
+        if !has_finance {
+            w.give_new_game_finances();
         }
         if w.human.is_none() || w.human_location().is_none() {
             w.pick_human();
@@ -319,5 +364,40 @@ mod tests {
         let truncated: String = good.lines().take(40).collect::<Vec<_>>().join("\n");
         assert!(World::load(&truncated).unwrap_err().contains("8 clubs"));
         assert!(World::load(&good.replacen("seed|", "sead|", 1)).is_err());
+    }
+
+    #[test]
+    fn finances_survive_a_save_and_old_saves_get_new_game_money() {
+        let mut w = World::synthetic(77);
+        for _ in 0..3 {
+            w.play_round();
+        }
+        let back = World::load(&w.save()).unwrap();
+        for d in 0..4 {
+            for (a, b) in w.divisions[d].iter().zip(&back.divisions[d]) {
+                assert_eq!(a.fin, b.fin);
+            }
+        }
+        assert_eq!(back.cash_ref, w.cash_ref);
+        assert!(w.divisions[0]
+            .iter()
+            .all(|c| c.fin.gate >= 0 && c.fin.wages < 0));
+        // a save from before finances: club lines have at most 11 fields
+        let old: String = w
+            .save()
+            .lines()
+            .map(|l| {
+                if l.starts_with("club|") {
+                    l.split('|').take(11).collect::<Vec<_>>().join("|")
+                } else {
+                    l.to_string()
+                }
+            })
+            .filter(|l| !l.starts_with("scale|") && !l.starts_with("cashref|"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let loaded = World::load(&old).unwrap();
+        assert_eq!(loaded.divisions[0][0].fin.cash, 49 * 50_000 * 5);
+        assert_eq!(loaded.divisions[0][0].fin.stadium, 15);
     }
 }

@@ -8,6 +8,7 @@ pub mod e98;
 pub mod economy;
 pub mod eft;
 pub mod evolution;
+pub mod finance;
 pub mod matchsim;
 pub mod outcome;
 pub mod rng;

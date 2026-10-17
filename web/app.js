@@ -199,7 +199,8 @@ function renderResults() {
   box.hidden = false;
   const tl = timeline(m);
   const evs = tl.length ? tl.map((e) => `<div class="ev ${e.away ? "away" : ""}"><span class="m">${e.m}'</span><span>${e.html}</span><span></span></div>`).join("") : `<p class="empty">Sem acontecimentos.</p>`;
-  box.innerHTML = `<h3>${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</h3>${evs}`;
+  const gate = m.att ? `<p class="note">Público: ${m.att.toLocaleString("pt-PT")} · Receita: ${money(m.gate)}</p>` : "";
+  box.innerHTML = `<h3>${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</h3>${gate}${evs}`;
 }
 
 const isMine = (m) => state.human && m.div === state.human.div && (m.homeIdx === state.human.idx || m.awayIdx === state.human.idx) &&
@@ -241,10 +242,27 @@ function subsFromDom() {
   });
 }
 
+const money = (v) => `${v < 0 ? "−" : ""}${Math.abs(v).toLocaleString("pt-PT")}`;
+
+function renderFinance(h) {
+  const f = h.finance;
+  if (!f) { $("finance").innerHTML = ""; return; }
+  $("finance").innerHTML = `<h3>Finanças</h3><dl>` +
+    `<div><dt>Caixa</dt><dd>${money(f.cash)}</dd></div>` +
+    `<div><dt>Bilhetes (época)</dt><dd>${money(f.gate)}</dd></div>` +
+    `<div><dt>Salários (época)</dt><dd>${money(f.wages)}</dd></div>` +
+    `<div><dt>Salários por jogo</dt><dd>${money(-f.wageBill)}</dd></div>` +
+    `<div><dt>Preço do bilhete</dt><dd>${f.price}</dd></div>` +
+    `<div><dt>Estádio</dt><dd>${f.capacity.toLocaleString("pt-PT")} lugares (nível ${f.stadium})</dd></div>` +
+    `<div><dt>Empréstimo</dt><dd>${money(f.loan)}</dd></div></dl>` +
+    `<p class="note">Valores em reais (escala ${f.scale}). Receitas de bilheteira, salários, caixa inicial e estádio seguem o original; transferências ainda não existem.</p>`;
+}
+
 function renderClub() {
   const card = $("club-card"), h = state.human;
   if (!h) { card.hidden = true; return; }
   card.hidden = false;
+  renderFinance(h);
   $("club-name").textContent = h.club;
   $("club-div").textContent = state.divisions[h.div].name;
   const sel = $("formation");

@@ -14,8 +14,11 @@
 //! - league teams (the first 32 of the master list) end with a count (14) and 14 fixture entries of 16 bytes whose `u16` value at `+0` is the
 //!   team id of the opponent. Clubs that play each other form one division.
 use crate::cipher::read_pstr_n;
+use crate::economy::DEFAULT_SCALE;
+use crate::finance::Finance;
 use crate::season::Club;
 use crate::sector::{Slot, Status};
+use crate::world::base_strength;
 use crate::world::World;
 use std::collections::HashMap;
 
@@ -41,6 +44,11 @@ pub struct E98Team {
     pub goals_against: u16,
     pub points: u16,
     pub k: f64,
+    pub cash: i64,
+    pub loan: i64,
+    pub factor: f64,
+    /// Season totals of the ledger: gate, sales, purchases, wages.
+    pub ledger: [i64; 4],
     pub players: Vec<E98Player>,
     /// Team ids of the opponents in the fixture list (each twice); empty for clubs outside the league.
     pub opponents: Vec<u16>,
@@ -190,6 +198,27 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         let k = d.get(ko..ko + 6).map(real48).unwrap_or(1.0);
         let k = if (0.3..=11.0).contains(&k) { k } else { 1.0 };
 
+        // finances: ledger longs inside the standings block, then cash, loan and F after the morale and the coach id
+        let long = |at: usize| -> i64 {
+            d.get(at..at + 4)
+                .map(|b| i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as i64)
+                .unwrap_or(0)
+        };
+        let ledger = [
+            long(o + 0x31 - 0x15),
+            long(o + 0x35 - 0x15),
+            long(o + 0x39 - 0x15),
+            long(o + 0x41 - 0x15),
+        ];
+        let fo = ko + 6 + 2 + 28 + 28;
+        let (loan, cash) = (long(fo), long(fo + 4));
+        let factor = d.get(fo + 12..fo + 22).map(extended).unwrap_or(1.0);
+        let factor = if (0.1..=10.0).contains(&factor) {
+            factor
+        } else {
+            1.0
+        };
+
         // squad: scan forward for a run of player records
         let mut players = Vec::new();
         let mut q = ko + 6;
@@ -233,6 +262,10 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
             goals_against: w(4),
             points: w(5),
             k,
+            cash,
+            loan,
+            factor,
+            ledger,
             players,
             opponents,
         });
@@ -312,7 +345,7 @@ impl E98 {
     }
 }
 
-fn club_of(t: &E98Team, name: String) -> Club {
+fn club_of(t: &E98Team, name: String, base: i32) -> Club {
     let slots: Vec<Slot> = t
         .players
         .iter()
@@ -335,6 +368,14 @@ fn club_of(t: &E98Team, name: String) -> Club {
     c.losses = t.losses;
     c.goals_for = t.goals_for as i32;
     c.goals_against = t.goals_against as i32;
+    c.fin = Finance::new_game(base, DEFAULT_SCALE); // stadium level: the save's stadium object was not located
+    c.fin.cash = t.cash;
+    c.fin.loan = t.loan;
+    c.fin.f = t.factor;
+    c.fin.gate = t.ledger[0];
+    c.fin.sales = t.ledger[1];
+    c.fin.purchases = t.ledger[2];
+    c.fin.wages = t.ledger[3];
     c
 }
 
@@ -353,12 +394,16 @@ impl World {
             }
             name
         };
+        // team ids follow the master list, so the rank of the id is the list position that fixed the new-game values
+        let mut by_id: Vec<usize> = (0..save.teams.len()).collect();
+        by_id.sort_by_key(|&i| save.teams[i].id);
+        let base_of = |i: usize| base_strength(by_id.iter().position(|&x| x == i).unwrap_or(0));
         let mut in_league = std::collections::HashSet::new();
         let mut divisions: [Vec<Club>; 4] = Default::default();
         for (d, idx) in divs.iter().enumerate() {
             for &i in idx {
                 in_league.insert(i);
-                divisions[d].push(club_of(&save.teams[i], name_of(&save.teams[i])));
+                divisions[d].push(club_of(&save.teams[i], name_of(&save.teams[i]), base_of(i)));
             }
         }
         let mut rest: Vec<usize> = (0..save.teams.len())
@@ -367,7 +412,7 @@ impl World {
         rest.sort_by_key(|&i| std::cmp::Reverse(save.teams[i].level));
         let pool: Vec<Club> = rest
             .iter()
-            .map(|&i| club_of(&save.teams[i], name_of(&save.teams[i])))
+            .map(|&i| club_of(&save.teams[i], name_of(&save.teams[i]), base_of(i)))
             .collect();
         let round = divs
             .iter()
@@ -380,6 +425,7 @@ impl World {
             .unwrap_or(0);
         let mut w = World::empty(seed, divisions, pool, save.year, round.min(13));
         w.economy = save.economy;
+        w.refresh_cash_ref();
         let human = divs.iter().enumerate().find_map(|(d, idx)| {
             idx.iter()
                 .position(|&i| save.teams[i].id == save.human_id)
@@ -432,6 +478,22 @@ mod tests {
             // the standings are internally consistent
             for c in w.divisions.iter().flatten() {
                 assert_eq!(c.points, 3 * c.wins + c.draws, "{}", c.name);
+            }
+            let human = w.divisions[3]
+                .iter()
+                .find(|c| c.name == "FIGUEIRENSE")
+                .unwrap();
+            if name == "snap1.e98" {
+                assert_eq!(human.fin.cash, 1_250_000);
+                assert_eq!(
+                    w.divisions[0].iter().map(|c| c.fin.cash).max(),
+                    Some(12_250_000)
+                );
+                assert!((human.fin.f - 0.97679).abs() < 1e-4);
+            } else {
+                assert_eq!(human.fin.cash, 1_216_448);
+                assert_eq!(human.fin.gate, 47_448);
+                assert_eq!(human.fin.wages, -81_000);
             }
             let (d, _) = w.human_location().unwrap();
             assert_eq!(d, 3, "Figueirense starts in the fourth division");

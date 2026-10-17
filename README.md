@@ -36,7 +36,7 @@ open it with `?nosw` to skip the cache. CI (`.github/workflows/ci.yml`) runs fmt
 **Saving:** Guardar/Carregar use the browser's storage (optional autosave after every round); Exportar/Importar move a
 text file (`ELIFOOT98-RS 1`, our own format: `core/src/save.rs`). A loaded game continues identically (same RNG seed).
 **Importar .e98 original** reads a `JOGOS\*.e98` save of the original game in your browser (nothing is uploaded): squads, standings,
-morale, year and round carry over; economy, finances, injuries and the cup restart (see `docs/findings.md`).
+morale, year and round carry over; injuries and the cup restart; cash, loans and the economic factor are read as well (see `docs/findings.md`).
 Native checks:
 `cargo test`, `cargo run --release -p elifoot-core --example sim|season|world`, and the browser smoke test
 `node tools/capture/web_test.mjs`.

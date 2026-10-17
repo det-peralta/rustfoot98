@@ -27,4 +27,5 @@
 - [x] Save/load (own text format, browser storage + file export/import); a loaded game continues identically
 - [x] PWA: manifest, icons, service worker (offline after the first load), CI workflow
 - [x] Import of original `.e98` saves: rosters, standings, morale, year, round (see docs/findings.md); economy/finances/injuries still undecoded
+- [x] Finances: wages, gate, ticket price, cash, stadium (docs/finance.md); transfers/loans/prizes still open
 - [ ] The user's market (buy/sell, tickets, salaries)
