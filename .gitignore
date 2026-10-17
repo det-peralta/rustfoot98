@@ -20,3 +20,4 @@ analysis/out/
 analysis/ghidra-proj/
 analysis/rea/
 analysis/*.log
+target/
