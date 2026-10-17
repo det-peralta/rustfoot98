@@ -1,8 +1,9 @@
 # Analysis plan
 
 - [x] Identify target: 16-bit Windows NE, Delphi 1 (TGauge/TGaugeKind classes, VBX gauges)
-- [ ] Install Ghidra, configure REA provider, `rea doctor` green
-- [ ] Load `ELIFOOT.EXE` (NE loader), run analysis, recover Delphi RTTI/class names
+- [x] Install Ghidra 12.1.2, `rea doctor --provider ghidra` healthy (REA's `analyze` rejects NE, so Ghidra headless is used directly)
+- [x] Load `ELIFOOT.EXE` with Ghidra NE loader (x86:LE:16:Protected Mode), auto-analysis done, 3007 functions
+- [ ] Recover Delphi RTTI/class names and map event handlers to functions
 - [ ] Extract form resources (TForm layouts, strings) → UI spec
 - [ ] Document file formats: `.EFT` team, `.TXE`, `.e98` save
 - [ ] Locate RNG and match simulation; document algorithm

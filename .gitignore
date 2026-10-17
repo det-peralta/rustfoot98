@@ -14,3 +14,9 @@ original/
 node_modules/
 dist/
 .rea/
+
+# Derived from third-party binary / large local DBs
+analysis/out/
+analysis/ghidra-proj/
+analysis/rea/
+analysis/*.log

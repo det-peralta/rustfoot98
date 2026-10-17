@@ -35,3 +35,16 @@ Reference build for differential testing: <https://github.com/elifoot98web/elifo
 
 ## 4. Out of scope
 The registration key generator (`crack.exe`) offered on some mirrors is **not** used.
+
+## 5. Running the analysis
+REA 6.5.0 `analyze` rejects 16-bit NE executables (`unsupported NE executable in MZ image`),
+so use Ghidra headless directly (its NE loader works):
+
+```bash
+/opt/ghidra/support/analyzeHeadless analysis/ghidra-proj elifoot \
+  -import original/elifoot98/ELIFOOT.EXE -overwrite
+/opt/ghidra/support/analyzeHeadless analysis/ghidra-proj elifoot \
+  -process ELIFOOT.EXE -noanalysis -scriptPath tools/ghidra \
+  -postScript ExportSummary.java analysis/out
+```
+Outputs (git-ignored): `analysis/out/{memory,functions,strings,symbols}.txt`.
