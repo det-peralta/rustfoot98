@@ -16,6 +16,8 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/architecture.md](docs/architecture.md) | How the current site works, and the target port design |
 | [docs/analysis-plan.md](docs/analysis-plan.md) | Step-by-step reverse-engineering plan and status |
 | [docs/findings.md](docs/findings.md) | Facts established about the binary and file formats |
+| [docs/classes.md](docs/classes.md) | Delphi class table |
+| [docs/references.md](docs/references.md) | Third-party research (leads to verify) |
 
 ## Status
 See the checklist in [docs/analysis-plan.md](docs/analysis-plan.md).
