@@ -111,3 +111,9 @@ Saves are written to the host folder `original/run/d/eli98/jogos/` (git-ignored)
 ## Correction to the player record notes
 In the save, the tail field at `+23` (u16, values 1..9) is the hidden talent `g`; a player is a star when
 `g >= 8` and position >= 2 (matches the single `*` player). The field at `+2` is the strength.
+
+## Player tail fields, final map (verified 15/15 with name-derived formulas)
+`+0` position, `+1` star, `+2` strength (u16), `+17` aggression (u8), `+21` injury proneness (u16),
+`+23` talent `g` (u16), `+25` price (u16), `+32` appearances. `+8` (1 or 2 -> 0 after a round) is unidentified.
+The earlier guess that `+21` was "contract games" is wrong. Aggression, proneness and `g` are not stored
+independently of the name: they are recomputed from it by the game (`1010:7516`).

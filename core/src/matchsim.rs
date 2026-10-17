@@ -1,13 +1,14 @@
-//! Minute-by-minute match, following `1048:069b` -> `1010:a6eb`/`46df`/`aea7`.
+//! Minute-by-minute match (v1), following `1048:069b` -> `a6eb`, `aa11`, `ac72`, `aea7`.
 //!
-//! Implemented: primary bonus rolls (`Random(6000)`/`Random(7000)`), the main goal generator, scorer
-//! selection and goal annulment. **Not yet modelled** (decoded elsewhere in the original): red cards and
-//! injuries (`aa11`, `ac72`), penalties, substitutions, half-time/extra-time handling, human interaction.
-//! `scorer` for the main generator uses an approximation of the roulette in `1010:100b` (weights unknown).
+//! Implemented: primary bonus rolls (`Random(6000)`/`Random(7000)`), the main goal generator with the
+//! weighted scorer roulette (bench weights dilute it, as in the original), penalties after a goalkeeper or
+//! defender is sent off, red cards (`aa11`), injuries (`ac72`), automatic substitutions (`67f7`) and goal
+//! annulment (`aea7`). **Not yet modelled:** half-time/extra time, the post-match `K` update, human-controlled
+//! interaction, the foul roulette of the interactive path.
 use crate::chance::{self, SideState};
 use crate::outcome::{self, Outcome};
 use crate::rng::DelphiRng;
-use crate::sector::{self, Sectors, Slot};
+use crate::sector::{self, Sectors, Slot, Status};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
@@ -15,10 +16,23 @@ pub enum Side {
     Away,
 }
 
+impl Side {
+    pub fn other(self) -> Side {
+        match self {
+            Side::Home => Side::Away,
+            Side::Away => Side::Home,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventKind {
     Goal,
     Annulled,
+    /// Event kind 4 (`aa11`).
+    RedCard,
+    /// Event kind 5 (`ac72`).
+    Injury,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -26,9 +40,11 @@ pub struct Event {
     pub minute: u16,
     pub side: Side,
     pub kind: EventKind,
-    /// Index into the scoring team's slots.
-    pub scorer: usize,
-    /// Came from the rare `Random(6000)/(7000)` path (event kind 2 in the original).
+    /// Index into that team's slots (scorer, sent-off or injured player).
+    pub player: usize,
+    /// Position of the player (the original stores it in the event, `+0x0c`).
+    pub position: u8,
+    /// Goal came from the rare bonus/penalty path (event kind 2).
     pub primary: bool,
 }
 
@@ -40,10 +56,16 @@ pub struct TeamState {
     pub annulled: i32,
     /// `team+0x5b` Real48 multiplier (1.0 at the start).
     pub k: f64,
+    /// `team+0x4d`: substitutions left, `min(3, fit substitutes)` (`1010:4b73`).
+    pub subs_left: u8,
 }
 
 impl TeamState {
     pub fn new(slots: Vec<Slot>) -> Self {
+        let fit = slots
+            .iter()
+            .filter(|s| s.status == Status::Sub && s.available())
+            .count();
         let sectors = sector::compute(&slots);
         Self {
             slots,
@@ -51,6 +73,7 @@ impl TeamState {
             goals: 0,
             annulled: 0,
             k: 1.0,
+            subs_left: fit.min(3) as u8,
         }
     }
 
@@ -62,6 +85,46 @@ impl TeamState {
             k: self.k,
         }
     }
+
+    fn recompute(&mut self) {
+        self.sectors = sector::compute(&self.slots);
+    }
+}
+
+/// `1010:0f2e` weights for the roulette `1010:100b`: kind 1 strength, 2 `pos^2*strength*g` (scorers),
+/// 3 aggression (red cards), 4 injury proneness.
+fn weight(p: &Slot, kind: u8) -> u32 {
+    match kind {
+        1 => p.strength as u32,
+        2 => {
+            ((p.position as u16 * p.position as u16)
+                .wrapping_mul(p.strength)
+                .wrapping_mul(p.g as u16)) as u32
+        }
+        3 => p.aggression as u32,
+        4 => p.proneness as u32,
+        _ => 0,
+    }
+}
+
+/// `1010:100b(kind, mode 1, squad)`: the total includes **every** slot, the pick only walks the starters,
+/// so a roll that lands in the bench's share selects nobody.
+pub fn roulette(rng: &mut DelphiRng, slots: &[Slot], kind: u8) -> Option<usize> {
+    let total: u32 = slots
+        .iter()
+        .map(|p| weight(p, kind))
+        .fold(0u16, |a, w| a.wrapping_add(w as u16)) as u32;
+    let r = rng.random(total as u16) as u32;
+    let mut acc = 0u32;
+    for (i, p) in slots.iter().enumerate() {
+        if p.starter() {
+            acc += weight(p, kind);
+            if r < acc {
+                return Some(i);
+            }
+        }
+    }
+    None
 }
 
 #[derive(Clone, Debug)]
@@ -87,7 +150,7 @@ impl Match {
         }
     }
 
-    fn team(&self, side: Side) -> &TeamState {
+    pub fn team(&self, side: Side) -> &TeamState {
         match side {
             Side::Home => &self.home,
             Side::Away => &self.away,
@@ -103,93 +166,185 @@ impl Match {
 
     /// AI-resolved chance (`1038:39b6`): best attacker against the best goalkeeper; a goal needs outcome `Goal`.
     fn primary_goal(&mut self, rng: &mut DelphiRng, side: Side) -> Option<usize> {
-        let (att, def) = match side {
-            Side::Home => (&self.home, &self.away),
-            Side::Away => (&self.away, &self.home),
-        };
+        let (att, def) = (self.team(side), self.team(side.other()));
         let shooter = sector::best_attacker(&att.slots)?;
         let keeper = sector::best_defender(&def.slots)?;
-        let o = outcome::shot(
-            rng,
-            att.slots[shooter].attack_force(),
-            def.slots[keeper].strength,
-        );
-        (o == Outcome::Goal).then_some(shooter)
+        let force = att.slots[shooter].attack_force();
+        let strength = def.slots[keeper].strength;
+        (outcome::shot(rng, force, strength) == Outcome::Goal).then_some(shooter)
     }
 
-    /// Approximation of the `100b` roulette: weight = attack force of starters (outfield players weigh at least 1).
-    fn roulette_scorer(&self, rng: &mut DelphiRng, side: Side) -> Option<usize> {
-        let slots = &self.team(side).slots;
-        let w = |p: &Slot| {
-            if p.starter {
-                p.attack_force().max(1) as u32
-            } else {
-                0
-            }
-        };
-        let total: u32 = slots.iter().map(w).sum();
-        if total == 0 {
-            return None;
-        }
-        let r = rng.random(total.min(u16::MAX as u32) as u16) as u32;
-        let mut acc = 0;
-        slots.iter().position(|p| {
-            acc += w(p);
-            w(p) > 0 && r < acc
-        })
-    }
-
-    /// Main generator for one side; returns the scorer when a goal happens.
+    /// Main generator for one side; the scorer comes from the roulette (kind 2) and may be nobody.
     fn secondary_goal(&mut self, rng: &mut DelphiRng, side: Side) -> Option<usize> {
         let own = self.team(side).side_state();
-        let opp = self
-            .team(match side {
-                Side::Home => Side::Away,
-                Side::Away => Side::Home,
-            })
-            .sectors;
+        let opp = self.team(side.other()).sectors;
         if chance::chance(rng, &own, &opp, side == Side::Home, self.minute) {
-            self.roulette_scorer(rng, side)
+            roulette(rng, &self.team(side).slots, 2)
         } else {
             None
         }
     }
 
-    /// `1010:a6eb` without penalties. Returns true when a goal was scored this minute.
+    /// Penalty after a red card in the previous minute (`a6eb`): goalkeeper always, defender 1 in 3.
+    fn penalty_for(&self, rng: &mut DelphiRng, side: Side) -> bool {
+        let Some(e) = self.events.last() else {
+            return false;
+        };
+        if e.minute + 1 != self.minute
+            || e.kind != EventKind::RedCard
+            || e.side != side.other()
+            || self.minute % 45 <= 1
+        {
+            return false;
+        }
+        e.position == 0 || (e.position == 1 && rng.random(3) == 0)
+    }
+
+    /// `1010:a6eb`. Returns true when a goal was scored this minute.
     fn chances(&mut self, rng: &mut DelphiRng) -> bool {
         let m = self.minute;
+        let home_pen = self.penalty_for(rng, Side::Home);
         let r6000 = rng.random(6000) as i32;
-        let mut home = if self.home_bonus >= 0 && r6000 < self.home_bonus {
-            self.primary_goal(rng, Side::Home).map(|s| (s, true))
-        } else {
-            None
-        };
-        let r7000 = rng.random(7000) as i32;
-        let mut away = if home.is_none() && self.away_bonus >= 0 && r7000 < self.away_bonus {
-            self.primary_goal(rng, Side::Away).map(|s| (s, true))
-        } else {
-            None
-        };
-        if home.is_none() && away.is_none() {
-            home = self.secondary_goal(rng, Side::Home).map(|s| (s, false));
+        let mut home = None;
+        if (self.home_bonus >= 0 && r6000 < self.home_bonus) || home_pen {
+            home = self.primary_goal(rng, Side::Home).map(|s| (s, true));
         }
-        if home.is_none() && away.is_none() {
-            away = self.secondary_goal(rng, Side::Away).map(|s| (s, false));
+        let home_block = home_pen || home.is_some();
+        let away_pen = self.penalty_for(rng, Side::Away);
+        let r7000 = rng.random(7000) as i32;
+        let mut away = None;
+        if ((self.away_bonus >= 0 && r7000 < self.away_bonus) || away_pen) && home.is_none() {
+            away = self.primary_goal(rng, Side::Away).map(|s| (s, true));
+        }
+        let away_block = away_pen || away.is_some();
+        if !home_block && !away_block {
+            home = self.secondary_goal(rng, Side::Home).map(|s| (s, false));
+            if home.is_none() {
+                away = self.secondary_goal(rng, Side::Away).map(|s| (s, false));
+            }
         }
         for (side, hit) in [(Side::Home, home), (Side::Away, away)] {
-            if let Some((scorer, primary)) = hit {
+            if let Some((player, primary)) = hit {
+                let position = self.team(side).slots[player].position;
                 self.team_mut(side).goals += 1;
                 self.events.push(Event {
                     minute: m,
                     side,
                     kind: EventKind::Goal,
-                    scorer,
+                    player,
+                    position,
                     primary,
                 });
                 return true;
             }
         }
         false
+    }
+
+    /// `1010:67f7`: automatic substitution. Mode 0 (injury): first designated substitute with the same
+    /// goalkeeper-ness. Mode 1 (red card): only for a sent-off goalkeeper; the last starter makes way.
+    fn auto_sub(&mut self, side: Side, out: usize, mode: u8) {
+        let t = self.team_mut(side);
+        if t.subs_left == 0 {
+            return;
+        }
+        let is_gk = t.slots[out].position == 0;
+        let (leaving, coming) = match mode {
+            0 => (
+                Some(out),
+                t.slots
+                    .iter()
+                    .position(|s| s.status == Status::Sub && (s.position == 0) == is_gk),
+            ),
+            _ if is_gk => {
+                let sub = t
+                    .slots
+                    .iter()
+                    .position(|s| s.status == Status::Sub && s.position == 0);
+                let last_starter = (1..t.slots.len()).rev().find(|&i| t.slots[i].starter());
+                (last_starter, sub)
+            }
+            _ => (None, None),
+        };
+        if let (Some(l), Some(c)) = (leaving, coming) {
+            t.slots[l].status = Status::Out;
+            t.slots[c].status = Status::Starter;
+            t.subs_left -= 1;
+            t.recompute();
+        }
+    }
+
+    /// `1010:aa11` (red card). Returns true when a player was sent off.
+    fn red_card(&mut self, rng: &mut DelphiRng) -> bool {
+        let r = rng.random(1000) as i32;
+        let side = if r < 10 && self.home_bonus < r {
+            Side::Home
+        } else if r < 10 && self.away_bonus < r {
+            Side::Away
+        } else {
+            return false;
+        };
+        let Some(i) = roulette(rng, &self.team(side).slots, 3) else {
+            return false;
+        };
+        if self.team(side).slots[i].aggression < 1 {
+            return false;
+        }
+        let ban = rng.random(4) as u8 + 1;
+        let position = {
+            let p = &mut self.team_mut(side).slots[i];
+            p.status = Status::Out;
+            p.ban = ban;
+            p.position
+        };
+        self.events.push(Event {
+            minute: self.minute,
+            side,
+            kind: EventKind::RedCard,
+            player: i,
+            position,
+            primary: false,
+        });
+        self.auto_sub(side, i, 1);
+        self.home.recompute();
+        self.away.recompute();
+        true
+    }
+
+    /// `1010:ac72` (injury). Returns true when a player was injured.
+    fn injury(&mut self, rng: &mut DelphiRng) -> bool {
+        let side = match rng.random(500) {
+            0 => Side::Home,
+            1 => Side::Away,
+            _ => return false,
+        };
+        let Some(i) = roulette(rng, &self.team(side).slots, 4) else {
+            return false;
+        };
+        if self.team(side).slots[i].proneness < 1 {
+            return false;
+        }
+        let upper = rng.random(20);
+        let games = rng.random(upper) as u8 + 1;
+        let position = {
+            let p = &mut self.team_mut(side).slots[i];
+            p.status = Status::Out;
+            p.injured = games;
+            p.strength = p.strength.saturating_sub(10).max(1);
+            p.position
+        };
+        self.events.push(Event {
+            minute: self.minute,
+            side,
+            kind: EventKind::Injury,
+            player: i,
+            position,
+            primary: false,
+        });
+        self.auto_sub(side, i, 0);
+        self.home.recompute();
+        self.away.recompute();
+        true
     }
 
     /// `1010:aea7`: the goal scored in the previous minute may be annulled.
@@ -212,9 +367,8 @@ impl Match {
     /// One minute of play (`1048:069b` body for a single game).
     pub fn step(&mut self, rng: &mut DelphiRng) {
         self.minute += 1;
-        let goal = self.chances(rng);
-        // aa11 (Random(1000)) and ac72 (Random(500)) would run here when no goal happened: not modelled yet.
-        if !goal && self.minute != 46 && self.minute != 91 {
+        let happened = self.chances(rng) || self.red_card(rng) || self.injury(rng);
+        if !happened && self.minute != 46 && self.minute != 91 {
             self.annul(rng);
         }
     }
@@ -231,71 +385,102 @@ impl Match {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
-    /// 4-4-2 with `strength` everywhere, domestic players, `g` drawn from 1..=10.
-    pub fn squad(strength: u16, rng: &mut DelphiRng) -> Vec<Slot> {
-        let shape = [0u8, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3];
-        shape
-            .iter()
-            .map(|&position| Slot {
-                starter: true,
-                position,
-                strength,
-                g: rng.random(10) as u8 + 1,
-                same_country: true,
-            })
+    fn name(rng: &mut DelphiRng) -> String {
+        (0..5 + rng.random(8))
+            .map(|_| (b'a' + rng.random(26) as u8) as char)
             .collect()
     }
 
-    fn avg(n: u32, home_s: u16, away_s: u16, seed: u32) -> (f64, f64, f64, f64) {
+    /// 4-4-2 starters with `strength`, plus a bench of 1 GK + 4 outfield players.
+    pub fn squad(strength: u16, rng: &mut DelphiRng) -> Vec<Slot> {
+        let mut v = Vec::new();
+        for &pos in &[0u8, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3] {
+            v.push(Slot::new(&name(rng), pos, strength, true, Status::Starter));
+        }
+        for &pos in &[0u8, 1, 2, 3, 3] {
+            v.push(Slot::new(
+                &name(rng),
+                pos,
+                strength.saturating_sub(1).max(1),
+                true,
+                Status::Sub,
+            ));
+        }
+        v
+    }
+
+    /// Approximation of `c95c`: a per-fixture value in 0..=10 for each side, +2 for the home side.
+    fn approx_bonus(rng: &mut DelphiRng) -> (i32, i32) {
+        (rng.random(11) as i32 + 2, rng.random(11) as i32)
+    }
+
+    fn run(n: u32, hs: u16, as_: u16, seed: u32) -> (f64, f64, f64, f64, f64, f64) {
         let mut rng = DelphiRng::new(seed);
-        let (mut hg, mut ag, mut hw, mut aw) = (0.0, 0.0, 0.0, 0.0);
+        let (mut hg, mut ag, mut hw, mut aw, mut reds, mut inj) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
         for _ in 0..n {
-            let (h, a) = (squad(home_s, &mut rng), squad(away_s, &mut rng));
-            let mut m = Match::new(h, a, 2, 0);
+            let (hb, ab) = approx_bonus(&mut rng);
+            let mut m = Match::new(squad(hs, &mut rng), squad(as_, &mut rng), hb, ab);
             m.play(&mut rng);
             let (x, y) = m.score();
             hg += x as f64;
             ag += y as f64;
             hw += (x > y) as u32 as f64;
             aw += (y > x) as u32 as f64;
+            reds += m
+                .events
+                .iter()
+                .filter(|e| e.kind == EventKind::RedCard)
+                .count() as f64;
+            inj += m
+                .events
+                .iter()
+                .filter(|e| e.kind == EventKind::Injury)
+                .count() as f64;
         }
         let n = n as f64;
-        (hg / n, ag / n, hw / n, aw / n)
+        (hg / n, ag / n, hw / n, aw / n, reds / n, inj / n)
     }
 
     #[test]
     fn goals_per_game_are_in_a_football_range() {
-        let (h, a, _, _) = avg(20_000, 6, 6, 1);
+        let (h, a, ..) = run(20_000, 6, 6, 1);
         assert!(
-            (0.8..2.5).contains(&h) && (0.6..2.2).contains(&a),
+            (0.6..2.5).contains(&h) && (0.4..2.2).contains(&a),
             "home {h:.2} away {a:.2}"
         );
     }
 
     #[test]
     fn home_side_has_an_advantage() {
-        let (h, a, hw, aw) = avg(20_000, 6, 6, 2);
+        let (h, a, hw, aw, ..) = run(20_000, 6, 6, 2);
         assert!(h > a && hw > aw, "{h:.2}-{a:.2} wins {hw:.2}/{aw:.2}");
     }
 
     #[test]
     fn stronger_team_wins_more() {
-        let (_, _, hw, aw) = avg(20_000, 9, 4, 3);
+        let (_, _, hw, aw, ..) = run(20_000, 9, 4, 3);
         assert!(hw > aw + 0.2, "{hw:.2} vs {aw:.2}");
-        let (_, _, hw2, aw2) = avg(20_000, 4, 9, 4);
+        let (_, _, hw2, aw2, ..) = run(20_000, 4, 9, 4);
         assert!(aw2 > hw2, "{hw2:.2} vs {aw2:.2}");
     }
 
     #[test]
-    fn annulled_goals_are_removed_from_the_score() {
-        let mut rng = DelphiRng::new(5);
+    fn cards_and_injuries_happen_at_plausible_rates() {
+        let (.., reds, inj) = run(20_000, 6, 6, 5);
+        assert!((0.1..1.5).contains(&reds), "reds/game {reds:.3}");
+        assert!((0.05..0.6).contains(&inj), "injuries/game {inj:.3}");
+    }
+
+    #[test]
+    fn goals_equal_events_minus_annulled() {
+        let mut rng = DelphiRng::new(6);
         let mut annulled = 0;
         for _ in 0..5_000 {
-            let (h, a) = (squad(8, &mut rng), squad(8, &mut rng));
-            let mut m = Match::new(h, a, 2, 0);
+            let (hb, ab) = approx_bonus(&mut rng);
+            let mut m = Match::new(squad(8, &mut rng), squad(8, &mut rng), hb, ab);
             m.play(&mut rng);
             let goals = m
                 .events
@@ -310,5 +495,75 @@ mod tests {
                 .count();
         }
         assert!(annulled > 0);
+    }
+
+    #[test]
+    fn sent_off_player_leaves_and_goalkeeper_is_replaced() {
+        let mut rng = DelphiRng::new(7);
+        let mut m = Match::new(squad(6, &mut rng), squad(6, &mut rng), 2, 0);
+        let gk = m
+            .home
+            .slots
+            .iter()
+            .position(|s| s.starter() && s.position == 0)
+            .unwrap();
+        m.home.slots[gk].status = Status::Out; // as aa11 does
+        m.auto_sub(Side::Home, gk, 1);
+        assert!(
+            m.home
+                .slots
+                .iter()
+                .filter(|s| s.starter() && s.position == 0)
+                .count()
+                == 1
+        );
+        assert_eq!(m.home.subs_left, 2);
+        // the last starter made way, so the team now plays with 10
+        assert_eq!(m.home.slots.iter().filter(|s| s.starter()).count(), 10);
+    }
+
+    #[test]
+    fn injury_substitute_has_the_same_kind() {
+        let mut rng = DelphiRng::new(8);
+        let mut m = Match::new(squad(6, &mut rng), squad(6, &mut rng), 2, 0);
+        let fw = m
+            .home
+            .slots
+            .iter()
+            .position(|s| s.starter() && s.position == 3)
+            .unwrap();
+        m.home.slots[fw].status = Status::Out;
+        m.auto_sub(Side::Home, fw, 0);
+        assert_eq!(m.home.slots.iter().filter(|s| s.starter()).count(), 11);
+        assert_eq!(
+            m.home
+                .slots
+                .iter()
+                .filter(|s| s.starter() && s.position == 0)
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn bench_weight_dilutes_the_scorer_roulette() {
+        // same starters, but a bench full of strong attackers: the roulette lands on the bench more often
+        let mut rng = DelphiRng::new(9);
+        let mut lean = squad(6, &mut rng);
+        let mut stacked = lean.clone();
+        for p in stacked.iter_mut().filter(|p| p.status == Status::Sub) {
+            p.strength = 30;
+            p.position = 3;
+            p.g = 10;
+        }
+        for p in lean.iter_mut().filter(|p| p.status == Status::Sub) {
+            p.strength = 1;
+        }
+        let nobody = |slots: &[Slot], rng: &mut DelphiRng| {
+            (0..50_000)
+                .filter(|_| roulette(rng, slots, 2).is_none())
+                .count()
+        };
+        assert!(nobody(&stacked, &mut rng) > 5 * nobody(&lean, &mut rng).max(1));
     }
 }

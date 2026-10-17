@@ -18,19 +18,44 @@ Object offsets are Delphi 1 instance offsets (16-bit). Confirms the leads in `re
 | `1010:aa11` / `ac72` | cards / injuries (not decoded) | 1000 / 500 |
 | `1058:30ba` | `eli.cod` install id | 20000 |
 
-## Squad slot, hidden talent and star ("craque") — `1010:7516`, `397d`, `818c`
-**Correction:** earlier notes (and third-party write-ups) said a starter adds `strength × 2`. The disassembly of
-`1010:397d` shows `slot.strength + 2 × star + (same country ? 3 : 0)`, where `star` is the byte at `player+0x1a`.
+## Squad slot, hidden attributes and star ("craque") — `1010:7516`, `397d`, `818c`
+**Corrections:** earlier notes (and third-party write-ups) said a starter adds `strength × 2` and that players have
+no hidden attributes. The disassembly shows `slot.strength + 2 × star + (same country ? 3 : 0)` (`397d`), and
+three hidden attributes that are **deterministic functions of the player's name** (`7516`, `10c0:1882` is a 32-bit
+`mod`, not `Random`). With `H` = sum of the bytes of the name:
 
-- A squad **slot** (list item): `+6` player data, `+0x0a` **strength** (1..50), `+0x10` starter flag,
-  `+0x2b` **`g` = Random(10)+1** (hidden talent, fixed at creation by `7516`), `+0x2d`, `+0x2f` (derived values).
-- Player data: `+0x19` position (0 GK, 1 DEF, 2 MID, 3 ATT), `+0x1a` **star flag** = `g >= 8 && position >= 2`
-  (so ~30 % of midfielders/attackers are stars), `+0x1b` nationality pstr.
-- Confirmed on the real save: the only `*` player (Sandro Ventura, midfielder) has `g = 9`; the goalkeeper with `g = 8` is not a star.
-- **Sector strength** (`397d`): for each starter, `sector[position] += strength + 2*star + 3*sameCountry`.
+| attribute | slot offset | formula | verified |
+|---|---|---|---|
+| `g` (talent) | `+0x2b` | `H mod 10 + 1` | 15/15 players of a real save (tail `+23`) |
+| aggression (red-card weight) | `+0x2d` | `5 - trunc(sqrt(H mod 36))`; defenders `(x+2) mod 6` | 15/15 (tail `+17`) |
+| injury proneness | `+0x2f` | `H mod 11` | 15/15 (tail `+21`) |
+
+- **Star** (player `+0x1a`) = `g >= 8 && position >= 2`; the only `*` player in the save has `g = 9`.
+- Slot: `+6` player data, `+0x0a` strength (1..50), `+0x10` status (0 out, 1 starter, 2 substitute),
+  `+0x27` ban games, `+0x29` injury games. Player data: `+0x19` position, `+0x1a` star, `+0x1b` nationality.
+- **Sector strength** (`397d`): each starter adds `strength + 2*star + 3*sameCountry` to `sector[position]`.
 - **Attacker force** (`818c`): `round_half_even((position+1) * strength * (g/10 + 1) / 2)`.
-- **Shooter for AI-resolved chances**: starter with the highest force (ties -> later slot) via `0ee6` + comparer `201d`.
-- **Defender**: starter with the lowest position (the goalkeeper), strongest on ties (`0ee6` + comparer `1f88`).
+- **Shooter for AI chances**: starter with the highest force (ties -> later slot; `0ee6` + comparer `201d`).
+- **Defender**: starter with the lowest position, i.e. the goalkeeper, strongest on ties (`0ee6` + comparer `1f88`).
+- **Auto line-up** (`4b73`): `team+0x4d` (substitutions left) = `min(3, fit substitutes)`.
+
+## Weighted roulette — `1010:100b(kind, mode, squad)` (scorers, cards, injuries)
+Weights (`0f2e`): kind 1 `strength`; **kind 2 `position² × strength × g`** (scorer); kind 3 aggression; kind 4 proneness.
+`total` sums the weight of **every** slot (bench and unavailable players included), then `r = Random(total)`;
+only starters are eligible and the first one whose running sum exceeds `r` is chosen. A roll that lands in the
+bench's share picks **nobody** and the event does not happen, so deep benches dilute goals, cards and injuries.
+
+## Red cards (`aa11`, event kind 4) and injuries (`ac72`, kind 5)
+- `aa11`: `r = Random(1000)`; if `r < 10 && home.bonus(+0x4c) < r` home, else if `r < 10 && away.bonus(+0x4e) < r` away.
+  `48be`: roulette kind 3; needs aggression >= 1; the player leaves (status 0) and gets a ban `Random(4)+1` games.
+- `ac72`: `r = Random(500)`; `0` = home, `1` = away. `4940`: roulette kind 4; needs proneness >= 1; status 0,
+  injury `Random(Random(20)) + 1` games, **strength −10 (minimum 1)**.
+- AI substitution (`67f7`), if `subs_left > 0`: injury = first designated substitute with the same goalkeeper-ness;
+  red card = only for a sent-off goalkeeper: first substitute goalkeeper in, **last starter out**; a red card to an
+  outfield player is not replaced. Sectors are then recomputed (`397d`).
+- **Penalty** (`a6eb`): if the previous minute ended with a red card of the other side (and `minute % 45 > 1`),
+  the offender being a goalkeeper (always) or a defender (`Random(3) == 0`), the side gets a forced primary chance.
+  A pending penalty also blocks the main generator that minute.
 
 ## Attack opportunity — `1010:a6eb(match, ..., minute)`
 Match object: home team ptr `+0x2e`, away team ptr `+0x32`, event list `+0x44`,
@@ -96,7 +121,7 @@ For each player, with `rating` from `1068:1079(real at player+0xc)` (+1 / 0 / -1
 - `-1`: if `Random(2)==0` and strength > 1: strength--; undone if it falls below `teamLevel-5` or 1.
 
 ## Still unknown (next)
-- What `c95c` really compares (byte strings at `calEntry+0x0b+4` vs `team+0x2d`), and the `+3` condition.
+- What `c95c` really compares (byte strings at `calEntry+0x0b+4` vs `team+0x2d`), and the `+3` condition (it gates cards, annulments and the 6000/7000 rolls).
 - How `K` (`team+0x5b`, the Real48 multiplier) is updated in `1020:038e` (FPU ops missing from the decompile).
 - What `team+0x59` counts exactly (goals?) and `team+0x4f` (shots).
 - How `rating` (player `+0xc`, a Real) is produced after each match.
@@ -110,13 +135,15 @@ Per minute (`match+0x18e`), for every game of the round in turn: `a6eb` (goal ch
 tie may extend the length to 120.
 
 ## Rust port status (`core/src/matchsim.rs`)
-Implemented: primary bonus rolls, main goal generator, scorer (approximate roulette), annulment.
-Not yet: cards/injuries (`aa11`, `ac72`), penalties, substitutions, half-time, extra time, the `K` update.
-Simulation of 100k games per pairing (`cargo run --release -p elifoot-core --example sim`):
+Implemented: bonus rolls, main goal generator, weighted scorer roulette, red cards, injuries, automatic
+substitutions, penalties after red cards, goal annulment (30 unit tests, clippy clean).
+Not yet: half-time/extra time, the `K` update, interactive (human) paths, foul roulette of the UI path, and
+**`c95c`** (the per-fixture bonus values `+0x4c/+0x4e`), approximated by a uniform draw 0..=10 per side (+2 home).
+100k games per pairing (`cargo run --release -p elifoot-core --example sim`, 4-4-2, bench of 5, approximate `c95c`):
 
-| home/away strength | home goals | away goals | home W | draw | away W |
-|---|---|---|---|---|---|
-| 6 vs 6 | 1.39 | 1.08 | 43.9 % | 31.8 % | 24.4 % |
-| 8 vs 5 | 1.82 | 1.00 | 60.5 % | 25.3 % | 14.2 % |
-| 5 vs 8 | 1.31 | 1.42 | 31.1 % | 31.5 % | 37.4 % |
-| 10 vs 3 | 2.33 | 0.61 | 84.2 % | 12.3 % | 3.5 % |
+| home/away strength | home goals | away goals | home W | draw | away W | reds | injuries |
+|---|---|---|---|---|---|---|---|
+| 6 vs 6 | 1.13 | 0.87 | 42.2 % | 32.1 % | 25.7 % | 0.31 | 0.24 |
+| 8 vs 5 | 1.42 | 0.80 | 54.1 % | 28.4 % | 17.5 % | 0.31 | 0.24 |
+| 5 vs 8 | 1.05 | 1.10 | 32.8 % | 32.2 % | 34.9 % | 0.31 | 0.24 |
+| 10 vs 3 | 1.81 | 0.50 | 74.1 % | 19.5 % | 6.5 % | 0.31 | 0.23 |
