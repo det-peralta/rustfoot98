@@ -49,9 +49,28 @@ pub struct Club {
     pub losses: u16,
     pub goals_for: i32,
     pub goals_against: i32,
+    /// Games played by the current coach (`coach+0x0c`, saturating at `i16::MAX`); reset when the coach is sacked.
+    pub coach_games: u16,
 }
 
+/// Coach sacking (`1010:8b5d`): an AI coach with at least this many games ...
+pub const SACK_MIN_GAMES: u16 = 10;
+/// ... whose team's morale `K` is at most this (checked before the game's own morale update) is replaced.
+pub const SACK_MORALE: f64 = 0.65;
+
 impl Club {
+    /// `1010:8b5d` + `4f40`: replaces the coach when the results were bad for long enough. The new coach starts with
+    /// `K = 1.0` and zero games. (The original may swap the coach with another club's; that side effect is not modelled.)
+    pub fn maybe_sack_coach(&mut self) -> bool {
+        if self.coach_games >= SACK_MIN_GAMES && self.k <= SACK_MORALE {
+            self.k = 1.0;
+            self.coach_games = 0;
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn new(name: &str, slots: Vec<Slot>) -> Self {
         Self {
             name: name.to_string(),
@@ -66,6 +85,7 @@ impl Club {
             losses: 0,
             goals_for: 0,
             goals_against: 0,
+            coach_games: 0,
         }
     }
 }
@@ -442,8 +462,12 @@ pub fn play_round(
             }
         }
         let (rh, ra) = morale_results(x, y);
+        hc.maybe_sack_coach();
+        ac.maybe_sack_coach();
         hc.k = update_morale(hc.k, rh);
         ac.k = update_morale(ac.k, ra);
+        hc.coach_games = hc.coach_games.saturating_add(1).min(i16::MAX as u16);
+        ac.coach_games = ac.coach_games.saturating_add(1).min(i16::MAX as u16);
         records.push(MatchRecord {
             home: h,
             away: a,
@@ -767,5 +791,19 @@ mod tests {
             1
         );
         assert!(slots.iter().filter(|s| s.status == Status::Sub).count() <= 5);
+    }
+
+    #[test]
+    fn a_coach_is_sacked_after_ten_games_with_low_morale() {
+        let mut c = Club::new("X", Vec::new());
+        c.k = 0.5;
+        c.coach_games = 9;
+        assert!(!c.maybe_sack_coach(), "too few games");
+        c.coach_games = 10;
+        c.k = 0.66;
+        assert!(!c.maybe_sack_coach(), "morale above the threshold");
+        c.k = 0.65;
+        assert!(c.maybe_sack_coach());
+        assert_eq!((c.k, c.coach_games), (1.0, 0));
     }
 }

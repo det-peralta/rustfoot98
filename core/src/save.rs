@@ -64,7 +64,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -73,7 +73,8 @@ impl World {
                 c.draws,
                 c.losses,
                 c.goals_for,
-                c.goals_against
+                c.goals_against,
+                c.coach_games
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -204,6 +205,8 @@ impl World {
                     c.losses = num(n, &f, 7)? as u16;
                     c.goals_for = num(n, &f, 8)? as i32;
                     c.goals_against = num(n, &f, 9)? as i32;
+                    // older saves have no coach counter
+                    c.coach_games = f.get(10).and_then(|x| x.parse().ok()).unwrap_or(0);
                     c.names.clear();
                     current = Some((num(n, &f, 1)? as usize, c));
                 }
