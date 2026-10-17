@@ -48,3 +48,14 @@ so use Ghidra headless directly (its NE loader works):
   -postScript ExportSummary.java analysis/out
 ```
 Outputs (git-ignored): `analysis/out/{memory,functions,strings,symbols}.txt`.
+
+## 6. Running the original locally (to produce saves)
+The web build's bundle contains a Windows 3.1 disk image plus the game folder (`d/`).
+`tools/run/run-original.sh` boots it in native DOSBox 0.74 with a real mouse/keyboard; the game
+folder is a host mount, so saves land at `original/run/d/eli98/jogos/*.e98`.
+```bash
+sudo pacman -S --needed dosbox
+tools/run/run-original.sh
+```
+Notes: headless browser automation of the web build failed (js-dos uses relative mouse and needs
+timed key events); a native window is simpler. `original/` is git-ignored.

@@ -1,0 +1,12 @@
+import { createRequire } from 'module';
+const require = createRequire('/home/fgf/.local/share/mise/installs/npm-playwright/latest/node_modules/');
+const { chromium } = require('playwright');
+const b = await chromium.launch({ executablePath: '/usr/bin/chromium', headless: true, args: ['--no-sandbox'] });
+const ctx = await b.newContext({ viewport: { width: 1100, height: 800 } });
+const p = await ctx.newPage();
+p.on('console', m => console.log('console:', m.text().slice(0, 150)));
+await p.goto('https://www.elifoot98.com.br/#/game', { waitUntil: 'networkidle' });
+await p.waitForTimeout(8000);
+await p.screenshot({ path: 'analysis/shots/00_load.png' });
+console.log(await p.evaluate(() => ({ dos: typeof dosInstance, keys: dosInstance ? Object.keys(dosInstance) : null, title: document.title, buttons: [...document.querySelectorAll('button,ion-button')].map(x => x.innerText.trim()).slice(0, 20) })));
+await b.close();

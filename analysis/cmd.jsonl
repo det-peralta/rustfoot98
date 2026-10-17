@@ -1,0 +1,25 @@
+{"op":"wait","ms":20000}
+{"op":"shot","path":"analysis/shots/01.png"}
+{"op":"click","x":893,"y":620}
+{"op":"wait","ms":2500}
+{"op":"shot","path":"analysis/shots/02.png"}
+{"op":"click","x":817,"y":315}
+{"op":"wait","ms":2500}
+{"op":"shot","path":"analysis/shots/03.png"}
+{"op":"key","key":"Enter"}
+{"op":"wait","ms":2500}
+{"op":"shot","path":"analysis/shots/04.png"}
+{"op":"move","x":300,"y":285}
+{"op":"click","x":297,"y":283}
+{"op":"wait","ms":1500}
+{"op":"shot","path":"analysis/shots/05.png"}
+{"op":"key","key":"Tab"}
+{"op":"key","key":"space"}
+{"op":"key","key":"Tab"}
+{"op":"type","text":"TESTE1"}
+{"op":"wait","ms":1000}
+{"op":"shot","path":"analysis/shots/06.png"}
+{"op":"wait","ms":4000}
+{"op":"shot","path":"analysis/shots/07.png"}
+{"op":"eval","js":"({active: document.activeElement && (document.activeElement.tagName+\"#\"+document.activeElement.id+\".\"+document.activeElement.className), canvases:[...document.querySelectorAll(\"canvas\")].map(c=>({w:c.width,h:c.height,tab:c.tabIndex,cls:c.className}))})"}
+{"op":"quit"}
