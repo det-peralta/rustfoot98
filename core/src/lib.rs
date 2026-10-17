@@ -8,5 +8,6 @@ pub mod evolution;
 pub mod matchsim;
 pub mod outcome;
 pub mod rng;
+pub mod season;
 pub mod sector;
 pub mod txe;

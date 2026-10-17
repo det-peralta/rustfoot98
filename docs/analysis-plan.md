@@ -15,5 +15,6 @@
 - [ ] Registration check: understand shareware limits (no keygen use)
 - [x] `core/` in Rust (cipher, Delphi RNG, EFT/TXE, sectors, chance generator, outcome, evolution, Match v0)
 - [x] Decoded `aa11`/`ac72`, penalties, subs, `100b` weights, `c95c`, rating accumulator, per-round evolution, `K` morale
-- [ ] Half-time/extra time, season calendar (`1048`/`1916`), standings, finances (`6e48`, `10c8:2b46`), transfers
+- [x] Season fixtures (8-team double round-robin table), round driver, cup alternation, standings comparer (see docs/season.md)
+- [ ] Points rule, division base level, promotion/relegation, finances (`3e9c`, `6e48`, `10c8:2b46`), transfers, half-time/extra time, cup details
 - [ ] Build UI, PWA, saves import/export compatible with `.e98`
