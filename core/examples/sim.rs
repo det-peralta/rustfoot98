@@ -1,5 +1,5 @@
 //! `cargo run --release -p elifoot-core --example sim` — match statistics for a few strength pairings.
-use elifoot_core::matchsim::{EventKind, Match};
+use elifoot_core::matchsim::{fixture_value, EventKind, Match};
 use elifoot_core::rng::DelphiRng;
 use elifoot_core::sector::{Slot, Status};
 
@@ -47,8 +47,10 @@ fn main() {
         let (mut hg, mut ag, mut hw, mut dr, mut aw, mut reds, mut inj) =
             (0u64, 0u64, 0u32, 0u32, 0u32, 0u64, 0u64);
         for _ in 0..n {
-            // c95c is not decoded yet: approximate it with a uniform 0..=10 per side (+2 for the home side)
-            let (hb, ab) = (rng.random(11) as i32 + 2, rng.random(11) as i32);
+            // per-fixture bonus through the real c95c formula, with random strings, domestic league match
+            let (a, h, v) = (name(&mut rng), name(&mut rng), name(&mut rng));
+            let hb = fixture_value(a.as_bytes(), h.as_bytes(), true) + 2;
+            let ab = fixture_value(a.as_bytes(), v.as_bytes(), true);
             let mut m = Match::new(squad(hs, &mut rng), squad(as_, &mut rng), hb, ab);
             m.play(&mut rng);
             let (x, y) = m.score();

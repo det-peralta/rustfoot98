@@ -98,11 +98,19 @@ and from minute 45 on it always passes. At minute 45 a half-time hook (`44a1`) a
 via `1010:100b` (weights) into `shooterOut`.
 Stage 3: needs a shooter (`*shooterOut != nil`). Then `8c67` is checked twice and `1068:11c7` runs (side effect, unknown).
 
-## Primary rolls recap (`a6eb`)
-`homeAttack(+0x4c) = c95c(...) + 2` and `awayAttack(+0x4e) = c95c(...)` are set once in the match
-constructor `1010:8db2`; `c95c` returns a small number (0..10, plus 3 under a country condition,
-derived from comparing byte strings). So `Random(6000) < homeAttack` / `Random(7000) < awayAttack` are
-**rare bonus events** (≈0.03–0.2 % per minute), not the main source of chances.
+## Per-fixture bonus values — `1010:c95c` (decoded)
+The match constructor `1010:8db2` stores `homeBonus (+0x4c) = c95c(division, home) + 2` and
+`awayBonus (+0x4e) = c95c(division, away)`. Exactly:
+```
+A = pstr at (division+7)->+4        B = pstr at teamdata+0x2d         n = max(len A, len B)   (1068:0fed = Max)
+S = sum_{i=1..n} A[i] - B[i]         (bytes past a string's length count as 0)
+value = |S mod 11|  (signed remainder, then abs)  + 3 if  pstr(division+7 -> +0x2d) == teamdata country(+0x4a)
+```
+`|S mod 11|` is uniform on 0..10, and the `+3` applies to every domestic league fixture, so a typical league match has
+home bonus 5..15 and away bonus 3..13. The bonus gates four things: the rare primary rolls
+(`Random(6000) < homeBonus`, `Random(7000) < awayBonus`), red cards and annulments (both need `bonus < r` with `r < 10`,
+so a bonus of 9 or more disables them), which makes a high-bonus fixture calm and a low-bonus one stormy.
+Which exact strings these are (division/country names vs team strings) is not identified; for simulation any strings do.
 
 ## Shot outcome — `1010:81ed(attacker, defenderSlot)`
 ```
@@ -138,12 +146,13 @@ tie may extend the length to 120.
 Implemented: bonus rolls, main goal generator, weighted scorer roulette, red cards, injuries, automatic
 substitutions, penalties after red cards, goal annulment (30 unit tests, clippy clean).
 Not yet: half-time/extra time, the `K` update, interactive (human) paths, foul roulette of the UI path, and
-**`c95c`** (the per-fixture bonus values `+0x4c/+0x4e`), approximated by a uniform draw 0..=10 per side (+2 home).
-100k games per pairing (`cargo run --release -p elifoot-core --example sim`, 4-4-2, bench of 5, approximate `c95c`):
+the identity of the two `c95c` strings (the formula itself is implemented as `fixture_value`).
+100k games per pairing (`cargo run --release -p elifoot-core --example sim`, 4-4-2, bench of 5, `c95c` with random strings,
+domestic league match):
 
 | home/away strength | home goals | away goals | home W | draw | away W | reds | injuries |
 |---|---|---|---|---|---|---|---|
-| 6 vs 6 | 1.13 | 0.87 | 42.2 % | 32.1 % | 25.7 % | 0.31 | 0.24 |
-| 8 vs 5 | 1.42 | 0.80 | 54.1 % | 28.4 % | 17.5 % | 0.31 | 0.24 |
-| 5 vs 8 | 1.05 | 1.10 | 32.8 % | 32.2 % | 34.9 % | 0.31 | 0.24 |
-| 10 vs 3 | 1.81 | 0.50 | 74.1 % | 19.5 % | 6.5 % | 0.31 | 0.23 |
+| 6 vs 6 | 1.15 | 0.87 | 42.6 % | 32.2 % | 25.2 % | 0.15 | 0.24 |
+| 8 vs 5 | 1.46 | 0.82 | 54.4 % | 28.1 % | 17.5 % | 0.15 | 0.24 |
+| 5 vs 8 | 1.08 | 1.12 | 32.9 % | 32.4 % | 34.7 % | 0.15 | 0.24 |
+| 10 vs 3 | 1.85 | 0.51 | 74.9 % | 19.0 % | 6.1 % | 0.15 | 0.24 |

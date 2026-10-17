@@ -91,6 +91,18 @@ impl TeamState {
     }
 }
 
+/// `1010:c95c`: the per-fixture value behind `match+0x4c` / `+0x4e`.
+///
+/// `a` is the Pascal string at `division+7 -> +4`, `b` the one at `team data+0x2d`, `domestic` is true when the team's
+/// country code (`team data+0x4a`) equals the string at `division+7 -> +0x2d`. Bytes past a string's length count as 0.
+/// The match stores `fixture_value(home) + 2` for the home side and `fixture_value(away)` for the away side.
+pub fn fixture_value(a: &[u8], b: &[u8], domestic: bool) -> i32 {
+    let n = a.len().max(b.len());
+    let at = |s: &[u8], i: usize| s.get(i).copied().unwrap_or(0) as i32;
+    let sum: i32 = (0..n).map(|i| at(a, i) - at(b, i)).sum();
+    (sum % 11).abs() + if domestic { 3 } else { 0 }
+}
+
 /// `1010:0f2e` weights for the roulette `1010:100b`: kind 1 strength, 2 `pos^2*strength*g` (scorers),
 /// 3 aggression (red cards), 4 injury proneness.
 fn weight(p: &Slot, kind: u8) -> u32 {
@@ -412,9 +424,14 @@ pub mod tests {
         v
     }
 
-    /// Approximation of `c95c`: a per-fixture value in 0..=10 for each side, +2 for the home side.
+    /// Bonus values through the real `c95c` formula with random strings (domestic league match).
     fn approx_bonus(rng: &mut DelphiRng) -> (i32, i32) {
-        (rng.random(11) as i32 + 2, rng.random(11) as i32)
+        let a = name(rng);
+        let (h, v) = (name(rng), name(rng));
+        (
+            fixture_value(a.as_bytes(), h.as_bytes(), true) + 2,
+            fixture_value(a.as_bytes(), v.as_bytes(), true),
+        )
     }
 
     fn run(n: u32, hs: u16, as_: u16, seed: u32) -> (f64, f64, f64, f64, f64, f64) {
@@ -442,6 +459,22 @@ pub mod tests {
         }
         let n = n as f64;
         (hg / n, ag / n, hw / n, aw / n, reds / n, inj / n)
+    }
+
+    #[test]
+    fn fixture_value_matches_c95c() {
+        // identical strings: sum 0 -> 0, domestic adds 3
+        assert_eq!(fixture_value(b"abc", b"abc", false), 0);
+        assert_eq!(fixture_value(b"abc", b"abc", true), 3);
+        // sum = (b-a)+(c-b)+(d-c) = 3 over equal length strings
+        assert_eq!(fixture_value(b"bcd", b"abc", false), 3);
+        // a longer second string subtracts its extra bytes: -(10 + 'a'(97)) mod 11 -> |-107 % 11| = |-8| = 8
+        assert_eq!(fixture_value(b"", b"\x0aa", false), 8);
+        // always 0..=10 (+3)
+        for i in 0..200u8 {
+            let v = fixture_value(&[i, i.wrapping_mul(7)], &[i.wrapping_mul(3)], i % 2 == 0);
+            assert!((0..=13).contains(&v));
+        }
     }
 
     #[test]
