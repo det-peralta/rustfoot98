@@ -5,6 +5,11 @@ const LABEL = { goal: "Golo", annulled: "Golo anulado", red: "Expulsão", injury
 
 let wasm, state, division = 0, selectedMatch = null, useReal = false, needTab = true;
 const $ = (id) => document.getElementById(id);
+const SAVE_KEY = "elifoot98-rs-save-v1";
+const store = {
+  get() { try { return localStorage.getItem(SAVE_KEY); } catch { return null; } },
+  set(v) { try { localStorage.setItem(SAVE_KEY, v); return true; } catch { return false; } },
+};
 
 async function boot() {
   const res = await fetch("elifoot_wasm.wasm");
@@ -12,6 +17,8 @@ async function boot() {
   $("wasm-size").textContent = (bytes.byteLength / 1024).toFixed(0) + " KB";
   const { instance } = await WebAssembly.instantiate(bytes, {});
   wasm = instance.exports;
+  $("load-now").disabled = !store.get();
+  if (store.get()) $("save-status").textContent = "Há um jogo guardado neste browser (botão Carregar).";
   newWorld();
 }
 
@@ -20,6 +27,35 @@ function read() {
   state = JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, ptr, len)));
   if (needTab && state.human) { division = state.human.div; needTab = false; }
   render();
+}
+
+function saveText() {
+  wasm.world_save();
+  return new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, wasm.save_ptr(), wasm.save_len()));
+}
+
+function saveNow(auto) {
+  const ok = store.set(saveText());
+  $("load-now").disabled = !store.get();
+  $("save-status").textContent = ok ? `${auto ? "Guardado automaticamente" : "Guardado"} às ${new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}.` : "Não foi possível guardar (armazenamento do browser bloqueado). Usa Exportar ficheiro.";
+}
+
+function loadText(text) {
+  const bytes = new TextEncoder().encode(text);
+  const ptr = wasm.buf_resize(bytes.length);
+  new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
+  if (!wasm.world_load(bytes.length)) {
+    const p = wasm.world_json_ptr(), l = wasm.world_json_len();
+    $("save-status").textContent = "Ficheiro inválido: " + JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, p, l))).error;
+    return false;
+  }
+  selectedMatch = null;
+  needTab = true;
+  useReal = false;
+  read();
+  $("mode").textContent = "jogo carregado";
+  $("save-status").textContent = "Jogo carregado.";
+  return true;
 }
 
 function newWorld() {
@@ -69,6 +105,7 @@ function play(fn) {
   selectedMatch = null;
   wasm[fn]();
   read();
+  if ($("autosave").checked) saveNow(true);
 }
 
 function renderTabs() {
@@ -286,6 +323,17 @@ $("change-club").onchange = (e) => {
   division = Number(di);
   read();
 };
+$("save-now").onclick = () => saveNow(false);
+$("load-now").onclick = () => { const t = store.get(); if (t) loadText(t); };
+$("export").onclick = () => {
+  const blob = new Blob([saveText()], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `elifoot98-${state.year}-j${state.round}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$("import").onchange = async (e) => { const f = e.target.files[0]; if (f) loadText(await f.text()); e.target.value = ""; };
 $("play-round").onclick = () => play("world_play_round");
 $("play-season").onclick = () => play("world_play_season");
 $("new-world").onclick = newWorld;

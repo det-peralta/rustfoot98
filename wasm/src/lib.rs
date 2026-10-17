@@ -11,6 +11,7 @@ thread_local! {
     static WORLD: RefCell<Option<World>> = const { RefCell::new(None) };
     static OUT: RefCell<String> = const { RefCell::new(String::new()) };
     static BUF: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
+    static SAVE: RefCell<String> = const { RefCell::new(String::new()) };
     static TEAMS: RefCell<Vec<EftTeam>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -289,6 +290,43 @@ pub extern "C" fn world_new_from_efts(seed: u32) -> i32 {
     }
 }
 
+/// Serialises the game; read the text with `save_ptr()` / `save_len()`.
+#[no_mangle]
+pub extern "C" fn world_save() {
+    let text = WORLD
+        .with(|w| w.borrow().as_ref().map(World::save))
+        .unwrap_or_default();
+    SAVE.with(|s| *s.borrow_mut() = text);
+}
+
+#[no_mangle]
+pub extern "C" fn save_ptr() -> *const u8 {
+    SAVE.with(|s| s.borrow().as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn save_len() -> usize {
+    SAVE.with(|s| s.borrow().len())
+}
+
+/// Loads a game from the first `len` bytes of the buffer; returns 1 on success, 0 on failure (JSON is then `{"error":...}`).
+#[no_mangle]
+pub extern "C" fn world_load(len: usize) -> i32 {
+    let text =
+        BUF.with(|b| String::from_utf8_lossy(&b.borrow()[..len.min(b.borrow().len())]).to_string());
+    match World::load(&text) {
+        Ok(w) => {
+            WORLD.with(|cell| *cell.borrow_mut() = Some(w));
+            publish();
+            1
+        }
+        Err(e) => {
+            OUT.with(|o| *o.borrow_mut() = format!("{{\"error\":{}}}", esc(&e)));
+            0
+        }
+    }
+}
+
 /// Makes club `club` of division `division` the user's club.
 #[no_mangle]
 pub extern "C" fn human_set(division: u32, club: u32) {
@@ -541,5 +579,29 @@ mod tests {
         send_plan(&[200, 1, 2]);
         send_plan(&[]);
         assert!(json().contains("\"human\":{"));
+    }
+
+    #[test]
+    fn a_game_can_be_saved_and_loaded_through_the_abi() {
+        world_new(5);
+        world_play_season();
+        world_play_round();
+        world_save();
+        let text = SAVE.with(|s| s.borrow().clone());
+        assert!(text.starts_with("ELIFOOT98-RS 1\n"));
+        let before = json();
+        world_new(99); // a different game
+        let ptr = buf_resize(text.len());
+        unsafe { std::ptr::copy_nonoverlapping(text.as_ptr(), ptr, text.len()) };
+        assert_eq!(world_load(text.len()), 1);
+        // same table, year, round and club as before the save (the last round's matches are not stored)
+        let strip = |j: &str| j[..j.find("\"human\":").unwrap()].to_string();
+        assert_eq!(strip(&json()), strip(&before));
+        // garbage is refused with a message and leaves the game usable
+        let bad = b"nope";
+        let ptr = buf_resize(bad.len());
+        unsafe { std::ptr::copy_nonoverlapping(bad.as_ptr(), ptr, bad.len()) };
+        assert_eq!(world_load(bad.len()), 0);
+        assert!(json().starts_with("{\"error\":"));
     }
 }

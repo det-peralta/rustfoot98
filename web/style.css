@@ -81,3 +81,7 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 .mm { margin: 0; padding: 0; list-style: none; }
 .mm li { padding: 2px 0; }
 @media (max-width: 800px) { .club-grid { grid-template-columns: 1fr; } }
+
+.controls.saves { padding-top: 0; }
+.check { color: var(--muted); font-size: .9rem; display: flex; gap: 6px; align-items: center; }
+#save-status { margin: 0; }

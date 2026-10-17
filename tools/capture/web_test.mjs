@@ -63,6 +63,28 @@ try {
   await p.click('#new-world'); await p.click('#play-round');
   const c = await p.textContent('#table tbody');
   check('same seed gives the same round', a === c);
+  // saving and loading
+  await p.fill('#seed', '777'); await p.click('#new-world');
+  await p.click('#play-round'); await p.click('#play-round');
+  const snapshot = await p.textContent('#table tbody');
+  const yearRound = (await p.textContent('#round'));
+  check('autosave wrote a save', (await p.evaluate(() => localStorage.getItem('elifoot98-rs-save-v1') || '')).startsWith('ELIFOOT98-RS 1'));
+  await p.click('#new-world'); // a different game replaces the state
+  check('state changed', (await p.textContent('#round')).startsWith('0 /'));
+  check('load enabled', await p.isEnabled('#load-now'));
+  await p.click('#load-now');
+  check('load restores round and table', (await p.textContent('#round')) === yearRound && (await p.textContent('#table tbody')) === snapshot);
+  const [download] = await Promise.all([p.waitForEvent('download'), p.click('#export')]);
+  const file = await download.path();
+  const exported = (await import('fs')).readFileSync(file, 'utf8');
+  check('exported file is a save', exported.startsWith('ELIFOOT98-RS 1'));
+  await p.click('#new-world');
+  await p.setInputFiles('#import', { name: 'save.txt', mimeType: 'text/plain', buffer: Buffer.from(exported) });
+  await p.waitForFunction(() => document.querySelector('#save-status').textContent.includes('carregado'), null, { timeout: 5000 });
+  check('import restores the game', (await p.textContent('#round')) === yearRound && (await p.textContent('#table tbody')) === snapshot);
+  await p.setInputFiles('#import', { name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from('garbage') });
+  await p.waitForFunction(() => document.querySelector('#save-status').textContent.includes('inválido'), null, { timeout: 5000 }).catch(() => {});
+  check('bad file refused', (await p.textContent('#save-status')).includes('inválido'), await p.textContent('#save-status'));
   // real teams: upload the shipped .EFT files when they exist locally (they are git-ignored)
   const fs = await import('fs');
   const dir = 'original/elifoot98/EQUIPAS';
