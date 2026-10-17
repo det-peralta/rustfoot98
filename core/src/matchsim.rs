@@ -10,6 +10,24 @@ use crate::outcome::{self, Outcome};
 use crate::rng::DelphiRng;
 use crate::sector::{self, Sectors, Slot, Status};
 
+/// Weight of the old value in the morale moving average (`1068:10d1` call sites in `1010:9396`).
+pub const MORALE_WEIGHT: f64 = 0.85;
+
+/// `1068:10d1`: `K = 0.85 * K + 0.15 * result`.
+pub fn update_morale(k: f64, result: f64) -> f64 {
+    MORALE_WEIGHT * k + (1.0 - MORALE_WEIGHT) * result
+}
+
+/// Morale result values `(home, away)` for a finished game (`1010:9396`): home win `2.0/0.0`, away win `0.0/2.5`,
+/// draw `0.8/1.3`.
+pub fn morale_results(home_goals: i32, away_goals: i32) -> (f64, f64) {
+    match home_goals.cmp(&away_goals) {
+        std::cmp::Ordering::Greater => (2.0, 0.0),
+        std::cmp::Ordering::Less => (0.0, 2.5),
+        std::cmp::Ordering::Equal => (0.8, 1.3),
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Side {
     Home,
@@ -404,13 +422,6 @@ impl Match {
         }
     }
 
-    /// `1020:038e`: after a processed game the user's team gains +1.0 morale (`K`) and its opponent +0.5.
-    /// (`K` resets to 1.0 when a coach takes over, `1010:4f40`.)
-    pub fn apply_morale(user: &mut TeamState, opponent: &mut TeamState) {
-        user.k += 1.0;
-        opponent.k += 0.5;
-    }
-
     pub fn score(&self) -> (i32, i32) {
         (self.home.goals, self.away.goals)
     }
@@ -644,15 +655,19 @@ pub mod tests {
     }
 
     #[test]
-    fn morale_grows_after_games() {
-        let mut rng = DelphiRng::new(11);
-        let (mut a, mut b) = (
-            TeamState::new(squad(6, &mut rng)),
-            TeamState::new(squad(6, &mut rng)),
-        );
-        Match::apply_morale(&mut a, &mut b);
-        Match::apply_morale(&mut a, &mut b);
-        assert_eq!((a.k, b.k), (3.0, 2.0));
+    fn morale_is_a_moving_average_of_results() {
+        assert_eq!(morale_results(2, 0), (2.0, 0.0));
+        assert_eq!(morale_results(0, 1), (0.0, 2.5));
+        assert_eq!(morale_results(1, 1), (0.8, 1.3));
+        // one home win from the initial 1.0: 0.85 + 0.15 * 2.0
+        assert!((update_morale(1.0, 2.0) - 1.15).abs() < 1e-12);
+        // a long unbeaten home run converges to 2.0, a losing run to 0
+        let (mut up, mut down) = (1.0, 1.0);
+        for _ in 0..200 {
+            up = update_morale(up, 2.0);
+            down = update_morale(down, 0.0);
+        }
+        assert!((up - 2.0).abs() < 1e-6 && down < 1e-6);
     }
 
     #[test]

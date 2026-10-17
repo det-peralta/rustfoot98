@@ -14,10 +14,20 @@
 - **Standings order**: the division's team list is sorted with comparer `1050:1a61`, which compares a per-round byte
   array at `team+0x21+round` (points). Only that value is compared, so ties are not separated by goal difference.
   (Assumed: the sort `1068:0e0d` is stable.) The sorted rank feeds the evolution clamp `level = base − 2·rank`.
+- **Points are 3-1-0** (verified): `1010:9396`, the per-game finaliser, adds 3 to `team+0x20` for a win and 1 to both sides
+  for a draw; wins/draws/losses are `+0x16/+0x18/+0x1a`, goals for/against `+0x1c/+0x1e`. Goal difference is not stored
+  in the sort key. Each game also updates the two coaches' scores (`coach+0x0e`: home win +2 for the home coach, away win
+  +3 for the away coach, draw +1 home / +2 away) and may sack a coach (`8b5d` -> `4f40`).
+- **Morale `K`** after every game: `K = 0.85·K + 0.15·result` (see `match-engine.md`).
+- **Season end** (`1020:038e`, runs after round 14): lists are sorted by points; champion `K += 1.0`, cup winner `K += 0.5`;
+  `02a6` swaps teams between lists: **top two of each lower division <-> bottom two of the division above** (D1/D2 at
+  indices 6; D2/D3 and D3/D4 at 4 after the lists shift), then **two distinct random clubs from an outside pool replace
+  the bottom two of the 4th division**; year +1 and a new season starts (`2f3c`). Events are recorded for titles,
+  promotions ("Promovido para o"), relegations ("Despromovido para o") and sackings.
 - **Evolution** after every round (see `match-engine.md`).
 
 ## Assumed in the Rust port (`core/src/season.rs`)
-- **3-1-0 points** — the write to the per-round byte array was not located.
+(3-1-0 points, morale and promotion/relegation are now verified and implemented.)
 - **4-4-2 auto line-up** — the original (`1010:4b73`) chooses a formation; ours is a stand-in.
 - Ranks for evolution are taken after the round's results (the original sorts at `0c41` start; order not confirmed).
 - **Division base level** (`division+4`) is unknown; the example takes it as an argument (default 12).
@@ -28,5 +38,6 @@ the weakest in 0.9 %; mean squad strength falls by roughly 2 points over a seaso
 clamped by `base − 2·rank ± 5`). The drift magnitude depends on the unknown base level, so treat it as indicative only.
 
 ## Still to decode
-Division base level; points rule and the `+0x21` array writes; finances and transfers (`3e9c`, `6e48`, team `+0x71..+0x79`);
-cup details (round naming, ties, extra time/penalties); the global `Real` at `10c8:2b46`; promotion/relegation at season end.
+Division base level; the per-round byte array at `team+0x21` that the sort compares (the points word is `+0x20`);
+finances and transfers (`3e9c`, `6e48`, team `+0x71..+0x79`); cup details (round naming, ties, extra time/penalties);
+the global `Real` at `10c8:2b46`; coach sacking rule (`8b5d`); what the new-season routine `2f3c` resets.

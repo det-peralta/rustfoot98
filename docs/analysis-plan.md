@@ -16,5 +16,6 @@
 - [x] `core/` in Rust (cipher, Delphi RNG, EFT/TXE, sectors, chance generator, outcome, evolution, Match v0)
 - [x] Decoded `aa11`/`ac72`, penalties, subs, `100b` weights, `c95c`, rating accumulator, per-round evolution, `K` morale
 - [x] Season fixtures (8-team double round-robin table), round driver, cup alternation, standings comparer (see docs/season.md)
-- [ ] Points rule, division base level, promotion/relegation, finances (`3e9c`, `6e48`, `10c8:2b46`), transfers, half-time/extra time, cup details
+- [x] Points 3-1-0, per-game morale, season end: promotion/relegation, titles (verified, implemented)
+- [ ] Division base level, finances (`3e9c`, `6e48`, `10c8:2b46`), transfers, coach sacking, half-time/extra time, cup details
 - [ ] Build UI, PWA, saves import/export compatible with `.e98`

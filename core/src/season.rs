@@ -1,12 +1,15 @@
 //! Season layer: the league fixture table, rounds, standings and per-round evolution.
 //!
 //! **Verified in the original:** the 8-team double round-robin table (`DS:0x1838`, read by `1010:1d20`),
-//! the 14 league rounds (`1020:11b8` loops 0..=14), standings sorted by points only (`1050:1a61`, stable sort assumed),
-//! and evolution after every round with `level = base - 2 * rank` (`0c41 -> 0d9c -> 6fb8 -> 4a41`).
-//! **Assumed (not yet decoded):** 3-1-0 points, the 4-4-2 auto line-up (the real `1010:4b73` picks the formation),
-//! tie order, and that ranks are taken after the round's results.
+//! the 14 league rounds (`1020:11b8` loops 0..=14), **3-1-0 points** (`1010:9396` adds 3 to `team+0x20` for a win and
+//! 1 for a draw), wins/draws/losses at `+0x16/+0x18/+0x1a`, standings sorted by points only (`1050:1a61`, stable sort
+//! assumed), morale `K = 0.85*K + 0.15*result` after every game (`1068:10d1`), evolution after every round with
+//! `level = base - 2 * rank`, and the season end (`1020:038e`): champion `K += 1.0`, cup winner `K += 0.5`, the top two
+//! and bottom two of adjacent divisions swap (`1020:02a6`) and two random outside teams join the lowest division.
+//! **Assumed (not yet decoded):** the 4-4-2 auto line-up (the real `1010:4b73` picks the formation), tie order, and that
+//! ranks are taken after the round's results.
 use crate::evolution::{evolve_squad, level_for_rank};
-use crate::matchsim::{fixture_value, Match};
+use crate::matchsim::{fixture_value, morale_results, update_morale, Match};
 use crate::rng::DelphiRng;
 use crate::sector::{Slot, Status};
 
@@ -38,6 +41,9 @@ pub struct Club {
     pub slots: Vec<Slot>,
     pub k: f64,
     pub points: u16,
+    pub wins: u16,
+    pub draws: u16,
+    pub losses: u16,
     pub goals_for: i32,
     pub goals_against: i32,
 }
@@ -49,6 +55,9 @@ impl Club {
             slots,
             k: 1.0,
             points: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
             goals_for: 0,
             goals_against: 0,
         }
@@ -87,7 +96,7 @@ pub fn auto_lineup(slots: &mut [Slot]) {
     }
 }
 
-/// Plays one league round; updates ratings, injuries, bans, goals and points (3-1-0, assumed).
+/// Plays one league round; updates ratings, injuries, bans, goals, points (3-1-0), W/D/L and morale.
 pub fn play_round(
     rng: &mut DelphiRng,
     clubs: &mut [Club],
@@ -120,13 +129,26 @@ pub fn play_round(
         clubs[a].goals_for += y;
         clubs[a].goals_against += x;
         match x.cmp(&y) {
-            std::cmp::Ordering::Greater => clubs[h].points += 3,
-            std::cmp::Ordering::Less => clubs[a].points += 3,
+            std::cmp::Ordering::Greater => {
+                clubs[h].points += 3;
+                clubs[h].wins += 1;
+                clubs[a].losses += 1;
+            }
+            std::cmp::Ordering::Less => {
+                clubs[a].points += 3;
+                clubs[a].wins += 1;
+                clubs[h].losses += 1;
+            }
             std::cmp::Ordering::Equal => {
                 clubs[h].points += 1;
                 clubs[a].points += 1;
+                clubs[h].draws += 1;
+                clubs[a].draws += 1;
             }
         }
+        let (rh, ra) = morale_results(x, y);
+        clubs[h].k = update_morale(clubs[h].k, rh);
+        clubs[a].k = update_morale(clubs[a].k, ra);
     }
 }
 
@@ -147,6 +169,64 @@ pub fn end_of_round(rng: &mut DelphiRng, clubs: &mut [Club], base: i32) {
     }
     for (rank, i) in standings(clubs).into_iter().enumerate() {
         evolve_squad(rng, &mut clubs[i].slots, level_for_rank(base, rank));
+    }
+}
+
+/// `1020:02a6`: the team at `ia` of `a` and the team at `ib` of `b` swap lists (each is appended to the other list).
+fn swap_between(a: &mut Vec<Club>, ia: usize, b: &mut Vec<Club>, ib: usize) {
+    let x = a.remove(ia);
+    let y = b.remove(ib);
+    b.push(x);
+    a.push(y);
+}
+
+/// Where the cup winner sits: division `0..=3` or the outside pool (`4`), and its index in that list.
+pub type ClubRef = (usize, usize);
+
+/// `1020:038e`: season end. Lists are sorted by points first (`1020:38b8`). The first division's champion gets
+/// `K += 1.0` and the cup winner `K += 0.5`; then the **top two of each lower division swap with the bottom two of the
+/// division above** (calls `02a6` with indices 6, 4, 4 because the lists shift by two after the first pair), and two
+/// distinct random outside teams replace the lowest division's bottom two. Finally the table is cleared for a new season.
+/// Divisions must hold 8 clubs each and the pool at least 3.
+pub fn end_of_season(
+    rng: &mut DelphiRng,
+    divs: &mut [Vec<Club>; 4],
+    pool: &mut Vec<Club>,
+    cup_winner: Option<ClubRef>,
+) {
+    for d in divs.iter_mut() {
+        let order = standings(d);
+        let sorted: Vec<Club> = order.into_iter().map(|i| d[i].clone()).collect();
+        *d = sorted;
+    }
+    divs[0][0].k += 1.0;
+    if let Some((d, i)) = cup_winner {
+        let list = if d < 4 { &mut divs[d] } else { &mut *pool };
+        list[i].k += 0.5;
+    }
+    for upper in 0..3 {
+        let (head, tail) = divs.split_at_mut(upper + 1);
+        let (a, b) = (&mut tail[0], &mut head[upper]);
+        let idx_in_upper = if upper == 0 { 6 } else { 4 };
+        swap_between(a, 0, b, idx_in_upper);
+        swap_between(a, 0, b, idx_in_upper);
+    }
+    let first = rng.random(pool.len() as u16) as usize;
+    let second = loop {
+        let j = rng.random(pool.len() as u16) as usize;
+        if j != first {
+            break j;
+        }
+    };
+    swap_between(pool, first, &mut divs[3], 4);
+    swap_between(pool, second - (first < second) as usize, &mut divs[3], 4);
+    for c in divs.iter_mut().flatten().chain(pool.iter_mut()) {
+        c.points = 0;
+        c.wins = 0;
+        c.draws = 0;
+        c.losses = 0;
+        c.goals_for = 0;
+        c.goals_against = 0;
     }
 }
 
@@ -212,5 +292,109 @@ mod tests {
         // one injured player less: a goalkeeper plus the remaining outfield reserves
         assert_eq!(slots.iter().filter(|s| s.status == Status::Sub).count(), 4);
         assert_eq!(slots[3].status, Status::Out);
+    }
+
+    fn named_division(prefix: &str, rng: &mut DelphiRng) -> Vec<Club> {
+        (0..8)
+            .map(|i| {
+                let mut c = Club::new(
+                    &format!("{prefix}{i}"),
+                    crate::matchsim::tests::squad(5, rng),
+                );
+                c.points = 100 - i as u16 * 10; // sorted best first by construction
+                c
+            })
+            .collect()
+    }
+
+    #[test]
+    fn promotion_and_relegation_move_two_clubs_each_way() {
+        let mut rng = DelphiRng::new(3);
+        let mut divs = [
+            named_division("A", &mut rng),
+            named_division("B", &mut rng),
+            named_division("C", &mut rng),
+            named_division("D", &mut rng),
+        ];
+        let mut pool: Vec<Club> = (0..6)
+            .map(|i| Club::new(&format!("P{i}"), crate::matchsim::tests::squad(4, &mut rng)))
+            .collect();
+        let names = |d: &Vec<Club>| {
+            let mut v: Vec<String> = d.iter().map(|c| c.name.clone()).collect();
+            v.sort();
+            v
+        };
+        end_of_season(&mut rng, &mut divs, &mut pool, Some((1, 3)));
+        // division sizes are preserved
+        assert!(divs.iter().all(|d| d.len() == 8));
+        assert_eq!(pool.len(), 6);
+        // D1 = old top six + the two best of D2; D2 = old ranks 3..6 + D1's bottom two + the two best of D3
+        assert_eq!(
+            names(&divs[0]),
+            ["A0", "A1", "A2", "A3", "A4", "A5", "B0", "B1"]
+        );
+        assert_eq!(
+            names(&divs[1]),
+            ["A6", "A7", "B2", "B3", "B4", "B5", "C0", "C1"]
+        );
+        assert_eq!(
+            names(&divs[2]),
+            ["B6", "B7", "C2", "C3", "C4", "C5", "D0", "D1"]
+        );
+        // D4 lost its bottom two (to the pool) and gained two random outside clubs
+        let d4 = names(&divs[3]);
+        assert!(d4.contains(&"C6".to_string()) && d4.contains(&"C7".to_string()));
+        assert_eq!(d4.iter().filter(|n| n.starts_with('P')).count(), 2);
+        assert!(
+            names(&pool).contains(&"D6".to_string()) && names(&pool).contains(&"D7".to_string())
+        );
+        // the table is cleared
+        assert!(divs.iter().flatten().all(|c| c.points == 0));
+    }
+
+    #[test]
+    fn titles_raise_morale() {
+        let mut rng = DelphiRng::new(4);
+        let mut divs = [
+            named_division("A", &mut rng),
+            named_division("B", &mut rng),
+            named_division("C", &mut rng),
+            named_division("D", &mut rng),
+        ];
+        let mut pool: Vec<Club> = (0..4)
+            .map(|i| Club::new(&format!("P{i}"), crate::matchsim::tests::squad(4, &mut rng)))
+            .collect();
+        end_of_season(&mut rng, &mut divs, &mut pool, Some((0, 0))); // champion also wins the cup
+        let champion = divs.iter().flatten().find(|c| c.name == "A0").unwrap();
+        assert_eq!(champion.k, 2.5);
+        let other = divs.iter().flatten().find(|c| c.name == "A1").unwrap();
+        assert_eq!(other.k, 1.0);
+    }
+
+    #[test]
+    fn a_season_round_updates_points_wdl_and_morale() {
+        let mut rng = DelphiRng::new(5);
+        let mut clubs: Vec<Club> = (0..8)
+            .map(|i| Club::new(&format!("C{i}"), crate::matchsim::tests::squad(6, &mut rng)))
+            .collect();
+        let mut seed = DelphiRng::new(6);
+        let mut names = move |_k: usize| {
+            let mut n = || {
+                (0..8)
+                    .map(|_| b'a' + seed.random(26) as u8)
+                    .collect::<Vec<u8>>()
+            };
+            (n(), n(), n())
+        };
+        play_round(&mut rng, &mut clubs, 1, &mut names);
+        for c in &clubs {
+            assert_eq!(c.wins + c.draws + c.losses, 1);
+            assert_eq!(c.points, c.wins * 3 + c.draws);
+        }
+        assert_eq!(
+            clubs.iter().map(|c| c.wins).sum::<u16>(),
+            clubs.iter().map(|c| c.losses).sum::<u16>()
+        );
+        assert!(clubs.iter().any(|c| (c.k - 1.0).abs() > 1e-9));
     }
 }

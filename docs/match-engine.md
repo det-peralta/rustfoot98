@@ -140,16 +140,18 @@ For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)
   The effect is a steady pull of every squad toward its team's level window. (Matches the save: after 2 rounds most
   starters had lost 1–2 points and a reserve had gained 1.)
 
-## Morale `K` (`team+0x5b`, Real48) — `1020:038e`, `1010:4f40`
-`K` is the team's "moral" (the game has Moral gauges). It is 1.0 at creation and when a coach takes over (`4f40`).
-After a processed game `038e` adds **+1.0 to the user's team and +0.5 to its opponent**. It enters the goal threshold as
-`(K/2)^(1/4)`, so a long-serving coach's team scores more. `038e` addresses the user's game pair (list index 0), so
-AI-vs-AI games leave `K` untouched.
+## Morale `K` (`team+0x5b`, Real48) — `1010:9396`, `1068:10d1`, `1020:038e`
+**Correction:** an earlier note said `K` grows by +1.0 / +0.5 per game for the user. That routine (`038e`) is the
+**season-end** routine. `K` is the team's form/"moral" (the game has Moral gauges):
+- **After every finished game** (`1010:9396` via `1068:10d1`): `K = 0.85·K + 0.15·r` with `r` = home win 2.0, away win 2.5,
+  draw 0.8 (home side) / 1.3 (away side), loss 0.0. So `K` stays in 0..2.5, starts at 1.0 (and resets to 1.0 when a coach
+  takes over a team, `4f40`).
+- **Season end** (`038e`): the first division's champion gets `K += 1.0`, the cup winner `K += 0.5`.
+- It scales the goal threshold by `(K/2)^(1/4)`: a team on a winning run scores more, a team on a losing run much less.
 
 ## Still unknown
 - Identity of the two strings fed to `c95c` (division/country name vs a team string); the formula itself is decoded.
 - Role of the global `Real` at `10c8:2b46` that `0c41` random-walks every round (likely a finance/economy index).
-- Which of the two teams of a game is `puVar8` (+1.0 morale) in `038e`; whether AI-vs-AI games ever change `K`.
 - Half-time (minute 45) and extra-time (minute 90 -> 120) routines; the penalty shoot-out UI path; human-controlled chance path (`1038:328b`).
 - Where `division.base` (division `+4`) comes from, and the auto line-up formation choice in `1010:4b73`.
 - Season calendar generation, standings, finances (`1010:6e48` and the `+0x71..+0x79` team fields), transfers.
