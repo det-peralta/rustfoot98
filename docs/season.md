@@ -59,8 +59,8 @@ the global `Real` at `10c8:2b46`; coach sacking rule (`8b5d`); what the new-seas
 ## World dynamics (core/src/world.rs, `cargo run --release -p elifoot-core --example world -- 12`)
 A new world starts, by the verified rule, with mean squad strength about **43 / 31 / 18 / 7** for divisions 1..4. With the
 decoded evolution (starters drift down, reserves up, clamped to `base − 2·rank ± 5`) the means then erode slowly, to about
-**34 / 20 / 11 / 2** after twelve seasons. The original presumably counters this with mechanics not decoded yet
-(transfers, finances), so long runs of the demo drift weaker than the real game would.
+**34 / 20 / 11 / 2** after twelve seasons. AI clubs never trade players with each other (see `finance.md`), so this erosion
+is most likely intended; the user counters it by buying players at auction.
 
 ## The user's club (core/src/world.rs, web/)
 - **Start**: a random one of the bottom six clubs of the 4th division (`7 − Random(6)`, `1028:0b26`); the demo also lets you pick any club.
