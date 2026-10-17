@@ -36,3 +36,22 @@ See `tools/efdecode.py` (reference decoder). Summary:
   Players carry **no skill value** in the file; skill must be derived at runtime (to confirm in code).
 - **`JOGOS/DRLIST.ELI`:** 102-byte list, record layout TBD. `.e98` saves: format TBD
   (need a save produced by the game).
+
+## Save game (`JOGOS\*.e98`) — static findings so far
+- Delphi inline string literals sit **before** each routine; the real entry is the next `55 89 E5` prologue.
+  Pointing the decompiler at a string address yields garbage.
+- Save routine: `1020:1796` (load counterpart near `1020:1d8d`). It writes the game state as a sequence of
+  lists, in this order, from globals `DAT_10c8_26fe, 2702, 2706, 26f6, 26f2, 26fa, 270a` plus three
+  special blocks (`1020:1513`, `1020:1661`, `1020:16eb`):
+  `1010:0e33` (teams, trivial stub), `1010:11c3`, `1010:189f`, `1010:0751` (x2, flag 1/0 — squad lists),
+  `1010:0cfd`, `1010:1342`.
+- List serializer (`1010:0751`): writes `u16 count`, then each element via a per-class method
+  (`1010:305a` for the flag=1 variant) or a raw 2-byte id at `elem+8` (flag=0). Binary stream via
+  `10c0:0f67` (BlockWrite-like). Not yet decoded field by field.
+- Other files referenced: `\equipas.ef2` (bundled teams), `\treinad.ef2` (coaches), `drlist.eli`,
+  `elif98.ini` (sections System/Options), `win.ini` section `[Elias]` (registration).
+- Ghidra's decompiler is weak on 16-bit far-call Delphi code; expect to read disassembly for field layouts.
+
+## Method note
+Static decompilation of every serializer is slow. A real `.e98` save from the original game gives a
+ground truth to decode black-box and to validate each static finding.
