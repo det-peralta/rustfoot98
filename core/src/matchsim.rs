@@ -376,6 +376,18 @@ impl Match {
         }
     }
 
+    /// `1010:afff` -> `49e2` for both teams: one random squad member per team changes its season rating
+    /// (a starter loses 1, anyone else gains 1). Home first, then away; always runs, goal or not.
+    fn tick_ratings(&mut self, rng: &mut DelphiRng) {
+        for side in [Side::Home, Side::Away] {
+            let t = self.team_mut(side);
+            let i = rng.random(t.slots.len() as u16) as usize;
+            if let Some(p) = t.slots.get_mut(i) {
+                p.rating += if p.starter() { -1 } else { 1 };
+            }
+        }
+    }
+
     /// One minute of play (`1048:069b` body for a single game).
     pub fn step(&mut self, rng: &mut DelphiRng) {
         self.minute += 1;
@@ -383,12 +395,20 @@ impl Match {
         if !happened && self.minute != 46 && self.minute != 91 {
             self.annul(rng);
         }
+        self.tick_ratings(rng);
     }
 
     pub fn play(&mut self, rng: &mut DelphiRng) {
         while self.minute < 90 {
             self.step(rng);
         }
+    }
+
+    /// `1020:038e`: after a processed game the user's team gains +1.0 morale (`K`) and its opponent +0.5.
+    /// (`K` resets to 1.0 when a coach takes over, `1010:4f40`.)
+    pub fn apply_morale(user: &mut TeamState, opponent: &mut TeamState) {
+        user.k += 1.0;
+        opponent.k += 0.5;
     }
 
     pub fn score(&self) -> (i32, i32) {
@@ -576,6 +596,63 @@ pub mod tests {
                 .count(),
             1
         );
+    }
+
+    #[test]
+    fn season_ratings_make_starters_decline_and_reserves_improve() {
+        use crate::evolution::{evolve_squad, level_for_rank};
+        let mut rng = DelphiRng::new(10);
+        let mut team = squad(8, &mut rng);
+        let before_starters: i32 = team
+            .iter()
+            .filter(|p| p.starter())
+            .map(|p| p.strength as i32)
+            .sum();
+        let before_bench: i32 = team
+            .iter()
+            .filter(|p| !p.starter())
+            .map(|p| p.strength as i32)
+            .sum();
+        for _ in 0..38 {
+            let mut m = Match::new(team.clone(), squad(8, &mut rng), 8, 6);
+            m.play(&mut rng);
+            for (slot, played) in team.iter_mut().zip(m.home.slots.iter()) {
+                slot.rating = played.rating; // injuries/cards of that match are not carried over
+            }
+        }
+        assert!(team.iter().filter(|p| p.starter()).all(|p| p.rating < 0));
+        assert!(team.iter().filter(|p| !p.starter()).all(|p| p.rating > 0));
+        evolve_squad(&mut rng, &mut team, level_for_rank(8, 0));
+        let after_starters: i32 = team
+            .iter()
+            .filter(|p| p.starter())
+            .map(|p| p.strength as i32)
+            .sum();
+        let after_bench: i32 = team
+            .iter()
+            .filter(|p| !p.starter())
+            .map(|p| p.strength as i32)
+            .sum();
+        assert!(
+            after_starters < before_starters,
+            "{before_starters} -> {after_starters}"
+        );
+        assert!(
+            after_bench > before_bench,
+            "{before_bench} -> {after_bench}"
+        );
+    }
+
+    #[test]
+    fn morale_grows_after_games() {
+        let mut rng = DelphiRng::new(11);
+        let (mut a, mut b) = (
+            TeamState::new(squad(6, &mut rng)),
+            TeamState::new(squad(6, &mut rng)),
+        );
+        Match::apply_morale(&mut a, &mut b);
+        Match::apply_morale(&mut a, &mut b);
+        assert_eq!((a.k, b.k), (3.0, 2.0));
     }
 
     #[test]

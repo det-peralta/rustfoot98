@@ -14,5 +14,6 @@
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI
 - [ ] Registration check: understand shareware limits (no keygen use)
 - [x] `core/` in Rust (cipher, Delphi RNG, EFT/TXE, sectors, chance generator, outcome, evolution, Match v0)
-- [ ] Decode `aa11`/`ac72` (cards, injuries), penalties, substitutions, half-time, `K` update, `100b` weights
+- [x] Decoded `aa11`/`ac72`, penalties, subs, `100b` weights, `c95c`, rating accumulator, per-round evolution, `K` morale
+- [ ] Half-time/extra time, season calendar (`1048`/`1916`), standings, finances (`6e48`, `10c8:2b46`), transfers
 - [ ] Build UI, PWA, saves import/export compatible with `.e98`

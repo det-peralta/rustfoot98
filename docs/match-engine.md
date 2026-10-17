@@ -123,16 +123,34 @@ if code == 0: code = (a < d) ? 2 : 1
 Codes map to the on-screen strings (order found in the binary): 1 GOLO, 2 Defendeu, 3 Ao poste,
 4 (barra) crossbar, 5 Ao lado, 6 Por cima.
 
-## Strength evolution — `1010:4a41(team, teamLevel)`
-For each player, with `rating` from `1068:1079(real at player+0xc)` (+1 / 0 / -1):
-- `+1`: if not goalkeeper, or `Random(2)==0` for goalkeepers: strength++ (max 50); undone if it exceeds `teamLevel+5`.
-- `-1`: if `Random(2)==0` and strength > 1: strength--; undone if it falls below `teamLevel-5` or 1.
+## Strength evolution and the rating accumulator (decoded)
+**Rating accumulator** (`slot+0x0c`, int): `1010:afff` runs every minute of every game and calls `49e2` for both teams:
+pick one random squad member (`Random(squad.count)`, home team first); if it is a starter its rating goes **−1**,
+otherwise (bench or not in the matchday squad) **+1**. Starters therefore drift negative and reserves positive.
+
+**Evolution** runs after **every round**, not only at season end: `1020:0c41` (end-of-round routine, also updates a
+global `Real` random walk at `10c8:2b46` clamped to [lo, hi] — role not decoded) -> `1010:0d9c` (the 4 divisions)
+-> `6fb8` (each team, in list order) -> `4a41(team, level)` with **`level = round(division.base − 2 × rank)`**
+(`rank` = index of the team in the division's list, 0 = best; `division.base` = division object `+4`).
+For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)` (`1068:1079`, threshold 0.0):
+- `+1`: if not a goalkeeper (or a goalkeeper winning `Random(2)==0`), strength++ (max 50); undone if it exceeds `level+5`.
+- `-1`: `Random(2)==0` is **always drawn first**, then if strength > 1 it drops by 1; undone if below `level−5` or 1.
+- the rating is **not reset** between rounds (only when a coach takes over a team, `4f40`), so the sign keeps pushing:
+  strong starters keep sliding down until they reach `level−5`, strong-by-position reserves climb to `level+5`.
+  The effect is a steady pull of every squad toward its team's level window. (Matches the save: after 2 rounds most
+  starters had lost 1–2 points and a reserve had gained 1.)
+
+## Morale `K` (`team+0x5b`, Real48) — `1020:038e`, `1010:4f40`
+`K` is the team's "moral" (the game has Moral gauges). It is 1.0 at creation and when a coach takes over (`4f40`).
+After a processed game `038e` adds **+1.0 to the user's team and +0.5 to its opponent**. It enters the goal threshold as
+`(K/2)^(1/4)`, so a long-serving coach's team scores more. `038e` addresses the user's game pair (list index 0), so
+AI-vs-AI games leave `K` untouched.
 
 ## Still unknown (next)
 - What `c95c` really compares (byte strings at `calEntry+0x0b+4` vs `team+0x2d`), and the `+3` condition (it gates cards, annulments and the 6000/7000 rolls).
-- How `K` (`team+0x5b`, the Real48 multiplier) is updated in `1020:038e` (FPU ops missing from the decompile).
+- Role of the global `Real` at `10c8:2b46` that `0c41` random-walks every round (likely a finance/economy index).
+- Which of the two teams of a game is `puVar8` (+1.0) in `038e`; whether AI games ever change `K`.
 - What `team+0x59` counts exactly (goals?) and `team+0x4f` (shots).
-- How `rating` (player `+0xc`, a Real) is produced after each match.
 - `1010:100b` weights, `1038:39b6` shooter selection, `1010:818c` attacker force.
 
 ## Minute loop — `1048:069b`
@@ -145,7 +163,7 @@ tie may extend the length to 120.
 ## Rust port status (`core/src/matchsim.rs`)
 Implemented: bonus rolls, main goal generator, weighted scorer roulette, red cards, injuries, automatic
 substitutions, penalties after red cards, goal annulment (30 unit tests, clippy clean).
-Not yet: half-time/extra time, the `K` update, interactive (human) paths, foul roulette of the UI path, and
+Not yet: half-time/extra time, interactive (human) paths, foul roulette of the UI path, and
 the identity of the two `c95c` strings (the formula itself is implemented as `fixture_value`).
 100k games per pairing (`cargo run --release -p elifoot-core --example sim`, 4-4-2, bench of 5, `c95c` with random strings,
 domestic league match):

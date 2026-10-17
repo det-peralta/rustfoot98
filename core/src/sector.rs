@@ -65,6 +65,8 @@ pub struct Slot {
     pub ban: u8,
     /// Games of injury left (`+0x29`).
     pub injured: u8,
+    /// Season performance accumulator (`+0x0c`): -1 per pick while a starter, +1 while not (`1010:49e2`).
+    pub rating: i32,
 }
 
 impl Slot {
@@ -86,6 +88,7 @@ impl Slot {
             same_country,
             ban: 0,
             injured: 0,
+            rating: 0,
         }
     }
 
@@ -179,6 +182,7 @@ mod tests {
             same_country: same,
             ban: 0,
             injured: 0,
+            rating: 0,
         }
     }
     const S: Status = Status::Starter;
