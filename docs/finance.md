@@ -32,8 +32,8 @@ Slot fields: `+0x31/0x33` stored value (long, from `7ff4`), `+0x35` status flag 
 - **Sale priority score** (`1010:5de1`; the AI puts up the sellable player with the **lowest** score):
   `score = (5/(aggression+1))^(1/4) · T[L][pos]/(count[pos]+1) · T[L][5]/(squad+1) · strength / (rating+1)`, times a factor
   for slot status 0 or 1. `T` is a table at `DS:0x300`, rows for `L = 0..5` as `[GK, DEF, MID, ATT, 0, total]`:
-  `[3,8,7,3,0,22] [3,8,7,4,0,22] [3,8,8,5,0,23] [4,8,8,5,0,24] [4,9,8,5,0,25] [4,9,9,5,0,26]`-ish target squad sizes
-  (the last row printed from the binary is `[4,9,8,5,0,26]`).
+  `L0 [3,8,7,3,0,22]  L1 [3,8,7,4,0,22]  L2 [3,8,8,5,0,23]  L3 [4,8,8,5,0,24]  L4 [4,9,8,5,0,25]  L5 [4,9,8,5,0,26]`
+  (exact bytes of the binary: target squad shape, growing with the level).
   So overstaffed positions, large squads, weak and aggressive players go first.
 - **When an AI club sells** (`1010:3aad`, after each game, and only from round 2): when its cash is below the summed stored
   values of its sellable players (`5992`), or with probability 1/20, or when the squad is over 20 and the club is not in the
