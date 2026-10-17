@@ -406,6 +406,24 @@ pub extern "C" fn world_load(len: usize) -> i32 {
     }
 }
 
+/// Imports an original `.e98` save from the first `len` bytes of the buffer; returns 1 on success, 0 on failure
+/// (the JSON is then `{"error":...}`).
+#[no_mangle]
+pub extern "C" fn world_import_e98(len: usize, seed: u32) -> i32 {
+    let bytes = BUF.with(|b| b.borrow()[..len.min(b.borrow().len())].to_vec());
+    match elifoot_core::e98::parse(&bytes).and_then(|s| World::from_e98(seed, &s)) {
+        Ok(w) => {
+            WORLD.with(|cell| *cell.borrow_mut() = Some(w));
+            publish();
+            1
+        }
+        Err(e) => {
+            OUT.with(|o| *o.borrow_mut() = format!("{{\"error\":{}}}", esc(&e)));
+            0
+        }
+    }
+}
+
 /// Makes club `club` of division `division` the user's club.
 #[no_mangle]
 pub extern "C" fn human_set(division: u32, club: u32) {

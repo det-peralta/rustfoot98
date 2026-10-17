@@ -114,6 +114,20 @@ try {
     await p.click('#use-fiction');
     check('back to fiction', (await p.locator('#table tbody td.l').first().textContent()).match(/^(Atlético|Sporting|União|Académica|Desportivo|Estrela) /) !== null);
   }
+  // original .e98 import (the sample is a local, git-ignored game save; skipped when absent)
+  const { existsSync } = await import('fs');
+  if (existsSync('original/saves/snap2.e98')) {
+    await p.setInputFiles('#import-e98', 'original/saves/snap2.e98');
+    await p.waitForFunction(() => document.querySelector('#mode').textContent.includes('importado'));
+    check('e98 imported', (await p.textContent('#mode')).includes('importado'), await p.textContent('#save-status'));
+    check('e98 year 2026 round 2', (await p.textContent('#year')) === '2026' && (await p.textContent('#round')).startsWith('2 /'));
+    check('e98 my club is Figueirense', (await p.textContent('#club-name')).includes('FIGUEIRENSE'), await p.textContent('#club-name'));
+    await p.click('#play-round');
+    check('e98 plays on', (await p.textContent('#round')).startsWith('3 /'));
+  }
+  await p.setInputFiles('#import-e98', { name: 'x.e98', mimeType: 'application/octet-stream', buffer: Buffer.alloc(200) });
+  await p.waitForFunction(() => document.querySelector('#save-status').textContent.includes('Não foi possível'));
+  check('bad e98 refused', (await p.textContent('#save-status')).includes('Não foi possível importar'));
   check('no console errors', errors.length === 0, errors.join(' | '));
   await b.close();
 } finally { srv.kill(); }

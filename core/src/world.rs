@@ -320,6 +320,32 @@ impl World {
         Ok(w)
     }
 
+    /// A world around ready-made clubs (used by the `.e98` import): fresh cup, default economy index.
+    pub fn empty(
+        seed: u32,
+        divisions: [Vec<Club>; 4],
+        pool: Vec<Club>,
+        year: u16,
+        round: usize,
+    ) -> World {
+        let mut w = World {
+            divisions,
+            pool,
+            year,
+            economy: INITIAL_INDEX,
+            round,
+            rng: DelphiRng::new(seed),
+            last_round: Vec::new(),
+            last_season: None,
+            human: None,
+            cup: Vec::new(),
+            last_cup: None,
+            cup_champion: None,
+        };
+        w.reset_cup();
+        w
+    }
+
     /// A fictional world with the original's starting strengths: the club at list position `i` (division `i / 8`) gets
     /// `base_strength(i)`, so the first division starts around 49..38 and the fourth around 11..5.
     pub fn synthetic(seed: u32) -> World {

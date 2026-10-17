@@ -117,3 +117,22 @@ In the save, the tail field at `+23` (u16, values 1..9) is the hidden talent `g`
 `+23` talent `g` (u16), `+25` price (u16), `+32` appearances. `+8` (1 or 2 -> 0 after a round) is unidentified.
 The earlier guess that `+21` was "contract games" is wrong. Aggression, proneness and `g` are not stored
 independently of the name: they are recomputed from it by the game (`1010:7516`).
+
+## `.e98` layout used by the importer (`core/src/e98.rs`, `cargo run -p elifoot-core --example e98dump FILE`)
+Verified on `snap1` (new game) and `snap2` (after 2 rounds); the standings are consistent (`points = 3W + D`, goals for = goals
+against over the whole league) and `K` matches the morale formula (e.g. `0.7225 = 0.85²` for two defeats).
+- Header: `u16` id of the human club at `0x1f` (= the team id), `u16` year at `0x24`.
+- Teams are located by the `EFa` + zeros anchor of an embedded `.EFT` header. `u16` team id sits right before it
+  (ids are the first player id of the team's coach row). After the `.EFT` names/colours/country: `level u8`, then
+  `wins, draws, losses, goals for, goals against, points` as `u16`; then 14 opponent positions (1..8); **the morale `K` is a
+  Real48 57 bytes after the end of the standings**, followed by the squad (`u16 id, nat pstr, name pstr, 48 bytes`; `+0`
+  position, `+2` strength `u16`). The team list is in an unrelated order (not the standings, not the divisions).
+- League teams (32 of the master list; the others are the outside pool) end with `... 0E 00` + 14 fixture entries of 16 bytes
+  whose first `u16` is the **opponent's team id** (played entries carry the result in the 8 bytes that unplayed ones fill
+  with `FF`). Clubs that appear in each other's lists form a division of eight; the four groups are ordered by mean player
+  strength (the save stores no explicit division number that we have found).
+- Constants seen in team records: a Real48 `0.6` before each team id.
+- Header `0x28..0x2f`: an 80-bit extended that is `2.0` in a new game and `2.0214` after two rounds; it looks like the economy
+  index but the scale is unproven (so it is not imported).
+- Not decoded / not imported: economy index, injuries and suspensions, finances, transfers, the cup, results of played games.
+

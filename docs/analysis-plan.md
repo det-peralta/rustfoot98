@@ -8,7 +8,7 @@
 - [ ] Field layout of TPlayer(56)/TTeam(203)/TGame(81)/TCoach(35) from Load/Save methods
 - [ ] Extract form resources (TForm layouts, strings) → UI spec
 - [x] File formats: `.EFT` team, `.TXE` (done, see findings)
-- [ ] File formats: `.e98` save, `DRLIST.ELI`
+- [~] File formats: `.e98` save (partly), `DRLIST.ELI`
 - [x] Locate RNG and match simulation (see docs/match-engine.md); partly decoded
 - [ ] Decode attack-value computation (+0x4c/+0x4e) and the Real math in 46df
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI
@@ -26,4 +26,5 @@
 - [x] User-controlled club: formation, line-up, bench, planned substitutions (docs/season.md)
 - [x] Save/load (own text format, browser storage + file export/import); a loaded game continues identically
 - [x] PWA: manifest, icons, service worker (offline after the first load), CI workflow
-- [ ] Import of original `.e98` saves (layout only partly decoded), the user's market (buy/sell, tickets, salaries)
+- [x] Import of original `.e98` saves: rosters, standings, morale, year, round (see docs/findings.md); economy/finances/injuries still undecoded
+- [ ] The user's market (buy/sell, tickets, salaries)

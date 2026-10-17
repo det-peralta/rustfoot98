@@ -78,6 +78,24 @@ function loadText(text) {
   return true;
 }
 
+function importE98(bytes) {
+  const ptr = wasm.buf_resize(bytes.length);
+  new Uint8Array(wasm.memory.buffer, ptr, bytes.length).set(bytes);
+  const seed = Math.max(1, Number($("seed").value) | 0);
+  if (!wasm.world_import_e98(bytes.length, seed)) {
+    const p = wasm.world_json_ptr(), l = wasm.world_json_len();
+    $("save-status").textContent = "Não foi possível importar: " + JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, p, l))).error;
+    return false;
+  }
+  selectedMatch = null;
+  needTab = true;
+  useReal = false;
+  read();
+  $("mode").textContent = "jogo importado do Elifoot 98 original";
+  $("save-status").textContent = "Importado do .e98 original (classificações, jogadores, moral; economia, finanças e taça recomeçam).";
+  return true;
+}
+
 function newWorld() {
   selectedMatch = null;
   needTab = true;
@@ -388,6 +406,7 @@ $("export").onclick = () => {
   URL.revokeObjectURL(a.href);
 };
 $("import").onchange = async (e) => { const f = e.target.files[0]; if (f) loadText(await f.text()); e.target.value = ""; };
+$("import-e98").onchange = async (e) => { const f = e.target.files[0]; if (f) importE98(new Uint8Array(await f.arrayBuffer())); e.target.value = ""; };
 $("play-round").onclick = () => play("world_play_round");
 $("play-season").onclick = () => play("world_play_season");
 $("new-world").onclick = newWorld;

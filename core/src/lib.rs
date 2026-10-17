@@ -4,6 +4,7 @@
 pub mod chance;
 pub mod cipher;
 pub mod cup;
+pub mod e98;
 pub mod economy;
 pub mod eft;
 pub mod evolution;
