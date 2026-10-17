@@ -21,3 +21,6 @@ analysis/ghidra-proj/
 analysis/rea/
 analysis/*.log
 target/
+
+# build output of the web demo
+web/elifoot_wasm.wasm

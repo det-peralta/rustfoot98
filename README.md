@@ -21,5 +21,18 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/season.md](docs/season.md) | Season structure: fixtures, rounds, standings |
 | [docs/references.md](docs/references.md) | Third-party research (leads to verify) |
 
+## Try it (browser demo)
+```bash
+rustup target add wasm32-unknown-unknown     # once
+web/build.sh serve                            # builds the 143 KB WebAssembly core and serves http://localhost:8080
+```
+Plays full seasons of a fictional 4-division league using the decoded rules (no emulator). Native checks:
+`cargo test`, `cargo run --release -p elifoot-core --example sim|season|world`, and the browser smoke test
+`node tools/capture/web_test.mjs`.
+
+## Layout
+- `core/` pure Rust: formats, RNG, match engine, season, world.  `wasm/` C-ABI bindings.  `web/` the demo page.
+- `tools/` reverse-engineering helpers (Ghidra scripts, decoders).  `docs/` findings (see below).
+
 ## Status
 See the checklist in [docs/analysis-plan.md](docs/analysis-plan.md).

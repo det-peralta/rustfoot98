@@ -9,7 +9,7 @@
 //! **Assumed (not yet decoded):** the 4-4-2 auto line-up (the real `1010:4b73` picks the formation), tie order, and that
 //! ranks are taken after the round's results.
 use crate::evolution::{evolve_squad, level_for_rank};
-use crate::matchsim::{fixture_value, morale_results, update_morale, Match};
+use crate::matchsim::{fixture_value, morale_results, update_morale, Event, Match};
 use crate::rng::DelphiRng;
 use crate::sector::{Slot, Status};
 
@@ -39,6 +39,8 @@ pub fn fixtures(round: usize) -> Vec<(usize, usize)> {
 pub struct Club {
     pub name: String,
     pub slots: Vec<Slot>,
+    /// Player names, parallel to `slots`.
+    pub names: Vec<String>,
     pub k: f64,
     pub points: u16,
     pub wins: u16,
@@ -52,6 +54,9 @@ impl Club {
     pub fn new(name: &str, slots: Vec<Slot>) -> Self {
         Self {
             name: name.to_string(),
+            names: (0..slots.len())
+                .map(|i| format!("Player {}", i + 1))
+                .collect(),
             slots,
             k: 1.0,
             points: 0,
@@ -62,6 +67,16 @@ impl Club {
             goals_against: 0,
         }
     }
+}
+
+/// What happened in one game of a round (club indices refer to the slice passed to `play_round`).
+#[derive(Clone, Debug)]
+pub struct MatchRecord {
+    pub home: usize,
+    pub away: usize,
+    pub home_goals: i32,
+    pub away_goals: i32,
+    pub events: Vec<Event>,
 }
 
 /// Simplified 4-4-2 line-up (stand-in for `1010:4b73`): best fit players by strength per position,
@@ -101,13 +116,14 @@ pub fn play_round(
     rng: &mut DelphiRng,
     clubs: &mut [Club],
     round: usize,
-    names: &mut dyn FnMut(usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
-) {
+    names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+) -> Vec<MatchRecord> {
+    let mut records = Vec::new();
     for c in clubs.iter_mut() {
         auto_lineup(&mut c.slots);
     }
     for (h, a) in fixtures(round) {
-        let (division, hn, an) = names(round * 8 + h);
+        let (division, hn, an) = names(h, a);
         let hb = fixture_value(&division, &hn, true) + 2;
         let ab = fixture_value(&division, &an, true);
         let mut m = Match::new(clubs[h].slots.clone(), clubs[a].slots.clone(), hb, ab);
@@ -149,7 +165,15 @@ pub fn play_round(
         let (rh, ra) = morale_results(x, y);
         clubs[h].k = update_morale(clubs[h].k, rh);
         clubs[a].k = update_morale(clubs[a].k, ra);
+        records.push(MatchRecord {
+            home: h,
+            away: a,
+            home_goals: x,
+            away_goals: y,
+            events: m.events,
+        });
     }
+    records
 }
 
 /// Club indices ordered by points (stable: ties keep the club order), best first.
@@ -378,7 +402,7 @@ mod tests {
             .map(|i| Club::new(&format!("C{i}"), crate::matchsim::tests::squad(6, &mut rng)))
             .collect();
         let mut seed = DelphiRng::new(6);
-        let mut names = move |_k: usize| {
+        let mut names = move |_h: usize, _a: usize| {
             let mut n = || {
                 (0..8)
                     .map(|_| b'a' + seed.random(26) as u8)

@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "elifoot-core"
 version = "0.1.0"
+
+[[package]]
+name = "elifoot-wasm"
+version = "0.1.0"
+dependencies = [
+ "elifoot-core",
+]

@@ -24,13 +24,13 @@
   indices 6; D2/D3 and D3/D4 at 4 after the lists shift), then **two distinct random clubs from an outside pool replace
   the bottom two of the 4th division**; year +1 and a new season starts (`2f3c`). Events are recorded for titles,
   promotions ("Promovido para o"), relegations ("Despromovido para o") and sackings.
+- **Division base levels** (`1010:0b60`: `division+4 = index × −14 + 52`): **52, 38, 24, 10** for divisions 1–4 and −4 for the outside pool (index 4, never evolved). The evolution window of rank `r` is `base − 2r ± 5`.
 - **Evolution** after every round (see `match-engine.md`).
 
 ## Assumed in the Rust port (`core/src/season.rs`)
 (3-1-0 points, morale and promotion/relegation are now verified and implemented.)
 - **4-4-2 auto line-up** — the original (`1010:4b73`) chooses a formation; ours is a stand-in.
 - Ranks for evolution are taken after the round's results (the original sorts at `0c41` start; order not confirmed).
-- **Division base level** (`division+4`) is unknown; the example takes it as an argument (default 12).
 
 ## What the simulation shows (`cargo run --release -p elifoot-core --example season -- 12 2000`)
 Eight clubs of mean strength 9, 8, 7, 6, 6, 5, 4, 3, 2000 seasons: the strongest wins the title in 37 % of seasons,
@@ -38,6 +38,11 @@ the weakest in 0.9 %; mean squad strength falls by roughly 2 points over a seaso
 clamped by `base − 2·rank ± 5`). The drift magnitude depends on the unknown base level, so treat it as indicative only.
 
 ## Still to decode
-Division base level; the per-round byte array at `team+0x21` that the sort compares (the points word is `+0x20`);
+The per-round byte array at `team+0x21` that the sort compares (the points word is `+0x20`);
 finances and transfers (`3e9c`, `6e48`, team `+0x71..+0x79`); cup details (round naming, ties, extra time/penalties);
 the global `Real` at `10c8:2b46`; coach sacking rule (`8b5d`); what the new-season routine `2f3c` resets.
+
+## World dynamics (core/src/world.rs, `cargo run --release -p elifoot-core --example world -- 12`)
+With the verified bases, a synthetic world stratifies by itself: mean squad strength settles near **30 / 23 / 13 / 5.7**
+for divisions 1..4 by about the tenth season. The 4th-division value matches the real squad in a real save (mean 5.4).
+Starting strength `level + Random(7) − 3` is inferred from the deviations seen in that save (uniform −3..+3), not decoded.

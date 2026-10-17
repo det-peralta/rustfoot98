@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elifoot 98 — núcleo nativo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2714%27 fill=%27%231f7a3a%27/%3E%3Cpath d=%27M16 8l5 4-2 6h-6l-2-6z%27 fill=%27white%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1>Elifoot 98 <span>núcleo nativo (Rust → WebAssembly)</span></h1>
+    <p class="sub">Regras decodificadas do executável original · clubes e jogadores fictícios</p>
+  </div>
+  <div class="status" aria-live="polite">
+    <div><span class="k">Época</span> <b id="year">–</b></div>
+    <div><span class="k">Jornada</span> <b id="round">–</b></div>
+  </div>
+</header>
+
+<section class="controls">
+  <button id="play-round" class="primary">Jogar jornada</button>
+  <button id="play-season">Jogar época inteira</button>
+  <label class="seed">Semente <input id="seed" type="number" value="1998" min="1"></label>
+  <button id="new-world">Nova liga</button>
+</section>
+
+<nav id="tabs" role="tablist" aria-label="Divisões"></nav>
+
+<main>
+  <section class="card" aria-labelledby="t-title">
+    <h2 id="t-title">Classificação</h2>
+    <div class="scroll">
+      <table id="table">
+        <thead><tr>
+          <th>#</th><th class="l">Clube</th><th title="Jogos">J</th><th title="Vitórias">V</th><th title="Empates">E</th>
+          <th title="Derrotas">D</th><th title="Golos marcados">GM</th><th title="Golos sofridos">GS</th>
+          <th title="Pontos">Pts</th><th title="Moral (K): média móvel dos resultados, 0 a 2,5">Moral</th>
+          <th title="Força média do plantel">Força</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="note" id="base-note"></p>
+  </section>
+
+  <section class="card" aria-labelledby="r-title">
+    <h2 id="r-title">Última jornada</h2>
+    <ul id="results" class="results"></ul>
+    <div id="match" class="match" hidden></div>
+  </section>
+
+  <section class="card wide" id="season-card" hidden aria-labelledby="s-title">
+    <h2 id="s-title">Fim de época</h2>
+    <div id="season"></div>
+  </section>
+</main>
+
+<footer>
+  <p>Núcleo em Rust compilado para WebAssembly (<span id="wasm-size">–</span>), sem emulador. O jogo original corre Windows 3.1 dentro do DOSBox; aqui as regras
+  (golos, cartões, lesões, evolução, moral, classificação, subidas e descidas) foram recuperadas do binário e reimplementadas.</p>
+</footer>
+<script src="app.js" type="module"></script>
+</body>
+</html>
