@@ -1,11 +1,12 @@
 //! Reader for the original game's `.e98` saves (`JOGOS\*.e98`), and the import into a [`World`].
 //!
 //! Only part of the format is decoded (see `docs/findings.md`): what is read here was verified on two real saves (a new game
-//! and the same game after two rounds). Not decoded yet and therefore *not* imported: the economy index, injuries and bans,
-//! the finances, the cup, the fixture results. The imported world starts a fresh cup and keeps the default economy index.
+//! and the same game after two rounds). Not decoded yet and therefore *not* imported: injuries and bans, the finances,
+//! the cup, the fixture results. The imported world starts a fresh cup.
 //!
 //! Layout of what is used, found by scanning for the `EFa` + zeros anchor that opens every team record:
-//! - header: double-delta pstr (save description), `u16` id of the first human club at `0x1f`, `u16` year at `0x24`;
+//! - header: double-delta pstr (save description), `u16` id of the first human club at `0x1f`, `u16` year at `0x24`,
+//!   the economy index as an extended at `0x28`;
 //! - a coach table near the start (one row per team plus the two human managers) that is not needed here;
 //! - per team: `u16` team id, the `.EFT` header (names, colours, country), `level u8`, `wins, draws, losses, goals for,
 //!   goals against, points` as `u16`, the 14 opponent positions, 57 bytes later the morale `K` (Real48), then the squad: per
@@ -49,6 +50,8 @@ pub struct E98Team {
 pub struct E98 {
     pub description: String,
     pub year: u16,
+    /// Economy index (extended at header offset `0x28`; 2.0 in a new game).
+    pub economy: f64,
     pub human_id: u16,
     pub teams: Vec<E98Team>,
 }
@@ -57,6 +60,25 @@ const ANCHOR_ZEROS: usize = 20;
 
 fn u16_at(d: &[u8], o: usize) -> Option<u16> {
     Some(u16::from_le_bytes([*d.get(o)?, *d.get(o + 1)?]))
+}
+
+/// x87 80-bit extended (Delphi `Extended`).
+pub fn extended(b: &[u8]) -> f64 {
+    if b.len() < 10 {
+        return 0.0;
+    }
+    let m = u64::from_le_bytes(b[..8].try_into().unwrap());
+    let se = u16::from_le_bytes([b[8], b[9]]);
+    let e = (se & 0x7fff) as i32;
+    if e == 0 {
+        return 0.0;
+    }
+    let v = m as f64 / 2f64.powi(63) * 2f64.powi(e - 16383);
+    if se & 0x8000 != 0 {
+        -v
+    } else {
+        v
+    }
 }
 
 /// Delphi `Real48`: exponent byte, then a 39-bit mantissa and a sign bit.
@@ -215,9 +237,16 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
             opponents,
         });
     }
+    let economy = d.get(0x28..0x32).map(extended).unwrap_or(0.0);
+    let economy = if (0.5..=10.0).contains(&economy) {
+        economy
+    } else {
+        crate::economy::INITIAL_INDEX
+    };
     Ok(E98 {
         description,
         year,
+        economy,
         human_id,
         teams,
     })
@@ -350,6 +379,7 @@ impl World {
             .max()
             .unwrap_or(0);
         let mut w = World::empty(seed, divisions, pool, save.year, round.min(13));
+        w.economy = save.economy;
         let human = divs.iter().enumerate().find_map(|(d, idx)| {
             idx.iter()
                 .position(|&i| save.teams[i].id == save.human_id)
@@ -389,6 +419,11 @@ mod tests {
             };
             let save = parse(&bytes).unwrap();
             assert_eq!(save.year, 2026);
+            assert!(
+                (save.economy - if name == "snap1.e98" { 2.0 } else { 2.0054 }).abs() < 0.001,
+                "{}",
+                save.economy
+            );
             assert_eq!(save.teams.len(), 52);
             let divs = save.divisions().unwrap();
             assert!(divs.iter().all(|g| g.len() == 8));

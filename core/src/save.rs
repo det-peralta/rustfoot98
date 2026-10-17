@@ -305,7 +305,7 @@ mod tests {
             w.human.as_ref().unwrap().plan
         );
         assert_eq!(back.year, 1998);
-        assert_eq!(back.economy, 1.0);
+        assert_eq!(back.economy, INITIAL_INDEX);
     }
 
     #[test]

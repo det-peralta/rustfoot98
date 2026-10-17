@@ -544,7 +544,7 @@ mod tests {
         world_new(7);
         let first = json();
         assert!(first.starts_with("{\"year\":1998,\"round\":0"));
-        assert!(first.contains("\"economy\":1.000"));
+        assert!(first.contains("\"economy\":2.000"));
         world_play_round();
         let second = json();
         assert!(second.contains("\"round\":1"));
