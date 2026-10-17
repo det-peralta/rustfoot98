@@ -21,8 +21,8 @@ while (true) {
       if (c.op === 'shot') { await p.screenshot({ path: c.path }); out('shot ' + c.path); }
       else if (c.op === 'click') { await p.mouse.click(c.x, c.y, { clickCount: c.n || 1 }); out('click'); }
       else if (c.op === 'move') { await p.mouse.move(c.x, c.y); out('move'); }
-      else if (c.op === 'key') { await p.keyboard.press(c.key); out('key ' + c.key); }
-      else if (c.op === 'type') { await p.keyboard.type(c.text, { delay: 60 }); out('type'); }
+      else if (c.op === 'key') { await p.keyboard.press(c.key, { delay: 150 }); await p.waitForTimeout(700); out('key ' + c.key); }
+      else if (c.op === 'type') { await p.keyboard.type(c.text, { delay: 200 }); out('type'); }
       else if (c.op === 'wait') { await p.waitForTimeout(c.ms); out('waited'); }
       else if (c.op === 'eval') { out('eval ' + JSON.stringify(await p.evaluate(c.js))); }
       else if (c.op === 'quit') { out('bye'); await b.close(); process.exit(0); }

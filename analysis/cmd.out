@@ -1,26 +1,15 @@
 ready
 waited
-shot analysis/shots/01.png
+key Tab
+shot analysis/shots/10.png
 click
 waited
-shot analysis/shots/02.png
-click
-waited
-shot analysis/shots/03.png
 key Enter
 waited
-shot analysis/shots/04.png
-move
-click
-waited
-shot analysis/shots/05.png
 key Tab
-ERR keyboard.press: Unknown key: "space"
+key Space
 key Tab
 type
 waited
-shot analysis/shots/06.png
-waited
-shot analysis/shots/07.png
-eval {"active":"DIV#game-container.smooth-canvas not-selectable emulator-root full","canvases":[{"w":800,"h":600,"tab":-1,"cls":"emulator-canvas smooth-canvas"}]}
+shot analysis/shots/11.png
 bye
