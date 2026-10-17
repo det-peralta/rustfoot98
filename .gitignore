@@ -1,0 +1,16 @@
+# Third-party game files: never commit
+original/
+*.exe
+*.EXE
+*.dll
+*.DLL
+*.vbx
+*.VBX
+*.zip
+*.jsdos
+*.gpr
+*.rep
+*.e98
+node_modules/
+dist/
+.rea/
