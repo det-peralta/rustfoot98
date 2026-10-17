@@ -55,3 +55,32 @@ See `tools/efdecode.py` (reference decoder). Summary:
 ## Method note
 Static decompilation of every serializer is slow. A real `.e98` save from the original game gives a
 ground truth to decode black-box and to validate each static finding.
+
+## `.e98` save — decoded from a real save (snapshot 1: new game, Figueirense F.C., Brazil 4th div, 2026)
+Source: original game running in native DOSBox (`tools/run/run-original.sh`), file `JOGOS\ABCDEEEE.E98`, 83,676 bytes.
+Saves are written to the host folder `original/run/d/eli98/jogos/` (git-ignored).
+
+- **Header:** double-delta pstr (like TXE): `"joga1 e joga2\r17/10/26 21:03"` = save description
+  (the two manager names + timestamp). Followed by fixed binary state (season year `0xEA07`=2026 at
+  offset ~0x27, etc.), plain (non-encoded) Pascal strings of fixed width, e.g. currency `"Reais"` / `" reais"`.
+- Strings elsewhere are single-delta pstrs (same cipher as `.EFT`).
+- **Player record** (verified on all 15 Figueirense players against an in-game screenshot):
+  `[id u16 LE][nat pstr (4 B)][name pstr][48 fixed bytes]`, ids sequential per team (737, 738, …).
+  Offsets relative to the end of the name:
+
+  | off | size | meaning |
+  |---|---|---|
+  | +0 | u8 | position: 0 GK, 1 DEF, 2 MID, 3 ATT |
+  | +1 | u8 | star flag ("craque", shown as `*` after the name) |
+  | +2 | u16 | **strength** (1..50) |
+  | +8 | u8 | 1 or 2 (unknown) |
+  | +17 | u8 | 0..5 (unknown; maybe behaviour/discipline) |
+  | +21 | u16 | 0..10 (probably contract games left — to verify) |
+  | +23 | u16 | 1..9 (unknown) |
+  | +25 | u16 | **price = 500 × strength** (e.g. 5 → 2500) |
+  | +27.. | | zeros to the end; next record's id follows |
+- Team record for the managed side starts around `0xCDA0`: pstr name `FIGUEIRENSE F.C.` followed by fixed fields.
+- Two human managers are supported (`joga1`, `joga2`).
+- The 0-byte `.E98` appears as soon as a name is chosen; content is written on explicit save.
+- The "List index out of bounds" error on first new game went away after using a letters-only name
+  and selecting the radio button first (not fully diagnosed).
