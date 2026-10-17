@@ -25,4 +25,5 @@
 - [x] Division assignment and starting strengths at game start (verified against a real save)
 - [x] User-controlled club: formation, line-up, bench, planned substitutions (docs/season.md)
 - [x] Save/load (own text format, browser storage + file export/import); a loaded game continues identically
-- [ ] Import of original `.e98` saves (layout only partly decoded), PWA, transfers and finances for the user
+- [x] PWA: manifest, icons, service worker (offline after the first load), CI workflow
+- [ ] Import of original `.e98` saves (layout only partly decoded), the user's market (buy/sell, tickets, salaries)

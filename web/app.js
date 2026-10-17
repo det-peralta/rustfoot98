@@ -11,7 +11,27 @@ const store = {
   set(v) { try { localStorage.setItem(SAVE_KEY, v); return true; } catch { return false; } },
 };
 
+// Offline support: a service worker caches the page and the WebAssembly core. Add ?nosw to the URL while developing to skip it
+// (and remove any registered worker), otherwise edits can be hidden behind a stale cache.
+async function setupOffline() {
+  const out = $("offline-status");
+  if (!("serviceWorker" in navigator)) { out.textContent = "Este browser não suporta modo offline."; return; }
+  if (location.search.includes("nosw")) {
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    out.textContent = "Modo offline desligado (?nosw).";
+    return;
+  }
+  try {
+    await navigator.serviceWorker.register("sw.js");
+    await navigator.serviceWorker.ready;
+    out.textContent = "Funciona offline e pode ser instalado como aplicação.";
+  } catch (e) {
+    out.textContent = "Modo offline indisponível (precisa de https ou localhost).";
+  }
+}
+
 async function boot() {
+  setupOffline();
   const res = await fetch("elifoot_wasm.wasm");
   const bytes = await res.arrayBuffer();
   $("wasm-size").textContent = (bytes.byteLength / 1024).toFixed(0) + " KB";

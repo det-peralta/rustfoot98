@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Elifoot 98 — núcleo nativo</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f7a3a">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2714%27 fill=%27%231f7a3a%27/%3E%3Cpath d=%27M16 8l5 4-2 6h-6l-2-6z%27 fill=%27white%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -104,7 +107,7 @@
 </main>
 
 <footer>
-  <p>Núcleo em Rust compilado para WebAssembly (<span id="wasm-size">–</span>), sem emulador. O jogo original corre Windows 3.1 dentro do DOSBox; aqui as regras
+  <p><span id="offline-status">Modo offline: a verificar…</span> Núcleo em Rust compilado para WebAssembly (<span id="wasm-size">–</span>), sem emulador. O jogo original corre Windows 3.1 dentro do DOSBox; aqui as regras
   (golos, cartões, lesões, evolução, moral, classificação, subidas e descidas) foram recuperadas do binário e reimplementadas.</p>
 </footer>
 <script src="app.js" type="module"></script>

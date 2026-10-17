@@ -63,6 +63,18 @@ try {
   await p.click('#new-world'); await p.click('#play-round');
   const c = await p.textContent('#table tbody');
   check('same seed gives the same round', a === c);
+  // offline: the service worker must cache the app, then the page must work with the network cut
+  await p.waitForFunction(() => document.querySelector('#offline-status').textContent.includes('offline e pode'), null, { timeout: 10000 });
+  check('service worker active', true);
+  const manifest = await p.evaluate(async () => (await fetch('manifest.webmanifest')).json());
+  check('manifest has icons and standalone display', manifest.display === 'standalone' && manifest.icons.length >= 3);
+  await p.context().setOffline(true);
+  await p.reload({ waitUntil: 'domcontentloaded' });
+  await p.waitForSelector('#table tbody tr', { timeout: 10000 });
+  check('works offline after reload', (await p.locator('#table tbody tr').count()) === 8);
+  await p.click('#play-round');
+  check('plays a round offline', (await p.textContent('#round')).includes('1 /'));
+  await p.context().setOffline(false);
   // saving and loading
   await p.fill('#seed', '777'); await p.click('#new-world');
   await p.click('#play-round'); await p.click('#play-round');

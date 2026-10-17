@@ -29,7 +29,11 @@ web/build.sh serve                            # builds the 143 KB WebAssembly co
 ```
 Plays full seasons of a 4-division league using the decoded rules (no emulator), with **you managing one club**
 (formation, starters, bench and up to three planned substitutions per round): fictional clubs by default, or the
-real teams if you pick the `.EFT` files of your own Elifoot 98 install (read locally in the browser, never uploaded or bundled). **Saving:** Guardar/Carregar use the browser's storage (optional autosave after every round); Exportar/Importar move a
+real teams if you pick the `.EFT` files of your own Elifoot 98 install (read locally in the browser, never uploaded or bundled). **Offline / install:** the page registers a service worker (`web/sw.js`) that caches the app and the WebAssembly core, and has a
+web manifest, so browsers offer to install it as an app and it runs without a connection (needs https or localhost). While developing
+open it with `?nosw` to skip the cache. CI (`.github/workflows/ci.yml`) runs fmt, clippy, the tests and the WASM build.
+
+**Saving:** Guardar/Carregar use the browser's storage (optional autosave after every round); Exportar/Importar move a
 text file (`ELIFOOT98-RS 1`, our own format: `core/src/save.rs`). A loaded game continues identically (same RNG seed).
 Native checks:
 `cargo test`, `cargo run --release -p elifoot-core --example sim|season|world`, and the browser smoke test
