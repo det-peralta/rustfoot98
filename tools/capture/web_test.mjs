@@ -54,6 +54,8 @@ try {
   await p.click('#play-season');
   check('season rolled over', (await p.textContent('#year')) === '1999' && (await p.textContent('#round')).startsWith('0 /'));
   check('season summary visible', await p.locator('#season-card').isVisible());
+  check('cup winner announced at season end', (await p.textContent('#season')).includes('Vencedor da Taça'));
+  check('final shown in the cup card', (await p.textContent('#cup-title')).includes('FINAL') && await p.locator('#cup-results li').count() === 1);
   const moves = await p.locator('.moves li').count();
   check('16 promotion/relegation lines', moves === 12 + 4 || moves === 16, String(moves));
   await p.screenshot({ path: 'analysis/shots/web_season.png', fullPage: true });

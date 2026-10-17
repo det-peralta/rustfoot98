@@ -321,6 +321,82 @@ pub fn auto_lineup(slots: &mut [Slot]) {
     }
 }
 
+/// Two disjoint mutable references into one slice.
+fn two_mut<T>(v: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
+    assert_ne!(i, j);
+    if i < j {
+        let (a, b) = v.split_at_mut(j);
+        (&mut a[i], &mut b[0])
+    } else {
+        let (a, b) = v.split_at_mut(i);
+        (&mut b[0], &mut a[j])
+    }
+}
+
+/// The outcome of one played game (before league or cup bookkeeping).
+#[derive(Clone, Debug)]
+pub struct Game {
+    pub home_goals: i32,
+    pub away_goals: i32,
+    pub events: Vec<Event>,
+    pub subs: Vec<SubEvent>,
+    /// The game went to extra time (minutes 91..=120).
+    pub extra_time: bool,
+}
+
+/// Plays one game between two clubs whose line-ups are already set (`apply_plan` / `auto_lineup`): `hb` / `ab` are the
+/// fixture bonuses, plans carry the user's planned substitutions. With `extra_time_if_tied` a drawn game continues to
+/// minute 120 (`1048:069b` extends cup games). What persists is copied back to the clubs: ratings, strength loss, bans and
+/// injuries. Points, goals and morale are left to the caller.
+#[allow(clippy::too_many_arguments)]
+pub fn play_game(
+    rng: &mut DelphiRng,
+    home: &mut Club,
+    away: &mut Club,
+    hb: i32,
+    ab: i32,
+    home_plan: Option<&Plan>,
+    away_plan: Option<&Plan>,
+    extra_time_if_tied: bool,
+) -> Game {
+    let mut m = Match::new(home.slots.clone(), away.slots.clone(), hb, ab);
+    m.home.k = home.k;
+    m.away.k = away.k;
+    for (plan, side) in [(home_plan, Side::Home), (away_plan, Side::Away)] {
+        if let Some(plan) = plan {
+            m.planned.extend(
+                plan.subs
+                    .iter()
+                    .take(3)
+                    .map(|s| (side, s.minute, s.out, s.inn)),
+            );
+        }
+    }
+    m.play(rng);
+    let mut extra_time = false;
+    if extra_time_if_tied && m.score().0 == m.score().1 {
+        extra_time = true;
+        m.play_extra_time(rng);
+    }
+    // carry over what persists between matches: ratings, strength loss, bans, injuries
+    for (club, played) in [(&mut *home, &m.home), (&mut *away, &m.away)] {
+        for (slot, p) in club.slots.iter_mut().zip(played.slots.iter()) {
+            slot.rating = p.rating;
+            slot.strength = p.strength;
+            slot.ban = p.ban;
+            slot.injured = p.injured;
+        }
+    }
+    let (x, y) = m.score();
+    Game {
+        home_goals: x,
+        away_goals: y,
+        events: m.events,
+        subs: m.subs,
+        extra_time,
+    }
+}
+
 /// Plays one league round; updates ratings, injuries, bans, goals, points (3-1-0), W/D/L and morale.
 pub fn play_round(
     rng: &mut DelphiRng,
@@ -340,62 +416,41 @@ pub fn play_round(
         let (division, hn, an) = names(h, a);
         let hb = fixture_value(&division, &hn, true) + 2;
         let ab = fixture_value(&division, &an, true);
-        let mut m = Match::new(clubs[h].slots.clone(), clubs[a].slots.clone(), hb, ab);
-        m.home.k = clubs[h].k;
-        m.away.k = clubs[a].k;
-        for (club, side) in [(h, Side::Home), (a, Side::Away)] {
-            if let Some(plan) = plans.get(&club) {
-                m.planned.extend(
-                    plan.subs
-                        .iter()
-                        .take(3)
-                        .map(|s| (side, s.minute, s.out, s.inn)),
-                );
-            }
-        }
-        m.play(rng);
-        let (x, y) = m.score();
-        // carry over what persists between matches: ratings, strength loss, bans, injuries
-        for (club, played) in [(h, &m.home), (a, &m.away)] {
-            for (slot, p) in clubs[club].slots.iter_mut().zip(played.slots.iter()) {
-                slot.rating = p.rating;
-                slot.strength = p.strength;
-                slot.ban = p.ban;
-                slot.injured = p.injured;
-            }
-        }
-        clubs[h].goals_for += x;
-        clubs[h].goals_against += y;
-        clubs[a].goals_for += y;
-        clubs[a].goals_against += x;
+        let (hc, ac) = two_mut(clubs, h, a);
+        let g = play_game(rng, hc, ac, hb, ab, plans.get(&h), plans.get(&a), false);
+        let (x, y) = (g.home_goals, g.away_goals);
+        hc.goals_for += x;
+        hc.goals_against += y;
+        ac.goals_for += y;
+        ac.goals_against += x;
         match x.cmp(&y) {
             std::cmp::Ordering::Greater => {
-                clubs[h].points += 3;
-                clubs[h].wins += 1;
-                clubs[a].losses += 1;
+                hc.points += 3;
+                hc.wins += 1;
+                ac.losses += 1;
             }
             std::cmp::Ordering::Less => {
-                clubs[a].points += 3;
-                clubs[a].wins += 1;
-                clubs[h].losses += 1;
+                ac.points += 3;
+                ac.wins += 1;
+                hc.losses += 1;
             }
             std::cmp::Ordering::Equal => {
-                clubs[h].points += 1;
-                clubs[a].points += 1;
-                clubs[h].draws += 1;
-                clubs[a].draws += 1;
+                hc.points += 1;
+                ac.points += 1;
+                hc.draws += 1;
+                ac.draws += 1;
             }
         }
         let (rh, ra) = morale_results(x, y);
-        clubs[h].k = update_morale(clubs[h].k, rh);
-        clubs[a].k = update_morale(clubs[a].k, ra);
+        hc.k = update_morale(hc.k, rh);
+        ac.k = update_morale(ac.k, ra);
         records.push(MatchRecord {
             home: h,
             away: a,
             home_goals: x,
             away_goals: y,
-            events: m.events,
-            subs: m.subs,
+            events: g.events,
+            subs: g.subs,
         });
     }
     records
@@ -429,9 +484,6 @@ fn swap_between(a: &mut Vec<Club>, ia: usize, b: &mut Vec<Club>, ib: usize) {
     a.push(y);
 }
 
-/// Where the cup winner sits: division `0..=3` or the outside pool (`4`), and its index in that list.
-pub type ClubRef = (usize, usize);
-
 /// `1020:038e`: season end. Lists are sorted by points first (`1020:38b8`). The first division's champion gets
 /// `K += 1.0` and the cup winner `K += 0.5`; then the **top two of each lower division swap with the bottom two of the
 /// division above** (calls `02a6` with indices 6, 4, 4 because the lists shift by two after the first pair), and two
@@ -441,7 +493,7 @@ pub fn end_of_season(
     rng: &mut DelphiRng,
     divs: &mut [Vec<Club>; 4],
     pool: &mut Vec<Club>,
-    cup_winner: Option<ClubRef>,
+    cup_winner: Option<&str>,
 ) {
     for d in divs.iter_mut() {
         let order = standings(d);
@@ -449,9 +501,15 @@ pub fn end_of_season(
         *d = sorted;
     }
     divs[0][0].k += 1.0;
-    if let Some((d, i)) = cup_winner {
-        let list = if d < 4 { &mut divs[d] } else { &mut *pool };
-        list[i].k += 0.5;
+    if let Some(name) = cup_winner {
+        if let Some(c) = divs
+            .iter_mut()
+            .flatten()
+            .chain(pool.iter_mut())
+            .find(|c| c.name == name)
+        {
+            c.k += 0.5;
+        }
     }
     for upper in 0..3 {
         let (head, tail) = divs.split_at_mut(upper + 1);
@@ -573,7 +631,7 @@ mod tests {
             v.sort();
             v
         };
-        end_of_season(&mut rng, &mut divs, &mut pool, Some((1, 3)));
+        end_of_season(&mut rng, &mut divs, &mut pool, Some("B3"));
         // division sizes are preserved
         assert!(divs.iter().all(|d| d.len() == 8));
         assert_eq!(pool.len(), 6);
@@ -613,7 +671,7 @@ mod tests {
         let mut pool: Vec<Club> = (0..4)
             .map(|i| Club::new(&format!("P{i}"), crate::matchsim::tests::squad(4, &mut rng)))
             .collect();
-        end_of_season(&mut rng, &mut divs, &mut pool, Some((0, 0))); // champion also wins the cup
+        end_of_season(&mut rng, &mut divs, &mut pool, Some("A0")); // champion also wins the cup
         let champion = divs.iter().flatten().find(|c| c.name == "A0").unwrap();
         assert_eq!(champion.k, 2.5);
         let other = divs.iter().flatten().find(|c| c.name == "A1").unwrap();

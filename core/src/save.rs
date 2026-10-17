@@ -56,6 +56,12 @@ impl World {
                 subs.join(",")
             ));
         }
+        for name in &self.cup {
+            out.push_str(&format!("cup|{}\n", clean(name)));
+        }
+        if let Some(c) = &self.cup_champion {
+            out.push_str(&format!("cupchampion|{}\n", clean(c)));
+        }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
                 "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
@@ -104,6 +110,9 @@ impl World {
         }
         let (mut year, mut economy, mut round, mut seed) = (None, INITIAL_INDEX, 0usize, None);
         let mut human: Option<Human> = None;
+        let mut cup: Vec<String> = Vec::new();
+        let mut cup_champion: Option<String> = None;
+        let mut has_cup = false;
         let mut divisions: [Vec<Club>; 4] = Default::default();
         let mut pool: Vec<Club> = Vec::new();
         let mut current: Option<(usize, Club)> = None;
@@ -147,6 +156,13 @@ impl World {
                 }
                 "round" => round = num(n, &f, 1)? as usize,
                 "seed" => seed = Some(num(n, &f, 1)? as u32),
+                "cup" => {
+                    has_cup = true;
+                    cup.push(f.get(1).ok_or("cup entry without name")?.to_string());
+                }
+                "cupchampion" => {
+                    cup_champion = Some(f.get(1).ok_or("cupchampion without name")?.to_string())
+                }
                 "human" => {
                     let subs = f
                         .get(5)
@@ -235,7 +251,13 @@ impl World {
             last_round: Vec::new(),
             last_season: None,
             human,
+            cup,
+            last_cup: None,
+            cup_champion,
         };
+        if !has_cup {
+            w.reset_cup();
+        }
         if w.human.is_none() || w.human_location().is_none() {
             w.pick_human();
         }

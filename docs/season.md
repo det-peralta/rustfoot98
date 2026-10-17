@@ -71,3 +71,19 @@ is most likely intended; the user counters it by buying players at auction.
 - **Repairs**: unavailable (injured/suspended) or missing starters are replaced by the best available player of the same
   position before the match, and the repaired line-up is written back into the displayed plan.
 - If the user's club ever leaves the league (relegated to the outside pool) the game hands them another one (`4f40`).
+
+## The cup (`1020:0ed4`, implemented in `core/src/cup.rs` and `world.rs`)
+
+- Played after the league games of every **even** round; every club of the world (divisions + pool) enters.
+- The draw only happens when the number of survivors N is greater than `p = 2^((14 - r) / 2)`, so the final is always on round 14
+  (checked for N = 34..128). Survivors are shuffled (3n remove-and-append swaps); `k` = smallest power of two >= n/2; `n - k`
+  pairs are drawn (first of the pair is at home), the other clubs get a bye.
+- Single leg. A draw goes to extra time (to minute 120) and then a shootout.
+- **The automatic shootout is inverted in the original**: each side sums `3 x Random(team rating)` and the *home* side is
+  eliminated when `home_sum >= away_sum`. We keep it faithfully. The interactive (dialog) shootout used when a human plays a final
+  was not decoded; the AI formula is used for everybody.
+- Morale: the home side that advances gets 1.5, the away side that advances 2.0, the loser 0 (see `match-engine.md`).
+- Round names: `FINAL`, `Meias-finais`, `Quartos`, `Oitavos`, then "k avos de final".
+- The browser shows the last cup round in a "Taça" card and the winner in the season-end summary. Saves keep the cup state
+  (`cup|name`, `cupchampion|name` records); older saves start a fresh cup.
+

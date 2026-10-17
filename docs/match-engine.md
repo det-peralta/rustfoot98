@@ -177,3 +177,5 @@ domestic league match):
 | 8 vs 5 | 1.46 | 0.82 | 54.4 % | 28.1 % | 17.5 % | 0.15 | 0.24 |
 | 5 vs 8 | 1.08 | 1.12 | 32.9 % | 32.4 % | 34.7 % | 0.15 | 0.24 |
 | 10 vs 3 | 1.85 | 0.51 | 74.9 % | 19.0 % | 6.1 % | 0.15 | 0.24 |
+
+Cup ties use their own morale update: advancing at home 1.5, advancing away 2.0, eliminated 0 (`K = 0.85K + 0.15r`); the cup winner gets +0.5 at the season end.

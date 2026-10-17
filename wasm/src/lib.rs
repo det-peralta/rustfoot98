@@ -142,6 +142,73 @@ fn human_json(w: &World) -> String {
     )
 }
 
+fn cup_json(w: &World) -> String {
+    let Some(c) = &w.last_cup else {
+        return "null".to_string();
+    };
+    let ms: Vec<String> = c
+        .matches
+        .iter()
+        .map(|m| {
+            let pname = |side: Side, i: usize| {
+                let v = if side == Side::Home { &m.home_players } else { &m.away_players };
+                esc(v.get(i).map(String::as_str).unwrap_or("?"))
+            };
+            let events: Vec<String> = m
+                .events
+                .iter()
+                .map(|e| {
+                    let kind = match e.kind {
+                        EventKind::Goal => "goal",
+                        EventKind::Annulled => "annulled",
+                        EventKind::RedCard => "red",
+                        EventKind::Injury => "injury",
+                    };
+                    format!(
+                        "{{\"m\":{},\"side\":{},\"kind\":\"{}\",\"player\":{}}}",
+                        e.minute,
+                        if e.side == Side::Home { 0 } else { 1 },
+                        kind,
+                        pname(e.side, e.player)
+                    )
+                })
+                .collect();
+            let subs: Vec<String> = m
+                .subs
+                .iter()
+                .map(|s| {
+                    format!(
+                        "{{\"m\":{},\"side\":{},\"out\":{},\"in\":{},\"auto\":{}}}",
+                        s.minute,
+                        if s.side == Side::Home { 0 } else { 1 },
+                        pname(s.side, s.out),
+                        pname(s.side, s.inn),
+                        s.auto
+                    )
+                })
+                .collect();
+            format!(
+                "{{\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"extraTime\":{},\"shootout\":{},\"winner\":{},\"events\":[{}],\"subs\":[{}]}}",
+                esc(&m.home),
+                esc(&m.away),
+                m.home_goals,
+                m.away_goals,
+                m.extra_time,
+                m.shootout,
+                esc(&m.winner),
+                events.join(","),
+                subs.join(",")
+            )
+        })
+        .collect();
+    format!(
+        "{{\"name\":{},\"left\":{},\"matches\":[{}]}}",
+        esc(&c.name),
+        c.left,
+        ms.join(",")
+    )
+}
+
 fn world_json(w: &World) -> String {
     let mut out = String::new();
     let _ = write!(
@@ -186,7 +253,15 @@ fn world_json(w: &World) -> String {
         .map(|(d, r)| match_json(*d, r, w))
         .collect();
     out.push_str(&ms.join(","));
-    out.push_str("],\"lastSeason\":");
+    let _ = write!(
+        out,
+        "],\"cup\":{},\"cupLeft\":{},\"lastCup\":{},\"lastSeason\":",
+        w.cup
+            .iter()
+            .any(|n| Some(n.as_str()) == w.human.as_ref().map(|h| h.club.as_str())),
+        w.cup.len(),
+        cup_json(w)
+    );
     match &w.last_season {
         None => out.push_str("null"),
         Some(s) => {
@@ -215,10 +290,14 @@ fn world_json(w: &World) -> String {
                 .collect();
             let _ = write!(
                 out,
-                "{{\"year\":{},\"tables\":[{}],\"moves\":[{}]}}",
+                "{{\"year\":{},\"tables\":[{}],\"moves\":[{}],\"cupWinner\":{}}}",
                 s.year,
                 tables.join(","),
-                moves.join(",")
+                moves.join(","),
+                s.cup_winner
+                    .as_deref()
+                    .map(esc)
+                    .unwrap_or_else(|| "null".to_string())
             );
         }
     }

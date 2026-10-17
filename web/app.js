@@ -287,6 +287,39 @@ function renderClub() {
   box.innerHTML = `<p><b>${esc(mine.home)} ${mine.hg} – ${mine.ag} ${esc(mine.away)}</b></p><ul class="mm">${evs || "<li class=\"empty\">Sem acontecimentos.</li>"}</ul>`;
 }
 
+let selectedCup = null;
+function renderCup() {
+  const card = $("cup-card"), c = state.lastCup;
+  if (!c) { card.hidden = true; return; }
+  card.hidden = false;
+  $("cup-title").textContent = `Taça — ${c.name}`;
+  const mine = (m) => state.human && (m.home === state.human.club || m.away === state.human.club);
+  const list = $("cup-results");
+  list.innerHTML = "";
+  if (selectedCup != null && selectedCup >= c.matches.length) selectedCup = null;
+  c.matches.forEach((m, i) => {
+    const li = document.createElement("li");
+    if (mine(m)) li.className = "mine";
+    const b = document.createElement("button");
+    b.setAttribute("aria-pressed", String(i === selectedCup));
+    const how = m.shootout ? " (g.p.)" : m.extraTime ? " (a.p.)" : "";
+    b.innerHTML = `<span>${esc(m.home)}</span><span class="score">${m.hg} – ${m.ag}${how}</span><span class="away">${esc(m.away)}</span>`;
+    b.onclick = () => { selectedCup = i; renderCup(); };
+    li.appendChild(b);
+    list.appendChild(li);
+  });
+  const box = $("cup-match");
+  if (selectedCup == null) box.hidden = true;
+  else {
+    const m = c.matches[selectedCup];
+    box.hidden = false;
+    const tl = timeline(m);
+    const evs = tl.length ? tl.map((e) => `<div class="ev ${e.away ? "away" : ""}"><span class="m">${e.m}'</span><span>${e.html}</span><span></span></div>`).join("") : `<p class="empty">Sem acontecimentos.</p>`;
+    box.innerHTML = `<h3>${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</h3>${evs}<p class="note">Passa: <b>${esc(m.winner)}</b>${m.shootout ? " (grandes penalidades)" : m.extraTime ? " (após prolongamento)" : ""}</p>`;
+  }
+  $("cup-note").textContent = c.left === 1 ? "Final disputada." : `Ainda em prova: ${c.left} clubes.`;
+}
+
 function renderSeason() {
   const card = $("season-card"), s = state.lastSeason;
   if (!s) { card.hidden = true; return; }
@@ -296,7 +329,7 @@ function renderSeason() {
   const ups = s.moves.filter((m) => m.to < m.from).map((m) => `<li><span class="up-t">▲</span> ${esc(m.name)} → ${names[m.to]}</li>`).join("");
   const downs = s.moves.filter((m) => m.to > m.from).map((m) => `<li><span class="down-t">▼</span> ${esc(m.name)} → ${names[m.to]}</li>`).join("");
   $("s-title").textContent = `Fim de época ${s.year}`;
-  $("season").innerHTML = `<p><b>Campeão da 1ª Divisão:</b> ${esc(champ.name)} — ${champ.pts} pontos (${champ.w}V ${champ.d}E ${champ.l}D, ${champ.gf}–${champ.ga}).</p>` +
+  $("season").innerHTML = (s.cupWinner ? `<p><b>Vencedor da Taça:</b> ${esc(s.cupWinner)}.</p>` : "") + `<p><b>Campeão da 1ª Divisão:</b> ${esc(champ.name)} — ${champ.pts} pontos (${champ.w}V ${champ.d}E ${champ.l}D, ${champ.gf}–${champ.ga}).</p>` +
     `<div class="moves"><div><h3>Subidas</h3><ul>${ups}</ul></div><div><h3>Descidas</h3><ul>${downs}</ul></div></div>`;
 }
 
@@ -309,6 +342,7 @@ function render() {
   renderTable();
   renderResults();
   renderClub();
+  renderCup();
   renderSeason();
 }
 

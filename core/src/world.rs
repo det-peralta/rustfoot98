@@ -7,10 +7,12 @@
 //! starting strength of every player is `clamp(base(i) + 3 - Random(7), 1, 50)` with `base(i) = max(5, round((1 - i/32) * 50) - 1)`
 //! for the first 33 teams and 1 for the rest (`1028:0373`). **Assumed:** squad composition of the fictional world
 //! (2 GK, 7 DEF, 6 MID, 5 ATT), fictional names, no cup (so only the champion's `K += 1.0` applies).
+use crate::cup;
 use crate::economy::{walk_index, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
+use crate::matchsim::{Event, SubEvent};
 use crate::rng::DelphiRng;
-use crate::season::apply_plan;
+use crate::season::{apply_plan, auto_lineup, play_game};
 use crate::season::{
     best_formation, end_of_round, end_of_season, plan_for_formation, play_round, standings, Club,
     MatchRecord, Plan, FORMATIONS,
@@ -114,11 +116,38 @@ pub struct Move {
     pub to: usize,
 }
 
+/// One cup tie: the first club played at home. `winner` advanced.
+#[derive(Clone, Debug)]
+pub struct CupMatch {
+    pub home: String,
+    pub away: String,
+    pub home_goals: i32,
+    pub away_goals: i32,
+    pub extra_time: bool,
+    /// Decided by a shootout (the score is then level).
+    pub shootout: bool,
+    pub winner: String,
+    pub events: Vec<Event>,
+    pub subs: Vec<SubEvent>,
+    /// Player names of the two squads, so that the events can be shown.
+    pub home_players: Vec<String>,
+    pub away_players: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CupRound {
+    pub name: String,
+    pub matches: Vec<CupMatch>,
+    /// Clubs still in the cup after this round.
+    pub left: usize,
+}
+
 #[derive(Clone, Debug)]
 pub struct SeasonSummary {
     pub year: u16,
     pub tables: [Vec<TableRow>; 4],
     pub moves: Vec<Move>,
+    pub cup_winner: Option<String>,
 }
 
 /// The club the user manages: found by name (it changes division at season ends), with the chosen formation and plan.
@@ -144,6 +173,11 @@ pub struct World {
     pub last_round: Vec<(usize, MatchRecord)>,
     pub last_season: Option<SeasonSummary>,
     pub human: Option<Human>,
+    /// Names of the clubs still in the cup (all of them at the start of a season).
+    pub cup: Vec<String>,
+    /// The last cup round played in the current season (None before the first draw).
+    pub last_cup: Option<CupRound>,
+    pub cup_champion: Option<String>,
 }
 
 fn player_name(rng: &mut DelphiRng) -> String {
@@ -277,7 +311,11 @@ impl World {
             last_round: Vec::new(),
             last_season: None,
             human: None,
+            cup: Vec::new(),
+            last_cup: None,
+            cup_champion: None,
         };
+        w.reset_cup();
         w.pick_human();
         Ok(w)
     }
@@ -311,7 +349,11 @@ impl World {
             last_round: Vec::new(),
             last_season: None,
             human: None,
+            cup: Vec::new(),
+            last_cup: None,
+            cup_champion: None,
         };
+        w.reset_cup();
         w.pick_human();
         w
     }
@@ -334,6 +376,129 @@ impl World {
             club: c.name.clone(),
             formation,
             plan,
+        });
+    }
+
+    /// Starts a new cup: every club of the world is in.
+    pub fn reset_cup(&mut self) {
+        self.cup = self
+            .divisions
+            .iter()
+            .flatten()
+            .chain(self.pool.iter())
+            .map(|c| c.name.clone())
+            .collect();
+        self.cup_champion = None;
+    }
+
+    fn locate(&self, name: &str) -> Option<(usize, usize)> {
+        self.divisions
+            .iter()
+            .chain(std::iter::once(&self.pool))
+            .enumerate()
+            .find_map(|(d, v)| v.iter().position(|c| c.name == name).map(|i| (d, i)))
+    }
+
+    fn club_at(&mut self, (d, i): (usize, usize)) -> &mut Club {
+        if d < 4 {
+            &mut self.divisions[d][i]
+        } else {
+            &mut self.pool[i]
+        }
+    }
+
+    /// The cup of `round` (even), played after that round's league games; see `cup.rs` for the rules.
+    fn play_cup_round(&mut self, round: usize) {
+        let total = self.divisions.iter().map(Vec::len).sum::<usize>() + self.pool.len();
+        if total <= cup::threshold(round) || self.cup.len() < 2 {
+            return;
+        }
+        cup::shuffle(&mut self.rng, &mut self.cup);
+        let n = self.cup.len();
+        let (k, pairs) = cup::round_size(n);
+        let entrants: Vec<String> = self.cup.iter().take(pairs * 2).cloned().collect();
+        let plan = self
+            .human
+            .as_ref()
+            .map(|h| (h.club.clone(), h.plan.clone()));
+        let mut matches = Vec::new();
+        let mut losers = Vec::new();
+        for pair in entrants.chunks(2) {
+            let (hn, an) = (pair[0].clone(), pair[1].clone());
+            let (Some(hl), Some(al)) = (self.locate(&hn), self.locate(&an)) else {
+                continue;
+            };
+            let placeholder = || Club::new("", Vec::new());
+            let mut home = std::mem::replace(self.club_at(hl), placeholder());
+            let mut away = std::mem::replace(self.club_at(al), placeholder());
+            let plan_of = |c: &mut Club| -> Option<Plan> {
+                match &plan {
+                    Some((club, p)) if *club == c.name => {
+                        apply_plan(&mut c.slots, p);
+                        Some(p.clone())
+                    }
+                    _ => {
+                        auto_lineup(&mut c.slots);
+                        None
+                    }
+                }
+            };
+            let (hp, ap) = (plan_of(&mut home), plan_of(&mut away));
+            let hb = crate::matchsim::fixture_value(b"TACA", home.name.as_bytes(), true) + 2;
+            let ab = crate::matchsim::fixture_value(b"TACA", away.name.as_bytes(), true);
+            let g = play_game(
+                &mut self.rng,
+                &mut home,
+                &mut away,
+                hb,
+                ab,
+                hp.as_ref(),
+                ap.as_ref(),
+                true,
+            );
+            let shootout = g.home_goals == g.away_goals;
+            let home_out = if shootout {
+                cup::shootout_home_eliminated(
+                    &mut self.rng,
+                    cup::team_rating(&home.slots),
+                    cup::team_rating(&away.slots),
+                )
+            } else {
+                g.home_goals < g.away_goals
+            };
+            let (mh, ma) = cup::morale_results(!home_out);
+            home.k = crate::matchsim::update_morale(home.k, mh);
+            away.k = crate::matchsim::update_morale(away.k, ma);
+            let (winner, loser) = if home_out {
+                (an.clone(), hn.clone())
+            } else {
+                (hn.clone(), an.clone())
+            };
+            matches.push(CupMatch {
+                home: hn,
+                away: an,
+                home_goals: g.home_goals,
+                away_goals: g.away_goals,
+                extra_time: g.extra_time,
+                shootout,
+                winner,
+                events: g.events,
+                subs: g.subs,
+                home_players: home.names.clone(),
+                away_players: away.names.clone(),
+            });
+            losers.push(loser);
+            *self.club_at(hl) = home;
+            *self.club_at(al) = away;
+        }
+        self.cup.retain(|c| !losers.contains(c));
+        if self.cup.len() == 1 {
+            self.cup_champion = Some(self.cup[0].clone());
+        }
+        self.last_cup = Some(CupRound {
+            name: cup::round_name(k),
+            matches,
+            left: self.cup.len(),
         });
     }
 
@@ -435,11 +600,15 @@ impl World {
             end_of_round(&mut self.rng, &mut self.divisions[d], DIVISION_BASE[d]);
         }
         self.economy = walk_index(&mut self.rng, self.economy, self.year);
+        self.round = round;
+        self.last_cup = None;
+        if round.is_multiple_of(2) {
+            self.play_cup_round(round);
+        }
         if let Some(h) = self.human.as_mut() {
-            h.plan.subs.clear(); // planned substitutions are for one round only
+            h.plan.subs.clear(); // planned substitutions are for one round only (league game and cup tie)
         }
         self.refresh_plan();
-        self.round = round;
         if round == ROUNDS {
             self.finish_season();
         }
@@ -476,7 +645,13 @@ impl World {
             .flat_map(|(d, v)| v.iter().map(move |c| (c.name.clone(), d)))
             .chain(self.pool.iter().map(|c| (c.name.clone(), 4)))
             .collect();
-        end_of_season(&mut self.rng, &mut self.divisions, &mut self.pool, None);
+        let cup_winner = self.cup_champion.clone();
+        end_of_season(
+            &mut self.rng,
+            &mut self.divisions,
+            &mut self.pool,
+            cup_winner.as_deref(),
+        );
         if self.human_location().is_none() {
             self.pick_human(); // the user's club left the league: the game hands them another one (`4f40`)
         }
@@ -503,9 +678,11 @@ impl World {
             year: self.year,
             tables,
             moves,
+            cup_winner,
         });
         self.year += 1;
         self.round = 0;
+        self.reset_cup();
     }
 
     pub fn play_season(&mut self) {
@@ -806,5 +983,84 @@ mod tests {
             assert!(h.plan.bench.iter().all(|&k| slots[k].available()));
             assert!(h.plan.bench.len() <= 5);
         }
+    }
+
+    #[test]
+    fn a_season_cup_has_n_minus_one_ties_and_one_champion_on_round_14() {
+        let mut w = World::synthetic(41);
+        let total = 38usize;
+        assert_eq!(w.cup.len(), total);
+        let mut ties = 0;
+        let mut rounds_with_cup = Vec::new();
+        let mut champion = None;
+        for round in 1..=14usize {
+            w.play_round();
+            if round == 14 {
+                champion = w.last_season.as_ref().and_then(|s| s.cup_winner.clone());
+            }
+            if let Some(c) = &w.last_cup {
+                rounds_with_cup.push(round);
+                ties += c.matches.len();
+                // nobody plays twice in a round
+                let mut names: Vec<&String> =
+                    c.matches.iter().flat_map(|m| [&m.home, &m.away]).collect();
+                let before = names.len();
+                names.sort();
+                names.dedup();
+                assert_eq!(names.len(), before, "a club played twice in round {round}");
+                for m in &c.matches {
+                    assert!(m.winner == m.home || m.winner == m.away);
+                    if m.home_goals != m.away_goals {
+                        assert!(!m.shootout);
+                        assert_eq!(
+                            m.winner,
+                            if m.home_goals > m.away_goals {
+                                &m.home
+                            } else {
+                                &m.away
+                            }
+                            .as_str()
+                        );
+                    } else {
+                        assert!(
+                            m.shootout && m.extra_time,
+                            "a level game goes to extra time and then a shootout"
+                        );
+                    }
+                }
+            }
+        }
+        assert_eq!(ties, total - 1);
+        assert_eq!(rounds_with_cup, [4, 6, 8, 10, 12, 14]);
+        let champion = champion.expect("the cup has a champion at the end of the season");
+        // a new season: everybody is in the cup again and the champion's name is a club of the world
+        assert_eq!(w.cup.len(), total);
+        assert!(w.cup.contains(&champion));
+        assert!(w.cup_champion.is_none());
+    }
+
+    #[test]
+    fn cup_games_use_the_users_plan_and_can_be_played_for_many_seasons() {
+        let mut w = World::synthetic(42);
+        for _ in 0..8 {
+            w.play_season();
+        }
+        assert_eq!(w.year, 2006);
+        // every season recorded a cup winner
+        assert!(w.last_season.as_ref().unwrap().cup_winner.is_some());
+        assert!(w.human_location().is_some());
+    }
+
+    #[test]
+    fn a_game_saved_between_cup_rounds_keeps_the_cup() {
+        let mut a = World::synthetic(43);
+        for _ in 0..6 {
+            a.play_round();
+        }
+        let left = a.cup.len();
+        assert!(left < 38);
+        let b = World::load(&a.save()).unwrap();
+        assert_eq!(b.cup, a.cup);
+        assert_eq!(b.cup.len(), left);
     }
 }

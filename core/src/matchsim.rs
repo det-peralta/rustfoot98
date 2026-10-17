@@ -479,6 +479,14 @@ impl Match {
         }
     }
 
+    /// Extra time (`1048:069b`): the clock goes on from 90 to 120 for a drawn cup game; minute 91 skips the annulment check
+    /// like minute 46, as in the normal loop.
+    pub fn play_extra_time(&mut self, rng: &mut DelphiRng) {
+        while self.minute < 120 {
+            self.step(rng);
+        }
+    }
+
     pub fn score(&self) -> (i32, i32) {
         (self.home.goals, self.away.goals)
     }
