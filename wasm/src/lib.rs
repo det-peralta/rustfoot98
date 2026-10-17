@@ -74,8 +74,8 @@ fn world_json(w: &World) -> String {
     let mut out = String::new();
     let _ = write!(
         out,
-        "{{\"year\":{},\"round\":{},\"rounds\":{},\"divisions\":[",
-        w.year, w.round, ROUNDS
+        "{{\"year\":{},\"round\":{},\"rounds\":{},\"economy\":{:.3},\"divisions\":[",
+        w.year, w.round, ROUNDS, w.economy
     );
     for (d, div) in w.divisions.iter().enumerate() {
         if d > 0 {
@@ -261,6 +261,7 @@ mod tests {
         world_new(7);
         let first = json();
         assert!(first.starts_with("{\"year\":1998,\"round\":0"));
+        assert!(first.contains("\"economy\":1.000"));
         world_play_round();
         let second = json();
         assert!(second.contains("\"round\":1"));

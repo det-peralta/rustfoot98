@@ -16,6 +16,7 @@ try {
   await p.goto('http://127.0.0.1:8099/', { waitUntil: 'networkidle' });
   await p.waitForSelector('#table tbody tr');
   check('loads year 1998', (await p.textContent('#year')) === '1998');
+  check('economy index shown', /^\d+\.\d\d$/.test(await p.textContent('#economy')), await p.textContent('#economy'));
   check('8 rows in table', (await p.locator('#table tbody tr').count()) === 8);
   check('4 division tabs', (await p.locator('#tabs button').count()) === 4);
   await p.click('#play-round');
