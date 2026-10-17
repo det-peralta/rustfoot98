@@ -84,3 +84,26 @@ Saves are written to the host folder `original/run/d/eli98/jogos/` (git-ignored)
 - The 0-byte `.E98` appears as soon as a name is chosen; content is written on explicit save.
 - The "List index out of bounds" error on first new game went away after using a letters-only name
   and selecting the radio button first (not fully diagnosed).
+
+## Snapshot 1 vs snapshot 2 (after 2 league rounds; save made via Elifoot > Sair)
+- **Saving:** the game has no separate "save" command. `Elifoot > Sair` saves on exit; `Sair sem gravar` discards.
+  (From the `TPrepareGameDlg` main menu: Opções, Sair sem gravar, Sair, Acerca.)
+- File grew 83,676 → 83,968 bytes. Header description timestamp updated (`...21:03` → `...21:57`).
+- Header counter right after the description: `01` → `03` (round/day counter; to confirm).
+- 6 bytes at header offset ~0x29 were zero, now non-zero: a Pascal `Real` (6-byte real48) — likely money. To confirm.
+- **Teams are written in standings order**, not fixed order: the managed team's record moved from
+  `0xCDA0` to `0x22A1`. A parser must not rely on offsets.
+- **Team record** (starts with name pstr, then kit colours, country pstr, level…): after
+  `level(05) 00 00` comes a block of u16 counters, zero at start, `01 00 01 00 01 00 02 00 01 00`
+  after 2 rounds (played/won/drawn/lost/goals-style stats), then the lineup bytes
+  `02 07 06 03 04 08 05 01 08 05 04 03 07 06` (indices of the selected squad).
+- **Player tail, changed offsets** (relative to end of name; 48 B):
+  - `+2` strength **changed**: Gilberto 5→4, Dionisio 8→7, Nass 6→4, Nilson 7→5, Marquinhos 4→3, Petry 2→1,
+    Sandro Ventura 3→1, Vinicius 8→7, Marcelinho 7→6, Nando 8→7, Luciano 2→3.
+    Strength moves after a couple of rounds (evolution/form), by more than 1 in some cases.
+  - `+25` price (u16) is **not** recomputed for most players (stays 500 × old strength); Luciano's changed
+    (1000 → 1750). So price is a separate stored value, updated by other rules.
+  - `+8` was 1 or 2 for everyone, now 0 (one-shot "new player" style flag/counter).
+  - `+32` 0 → 1 or 2: appearances (games played) this season.
+  - `+12` and `+36` became 1 only for Marcelinho (an attacker): goals this season and goals total (hypothesis).
+  - `+14` became 1 only for Luciano (a card or injury; to confirm with the in-game Historial).
