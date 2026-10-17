@@ -36,11 +36,39 @@ Match object: home team ptr `+0x2e`, away team ptr `+0x32`, event list `+0x44`,
 4. On a chance: team shots counter `team+0x4f`++, player counters (`+0x0e`, `+0x14`, 32-bit `+0x1b`)++,
    and a match event is created with `1010:c1bf` (kind 1 normal, 2 when from a primary roll) and appended.
 
-## Secondary generator — `1010:46df(team, side, ..., minute)`
-Candidate if `Random(N1) < T - (team.shots(+0x4f) + team.goals(+0x59))` or `Random(N2) == 0`
-with `N1,N2` = `90,180` for home and `120,270` for away; `T` is computed with Pascal `Real`/FPU math
-(`1010:45b8`, `455d`, `44f5`, constants at `1010:46d3..46db`) — **still to decode**.
-Then the chance only stands if `Random(45) < minute`-style gate; at minute 45 a half-time hook runs.
+## Secondary (main) chance generator — `1010:46df(minute, opp, shooterOut, side, team)`
+Fully decoded from the disassembly (`tools/ghidra/ListRange.java`). Stack order is Pascal: the *last* source
+parameter sits at `bp+6`, so Ghidra's `param_1` is the own team, `bp+0xa` is `side` (0 home / 1 away),
+`bp+0xc` the shooter out-pointer, `bp+0x10` the opponent (pointer-to-pointer), `bp+0x14` the minute.
+
+RTL helpers used (all in the Delphi system unit, `10c0`): `04b2` = `ST1/ST0`, `04af` = `ST0/ST1`,
+`1295` = `Ln`, `1299` = `Exp`, `1285` = `Sqrt`, `11af` = Real48→Extended, `1068:1194` = `Power(base, exp)`.
+
+Sector values live at `team+0x51 GK, +0x53 DEF, +0x55 MID, +0x57 ATT` (from `397d`). Let `own` = this team, `opp` = opponent:
+```
+ownAtt  = own.ATT + own.MID / 2                         # 455d
+oppDef  = 3*opp.GK + opp.DEF + opp.MID / 2              # 44f5
+R       = 4*ownAtt / (oppDef + 1)
+# 45b8: running sums, NOT reset between lines (start lo=1, hi=1, S=0)
+ line 1: lo += own.DEF ; hi += opp.ATT          ; S += 1 * lo/(lo+hi+1)
+ line 2: lo += own.MID ; hi += opp.MID          ; S += 2 * lo/(lo+hi+1)
+ line 3: lo += own.ATT ; hi += 3*opp.GK+opp.DEF ; S += 1 * lo/(lo+hi+1)
+Y       = Ln(R + 1) * S            # Power(Y, 1.0) is the identity
+K       = Real48 at own.+0x5b      # starts at 1.0 (exponent byte 0x81, mantissa 0); modified by 1020:038e
+T       = (K / 2)^(1/4) * Y        # two Sqrt calls
+```
+Stage 1 (candidate): `Random(90) < T - (own.shots(+0x4f) + own.goals?(+0x59))` **or** `Random(180) == 0` for home;
+`Random(120)` / `Random(270)` for away.
+Stage 2 (warm-up gate): the candidate stands only if `Random(45) < minute` — early minutes are suppressed
+and from minute 45 on it always passes. At minute 45 a half-time hook (`44a1`) also runs; `44a1` picks the shooter
+via `1010:100b` (weights) into `shooterOut`.
+Stage 3: needs a shooter (`*shooterOut != nil`). Then `8c67` is checked twice and `1068:11c7` runs (side effect, unknown).
+
+## Primary rolls recap (`a6eb`)
+`homeAttack(+0x4c) = c95c(...) + 2` and `awayAttack(+0x4e) = c95c(...)` are set once in the match
+constructor `1010:8db2`; `c95c` returns a small number (0..10, plus 3 under a country condition,
+derived from comparing byte strings). So `Random(6000) < homeAttack` / `Random(7000) < awayAttack` are
+**rare bonus events** (≈0.03–0.2 % per minute), not the main source of chances.
 
 ## Shot outcome — `1010:81ed(attacker, defenderSlot)`
 ```
@@ -59,7 +87,8 @@ For each player, with `rating` from `1068:1079(real at player+0xc)` (+1 / 0 / -1
 - `-1`: if `Random(2)==0` and strength > 1: strength--; undone if it falls below `teamLevel-5` or 1.
 
 ## Still unknown (next)
-- Who computes `match+0x4c / +0x4e` (the attack values fed to the 6000/7000 rolls) from the sectors.
-- The `Real` arithmetic of `T` in `46df`.
+- What `c95c` really compares (byte strings at `calEntry+0x0b+4` vs `team+0x2d`), and the `+3` condition.
+- How `K` (`team+0x5b`, the Real48 multiplier) is updated in `1020:038e` (FPU ops missing from the decompile).
+- What `team+0x59` counts exactly (goals?) and `team+0x4f` (shots).
 - How `rating` (player `+0xc`, a Real) is produced after each match.
 - `1010:100b` weights, `1038:39b6` shooter selection, `1010:818c` attacker force.
