@@ -5,6 +5,7 @@ pub mod chance;
 pub mod cipher;
 pub mod eft;
 pub mod evolution;
+pub mod matchsim;
 pub mod outcome;
 pub mod rng;
 pub mod sector;

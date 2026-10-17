@@ -13,16 +13,24 @@ Object offsets are Delphi 1 instance offsets (16-bit). Confirms the leads in `re
 | `1010:4a41` | post-match strength evolution | 2, 2 |
 | `1010:100b` | foul/card roulette | (weights) |
 | `1010:397d` | team sector strength | (none) |
+| `1010:7516` | squad slot init (`g`, star) | 10, 11 (via `10c0:1882`) |
+| `1010:aea7` | goal annulment | 200 |
+| `1010:aa11` / `ac72` | cards / injuries (not decoded) | 1000 / 500 |
 | `1058:30ba` | `eli.cod` install id | 20000 |
 
-## Team sector strength — `1010:397d`
-`team+0x51..0x57` = four `u16` sectors indexed by position (0 GK, 1 DEF, 2 MID, 3 ATT), zeroed then
-for each squad slot with `slot+0x10 == 1` (starter):
-```
-sector[player.position] += player.strength*2 + (player.nationality == club.country ? 3 : 0) + slot.positionAdjust
-```
-(`player.position` = byte `+0x19`, `player.strength` = byte `+0x1a`, nationality pstr at `+0x1b`,
-club country pstr at `club+0x4a`, `slot.positionAdjust` = u16 `slot+10`.)
+## Squad slot, hidden talent and star ("craque") — `1010:7516`, `397d`, `818c`
+**Correction:** earlier notes (and third-party write-ups) said a starter adds `strength × 2`. The disassembly of
+`1010:397d` shows `slot.strength + 2 × star + (same country ? 3 : 0)`, where `star` is the byte at `player+0x1a`.
+
+- A squad **slot** (list item): `+6` player data, `+0x0a` **strength** (1..50), `+0x10` starter flag,
+  `+0x2b` **`g` = Random(10)+1** (hidden talent, fixed at creation by `7516`), `+0x2d`, `+0x2f` (derived values).
+- Player data: `+0x19` position (0 GK, 1 DEF, 2 MID, 3 ATT), `+0x1a` **star flag** = `g >= 8 && position >= 2`
+  (so ~30 % of midfielders/attackers are stars), `+0x1b` nationality pstr.
+- Confirmed on the real save: the only `*` player (Sandro Ventura, midfielder) has `g = 9`; the goalkeeper with `g = 8` is not a star.
+- **Sector strength** (`397d`): for each starter, `sector[position] += strength + 2*star + 3*sameCountry`.
+- **Attacker force** (`818c`): `round_half_even((position+1) * strength * (g/10 + 1) / 2)`.
+- **Shooter for AI-resolved chances**: starter with the highest force (ties -> later slot) via `0ee6` + comparer `201d`.
+- **Defender**: starter with the lowest position (the goalkeeper), strongest on ties (`0ee6` + comparer `1f88`).
 
 ## Attack opportunity — `1010:a6eb(match, ..., minute)`
 Match object: home team ptr `+0x2e`, away team ptr `+0x32`, event list `+0x44`,
@@ -33,8 +41,9 @@ Match object: home team ptr `+0x2e`, away team ptr `+0x32`, event list `+0x44`,
    (home advantage: 7000/6000 ≈ +16.7%). A shooter is then picked (`1038:39b6`); if home already
    has a chance the away roll is ignored.
 3. If neither primary roll fired, `1010:46df` is tried for home then (only if home didn't) for away.
-4. On a chance: team shots counter `team+0x4f`++, player counters (`+0x0e`, `+0x14`, 32-bit `+0x1b`)++,
+4. On a goal: `team+0x4f` (**goals scored**) ++, the scorer's counters (`+0x0e`, `+0x14`, 32-bit `+0x1b`) ++,
    and a match event is created with `1010:c1bf` (kind 1 normal, 2 when from a primary roll) and appended.
+   The primary path counts as a goal only if the duel `81ed` returns outcome 1 (`GOLO`).
 
 ## Secondary (main) chance generator — `1010:46df(minute, opp, shooterOut, side, team)`
 Fully decoded from the disassembly (`tools/ghidra/ListRange.java`). Stack order is Pascal: the *last* source
@@ -92,3 +101,22 @@ For each player, with `rating` from `1068:1079(real at player+0xc)` (+1 / 0 / -1
 - What `team+0x59` counts exactly (goals?) and `team+0x4f` (shots).
 - How `rating` (player `+0xc`, a Real) is produced after each match.
 - `1010:100b` weights, `1038:39b6` shooter selection, `1010:818c` attacker force.
+
+## Minute loop — `1048:069b`
+Per minute (`match+0x18e`), for every game of the round in turn: `a6eb` (goal chances); if no goal, `aa11`
+(`Random(1000)`), then `ac72` (`Random(500)`); if still nothing and minute is not 46 or 91, `aea7`
+(annulment: with `Random(200) < 10 && match.homeBonus < roll`, a goal from the previous minute is cancelled:
+`team+0x59`++, `team+0x4f`--, scorer counters --). Then `afff`. At minute 45 a half-time routine runs; at 90 a cup
+tie may extend the length to 120.
+
+## Rust port status (`core/src/matchsim.rs`)
+Implemented: primary bonus rolls, main goal generator, scorer (approximate roulette), annulment.
+Not yet: cards/injuries (`aa11`, `ac72`), penalties, substitutions, half-time, extra time, the `K` update.
+Simulation of 100k games per pairing (`cargo run --release -p elifoot-core --example sim`):
+
+| home/away strength | home goals | away goals | home W | draw | away W |
+|---|---|---|---|---|---|
+| 6 vs 6 | 1.39 | 1.08 | 43.9 % | 31.8 % | 24.4 % |
+| 8 vs 5 | 1.82 | 1.00 | 60.5 % | 25.3 % | 14.2 % |
+| 5 vs 8 | 1.31 | 1.42 | 31.1 % | 31.5 % | 37.4 % |
+| 10 vs 3 | 2.33 | 0.61 | 84.2 % | 12.3 % | 3.5 % |

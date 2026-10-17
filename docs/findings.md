@@ -107,3 +107,7 @@ Saves are written to the host folder `original/run/d/eli98/jogos/` (git-ignored)
   - `+32` 0 → 1 or 2: appearances (games played) this season.
   - `+12` and `+36` became 1 only for Marcelinho (an attacker): goals this season and goals total (hypothesis).
   - `+14` became 1 only for Luciano (a card or injury; to confirm with the in-game Historial).
+
+## Correction to the player record notes
+In the save, the tail field at `+23` (u16, values 1..9) is the hidden talent `g`; a player is a star when
+`g >= 8` and position >= 2 (matches the single `*` player). The field at `+2` is the strength.

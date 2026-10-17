@@ -1,4 +1,5 @@
-//! Main chance generator, a port of `1010:46df` (see `docs/match-engine.md`).
+//! Main goal generator, a port of `1010:46df` (see `docs/match-engine.md`). In the original a successful
+//! call is a goal event, and the threshold is dampened by goals already scored plus annulled goals.
 //! Uses `f64`; the original used x87 extended precision (differences are far below one `Random` step).
 use crate::rng::DelphiRng;
 use crate::sector::Sectors;
@@ -7,10 +8,10 @@ use crate::sector::Sectors;
 #[derive(Clone, Copy, Debug)]
 pub struct SideState {
     pub sectors: Sectors,
-    /// `team+0x4f` (shots / chances so far).
-    pub shots: i32,
-    /// `team+0x59` (goals).
+    /// `team+0x4f`: goals scored so far.
     pub goals: i32,
+    /// `team+0x59`: goals annulled so far (`1010:aea7`).
+    pub annulled: i32,
     /// `team+0x5b`, a Real48 multiplier; 1.0 at the start.
     pub k: f64,
 }
@@ -60,7 +61,7 @@ pub fn chance(
     let (a, b) = if home { (90, 180) } else { (120, 270) };
     let t = threshold(&own.sectors, opp, own.k);
     let candidate =
-        (rng.random(a) as f64) < t - (own.shots + own.goals) as f64 || rng.random(b) == 0;
+        (rng.random(a) as f64) < t - (own.goals + own.annulled) as f64 || rng.random(b) == 0;
     // warm-up gate: Random(45) < minute (signed compare in the original)
     candidate && (rng.random(45) as i32) < minute as i32
 }
@@ -96,8 +97,8 @@ mod tests {
     fn home_side_creates_more_chances() {
         let side = SideState {
             sectors: even(20),
-            shots: 0,
             goals: 0,
+            annulled: 0,
             k: 1.0,
         };
         let opp = even(20);
@@ -115,8 +116,8 @@ mod tests {
     fn early_minutes_are_suppressed() {
         let side = SideState {
             sectors: even(20),
-            shots: 0,
             goals: 0,
+            annulled: 0,
             k: 1.0,
         };
         let opp = even(20);
@@ -131,11 +132,11 @@ mod tests {
     }
 
     #[test]
-    fn shots_and_goals_dampen_the_threshold() {
+    fn goals_and_annulled_dampen_the_threshold() {
         let mut side = SideState {
             sectors: even(20),
-            shots: 0,
             goals: 0,
+            annulled: 0,
             k: 1.0,
         };
         let opp = even(20);
@@ -146,8 +147,8 @@ mod tests {
                 .sum::<u32>()
         };
         let fresh = count(&side);
-        side.shots = 12;
         side.goals = 3;
+        side.annulled = 1;
         assert!(count(&side) < fresh);
     }
 }

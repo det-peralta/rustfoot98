@@ -13,5 +13,6 @@
 - [ ] Decode attack-value computation (+0x4c/+0x4e) and the Real math in 46df
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI
 - [ ] Registration check: understand shareware limits (no keygen use)
-- [ ] Implement `core/` in TS with golden tests from the original
+- [x] `core/` in Rust (cipher, Delphi RNG, EFT/TXE, sectors, chance generator, outcome, evolution, Match v0)
+- [ ] Decode `aa11`/`ac72` (cards, injuries), penalties, substitutions, half-time, `K` update, `100b` weights
 - [ ] Build UI, PWA, saves import/export compatible with `.e98`
