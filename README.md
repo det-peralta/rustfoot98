@@ -17,6 +17,7 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/analysis-plan.md](docs/analysis-plan.md) | Step-by-step reverse-engineering plan and status |
 | [docs/findings.md](docs/findings.md) | Facts established about the binary and file formats |
 | [docs/classes.md](docs/classes.md) | Delphi class table |
+| [docs/match-engine.md](docs/match-engine.md) | Verified match-engine rules |
 | [docs/references.md](docs/references.md) | Third-party research (leads to verify) |
 
 ## Status

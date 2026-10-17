@@ -9,7 +9,8 @@
 - [ ] Extract form resources (TForm layouts, strings) → UI spec
 - [x] File formats: `.EFT` team, `.TXE` (done, see findings)
 - [ ] File formats: `.e98` save, `DRLIST.ELI`
-- [ ] Locate RNG and match simulation; document algorithm
+- [x] Locate RNG and match simulation (see docs/match-engine.md); partly decoded
+- [ ] Decode attack-value computation (+0x4c/+0x4e) and the Real math in 46df
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI
 - [ ] Registration check: understand shareware limits (no keygen use)
 - [ ] Implement `core/` in TS with golden tests from the original
