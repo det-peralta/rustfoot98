@@ -8,7 +8,7 @@
 - [ ] Field layout of TPlayer(56)/TTeam(203)/TGame(81)/TCoach(35) from Load/Save methods
 - [ ] Extract form resources (TForm layouts, strings) → UI spec
 - [x] File formats: `.EFT` team, `.TXE` (done, see findings)
-- [~] File formats: `.e98` save (partly), `DRLIST.ELI`
+- [~] File formats: `.e98` save (layout documented in docs/e98-format.md; fixtures/cup/news not imported), `DRLIST.ELI`
 - [x] Locate RNG and match simulation (see docs/match-engine.md); partly decoded
 - [ ] Decode attack-value computation (+0x4c/+0x4e) and the Real math in 46df
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI

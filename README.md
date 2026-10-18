@@ -18,6 +18,7 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/findings.md](docs/findings.md) | Facts established about the binary and file formats |
 | [docs/classes.md](docs/classes.md) | Delphi class table |
 | [docs/match-engine.md](docs/match-engine.md) | Verified match-engine rules |
+| [docs/e98-format.md](docs/e98-format.md) | Layout of the original `.e98` save files |
 | [docs/ui-strategy.md](docs/ui-strategy.md) | UI architecture: shared immediate-mode screens, SDL2 / canvas back ends, SDL1->SDL2 notes |
 | [docs/decompilation-map.md](docs/decompilation-map.md) | Every function of the binary: unit, kind, named / documented, work queue |
 | [docs/season.md](docs/season.md) | Season structure: fixtures, rounds, standings, knock-out cup |
