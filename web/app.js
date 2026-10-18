@@ -356,6 +356,14 @@ function renderCup() {
   $("cup-note").textContent = c.left === 1 ? "Final disputada." : `Ainda em prova: ${c.left} clubes.`;
 }
 
+function renderTransfers() {
+  const card = $("transfers-card"), list = state.transfers || [];
+  if (!list.length) { card.hidden = true; return; }
+  card.hidden = false;
+  $("transfers").innerHTML = list.map((t) =>
+    `<li><span class="muted">${t.year} · J${t.round}</span> <b>${esc(t.player)}</b> <small>(${POS[t.pos]}, ${t.str})</small> ${esc(t.from)} → ${esc(t.to)} <span class="fee">${money(t.fee)}</span></li>`).join("");
+}
+
 function renderSeason() {
   const card = $("season-card"), s = state.lastSeason;
   if (!s) { card.hidden = true; return; }
@@ -379,6 +387,7 @@ function render() {
   renderResults();
   renderClub();
   renderCup();
+  renderTransfers();
   renderSeason();
 }
 

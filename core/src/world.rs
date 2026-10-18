@@ -8,12 +8,13 @@
 //! for the first 33 teams and 1 for the rest (`1028:0373`). **Assumed:** squad composition of the fictional world
 //! (2 GK, 7 DEF, 6 MID, 5 ATT), fictional names, no cup (so only the champion's `K += 1.0` applies).
 use crate::cup;
-use crate::economy::{walk_index, DEFAULT_SCALE, INITIAL_INDEX};
+use crate::economy::{player_value, walk_index, DEFAULT_SCALE, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
 use crate::finance::{self, Finance};
+use crate::market::{code, country_class};
 use crate::matchsim::{Event, SubEvent};
 use crate::rng::DelphiRng;
-use crate::season::{apply_plan, auto_lineup, play_game};
+use crate::season::{apply_plan, auto_lineup, fixtures, play_game};
 use crate::season::{
     best_formation, end_of_round, end_of_season, plan_for_formation, play_round, standings, Club,
     MatchRecord, MoneyCtx, Plan, FORMATIONS,
@@ -184,6 +185,21 @@ pub struct World {
     /// The last cup round played in the current season (None before the first draw).
     pub last_cup: Option<CupRound>,
     pub cup_champion: Option<String>,
+    /// Transfers made between computer-managed clubs, newest last (kept for the current season).
+    pub transfers: Vec<Transfer>,
+}
+
+/// A completed transfer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Transfer {
+    pub round: usize,
+    pub year: u16,
+    pub player: String,
+    pub position: u8,
+    pub strength: u16,
+    pub from: String,
+    pub to: String,
+    pub fee: i64,
 }
 
 fn player_name(rng: &mut DelphiRng) -> String {
@@ -194,20 +210,25 @@ fn player_name(rng: &mut DelphiRng) -> String {
     )
 }
 
-fn make_club(rng: &mut DelphiRng, name: String, base: i32) -> Club {
+fn make_club(rng: &mut DelphiRng, name: String, base: i32, master: usize) -> Club {
     let mut slots = Vec::new();
     let mut names = Vec::new();
     for (position, count) in [(0u8, 2), (1, 7), (2, 6), (3, 5)] {
         for _ in 0..count {
             let n = player_name(rng);
             let strength = player_strength(rng, base);
-            slots.push(Slot::new(&n, position, strength, true, Status::Out));
+            let mut slot = Slot::new(&n, position, strength, true, Status::Out);
+            slot.nat = *b"POR";
+            slot.wage = player_value(strength, 1.0, INITIAL_INDEX, DEFAULT_SCALE);
+            slots.push(slot);
             names.push(n);
         }
     }
     let mut club = Club::new(&name, slots);
     club.names = names;
     club.fin = Finance::new_game(base, DEFAULT_SCALE);
+    club.country = *b"POR";
+    club.master = master as u16;
     club
 }
 
@@ -237,6 +258,7 @@ fn club_from_eft(
     t: &EftTeam,
     name: String,
     base: i32,
+    master: usize,
 ) -> Result<Club, String> {
     let mut slots = Vec::new();
     let mut names = Vec::new();
@@ -250,13 +272,17 @@ fn club_from_eft(
         };
         count[position as usize] += 1;
         let strength = player_strength(rng, base);
-        slots.push(Slot::new(
+        let mut slot = Slot::new(
             &p.name,
             position,
             strength,
             p.nationality == t.country,
             Status::Out,
-        ));
+        );
+        slot.nat = code(&p.nationality);
+        slot.foreign = country_class(code(&t.country), slot.nat);
+        slot.wage = player_value(strength, 1.0, INITIAL_INDEX, DEFAULT_SCALE);
+        slots.push(slot);
         names.push(p.name.clone());
     }
     if !crate::season::can_field(count) {
@@ -268,6 +294,8 @@ fn club_from_eft(
     let mut club = Club::new(&name, slots);
     club.names = names;
     club.fin = Finance::new_game(base, DEFAULT_SCALE);
+    club.country = code(&t.country);
+    club.master = master as u16;
     Ok(club)
 }
 
@@ -301,6 +329,7 @@ impl World {
                 &teams[i],
                 name,
                 base_strength(pos),
+                pos,
             )?);
         }
         let mut it = clubs.into_iter();
@@ -324,6 +353,7 @@ impl World {
             cup: Vec::new(),
             last_cup: None,
             cup_champion: None,
+            transfers: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -354,6 +384,7 @@ impl World {
             cup: Vec::new(),
             last_cup: None,
             cup_champion: None,
+            transfers: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -373,11 +404,11 @@ impl World {
         let mut divisions: [Vec<Club>; 4] = Default::default();
         for (d, division) in divisions.iter_mut().enumerate() {
             *division = (0..8)
-                .map(|j| make_club(&mut rng, next_name(), base_strength(d * 8 + j)))
+                .map(|j| make_club(&mut rng, next_name(), base_strength(d * 8 + j), d * 8 + j))
                 .collect();
         }
         let pool = (0..6)
-            .map(|i| make_club(&mut rng, next_name(), base_strength(32 + i)))
+            .map(|i| make_club(&mut rng, next_name(), base_strength(32 + i), 32 + i))
             .collect();
         let mut w = World {
             divisions,
@@ -394,6 +425,7 @@ impl World {
             cup: Vec::new(),
             last_cup: None,
             cup_champion: None,
+            transfers: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -435,6 +467,208 @@ impl World {
             c.fin = Finance::new_game(base_strength(32 + j), self.scale);
         }
         self.refresh_cash_ref();
+    }
+
+    /// All clubs as `(division, index)`, divisions 0..=3 then the outside pool as division 4, ordered by the master list.
+    fn all_clubs_by_master(&self) -> Vec<(usize, usize)> {
+        let mut v: Vec<(usize, usize)> = (0..4)
+            .flat_map(|d| (0..self.divisions[d].len()).map(move |i| (d, i)))
+            .chain((0..self.pool.len()).map(|i| (4, i)))
+            .collect();
+        v.sort_by_key(|&(d, i)| self.club_ref((d, i)).master);
+        v
+    }
+
+    fn club_ref(&self, (d, i): (usize, usize)) -> &Club {
+        if d < 4 {
+            &self.divisions[d][i]
+        } else {
+            &self.pool[i]
+        }
+    }
+
+    fn club_mut(&mut self, (d, i): (usize, usize)) -> &mut Club {
+        if d < 4 {
+            &mut self.divisions[d][i]
+        } else {
+            &mut self.pool[i]
+        }
+    }
+
+    fn is_human(&self, loc: (usize, usize)) -> bool {
+        self.human
+            .as_ref()
+            .is_some_and(|h| h.club == self.club_ref(loc).name)
+    }
+
+    /// Puts `slot_idx` of the club at `seller` up for sale at `ask` (`1010:5b37`) and settles the auction (`1008:3600`,
+    /// `373e`, `351a`, `39c7`): every computer-managed club except the seller that may bid does so, the highest bid wins (the
+    /// earlier club in the master list on a tie), pays it, and the player moves with a renegotiated wage.
+    fn auction(&mut self, seller: (usize, usize), slot_idx: usize, ask: i64, round: usize) -> bool {
+        let ask = crate::market::floor_1000(ask);
+        let slot = self.club_ref(seller).slots[slot_idx];
+        let value = player_value(
+            slot.strength,
+            self.club_ref(seller).fin.f,
+            self.economy,
+            self.scale,
+        );
+        let mut best: Option<((usize, usize), i64)> = None;
+        for loc in self.all_clubs_by_master() {
+            if loc == seller || self.is_human(loc) {
+                continue;
+            }
+            let buyer = self.club_ref(loc);
+            if !crate::market::may_bid(buyer, &slot) || buyer.fin.cash < ask {
+                continue;
+            }
+            let b = crate::market::floor_1000(crate::market::bid(
+                buyer,
+                value,
+                &slot,
+                self.economy,
+                self.scale,
+            ));
+            if b >= ask && best.is_none_or(|(_, top)| b > top || top == 0) {
+                best = Some((loc, b));
+            }
+        }
+        let Some((buyer_loc, fee)) = best else {
+            return false;
+        };
+        let mut moved = {
+            let c = self.club_mut(seller);
+            let name = c.names.remove(slot_idx);
+            let sl = c.slots.remove(slot_idx);
+            (sl, name)
+        };
+        let from = self.club_ref(seller).name.clone();
+        self.club_mut(seller)
+            .fin
+            .book(fee, finance::Category::Sales);
+        let to_country = self.club_ref(buyer_loc).country;
+        let (to, year) = {
+            let c = self.club_mut(buyer_loc);
+            moved.0.foreign = country_class(to_country, moved.0.nat);
+            moved.0.same_country = moved.0.foreign == 0;
+            moved.0.wage = value;
+            moved.0.fresh = true;
+            moved.0.status = Status::Out;
+            c.slots.push(moved.0);
+            c.names.push(moved.1.clone());
+            c.fin.book(-fee, finance::Category::Purchases);
+            (c.name.clone(), self.year)
+        };
+        if self.transfers.len() >= 200 {
+            self.transfers.remove(0);
+        }
+        self.transfers.push(Transfer {
+            round,
+            year,
+            player: moved.1,
+            position: moved.0.position,
+            strength: moved.0.strength,
+            from,
+            to,
+            fee,
+        });
+        true
+    }
+
+    /// `1010:3e9c` (and `3aad`) for one computer-managed club after a round: wage renegotiation, forced sale when broke, and
+    /// the regular decision to put a player up for sale.
+    fn club_after_round(&mut self, loc: (usize, usize), round: usize) {
+        if self.is_human(loc) || round < 2 {
+            return;
+        }
+        let (e, g) = (self.economy, self.scale);
+        // wages follow the player's value: the most overpaid and the most underpaid player (outside 0.8..1.2) are repriced
+        if self.club_ref(loc).coach_games > 1 {
+            let club = self.club_mut(loc);
+            let f = club.fin.f;
+            let (mut cut, mut raise) = (None, None);
+            let (mut cut_best, mut raise_best) = (1.2f64, 0.8f64);
+            for (i, s) in club.slots.iter().enumerate() {
+                if s.fresh {
+                    continue;
+                }
+                let v = player_value(s.strength, f, e, g);
+                let ratio = s.wage as f64 / v as f64;
+                if ratio > cut_best {
+                    cut = Some(i);
+                    cut_best = ratio;
+                }
+                if ratio < raise_best {
+                    raise = Some(i);
+                    raise_best = ratio;
+                }
+            }
+            for i in [cut, raise].into_iter().flatten() {
+                let s = &mut club.slots[i];
+                s.wage = player_value(s.strength, f, e, g);
+                s.fresh = true;
+            }
+            // a club that is broke sells its lowest-scoring player at any price
+            if club.fin.cash < 0 {
+                if let Some(i) = crate::market::pick_for_sale(club) {
+                    self.auction(loc, i, 0, round);
+                }
+            }
+        }
+        // `3aad`: sell when the cash is under a third of the wage bill, otherwise with a 1 in 20 chance, or when the squad is
+        // over 20 with exactly five foreigners
+        let (broke, five_and_big) = {
+            let club = self.club_ref(loc);
+            (
+                3 * club.fin.cash < crate::market::wage_sum(club),
+                crate::market::foreigners(club) == 5 && club.slots.len() >= 21,
+            )
+        };
+        let sell = broke || self.rng.random(20) == 0 || five_and_big;
+        if sell {
+            let club = self.club_ref(loc);
+            if let Some(i) = crate::market::pick_for_sale(club) {
+                let ask = crate::market::market_value(&club.slots[i], e, g);
+                self.auction(loc, i, ask, round);
+            }
+        }
+    }
+
+    /// The clubs of the next round's games, in game order (`13e1` walks the list of games just created).
+    fn market_round(&mut self, round: usize) {
+        let next = round % ROUNDS + 1;
+        let mut order = Vec::new();
+        for d in 0..4 {
+            for (h, a) in fixtures(next) {
+                order.push((d, h));
+                order.push((d, a));
+            }
+        }
+        for loc in order {
+            self.club_after_round(loc, round);
+        }
+    }
+
+    /// Saves from before the transfer market: every club gets an unknown country (all players count as domestic), wages at
+    /// the player's value and a master-list position following the current order.
+    pub fn give_market_defaults(&mut self) {
+        let (e, g) = (self.economy, self.scale);
+        for (master, c) in self
+            .divisions
+            .iter_mut()
+            .flatten()
+            .chain(self.pool.iter_mut())
+            .enumerate()
+        {
+            c.master = master as u16;
+            c.country = *b"???";
+            let f = c.fin.f;
+            for s in c.slots.iter_mut() {
+                s.nat = *b"???";
+                s.foreign = 0;
+                s.wage = player_value(s.strength, f, e, g);
+            }
+        }
     }
 
     /// `1010:7067` for every division: remembers the total cash.
@@ -564,7 +798,7 @@ impl World {
             let half = (attendance as f64 * money.price / 2.0).round_ties_even() as i64;
             for c in [&mut home, &mut away] {
                 c.fin.book(half, finance::Category::Gate);
-                let wages = finance::wage_bill(&c.slots, c.fin.f, money.e, money.g);
+                let wages = finance::wage_bill(&c.slots);
                 c.fin.book(-wages, finance::Category::Wages);
             }
             let (mh, ma) = cup::morale_results(!home_out);
@@ -686,6 +920,7 @@ impl World {
     pub fn play_round(&mut self) {
         self.last_round.clear();
         let round = self.round + 1;
+        #[allow(clippy::needless_range_loop)]
         for d in 0..4 {
             let division_name = DIVISION_NAMES[d].as_bytes().to_vec();
             let team_names: Vec<Vec<u8>> = self.divisions[d]
@@ -715,10 +950,14 @@ impl World {
                 Some(money),
             );
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
-            end_of_round(&mut self.rng, &mut self.divisions[d], DIVISION_BASE[d]);
+        }
+        // order of `1020:0c41`: games, economic factors (`6e48`), clubs sell and renegotiate (`3e9c`), then the evolution
+        self.update_factors();
+        self.market_round(round);
+        for (d, base) in DIVISION_BASE.iter().enumerate() {
+            end_of_round(&mut self.rng, &mut self.divisions[d], *base);
         }
         self.economy = walk_index(&mut self.rng, self.economy, self.year);
-        self.update_factors();
         self.round = round;
         self.last_cup = None;
         if round.is_multiple_of(2) {
@@ -1182,5 +1421,113 @@ mod tests {
         let b = World::load(&a.save()).unwrap();
         assert_eq!(b.cup, a.cup);
         assert_eq!(b.cup.len(), left);
+    }
+
+    fn player_count(w: &World) -> usize {
+        w.divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .map(|c| c.slots.len())
+            .sum()
+    }
+
+    #[test]
+    fn transfers_move_players_and_money_between_computer_clubs_only() {
+        let mut w = World::synthetic(2024);
+        let human = w.human.as_ref().unwrap().club.clone();
+        let players = player_count(&w);
+        let cash: i64 = w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .map(|c| c.fin.cash)
+            .sum();
+        let mut moved = 0;
+        for _ in 0..28 {
+            w.play_round();
+            moved = moved.max(w.transfers.len());
+        }
+        assert_eq!(
+            player_count(&w),
+            players,
+            "players are neither created nor lost"
+        );
+        assert!(
+            moved > 0,
+            "a season of the computer market produces transfers"
+        );
+        for t in &w.transfers {
+            assert_ne!(t.from, human);
+            assert_ne!(t.to, human);
+            assert_ne!(t.from, t.to);
+            assert!(t.fee >= 0 && t.fee % 1000 == 0);
+        }
+        for c in w.divisions.iter().flatten().chain(w.pool.iter()) {
+            assert!(
+                (11..=24).contains(&c.slots.len()),
+                "{} has {}",
+                c.name,
+                c.slots.len()
+            );
+            assert_eq!(c.slots.len(), c.names.len());
+        }
+        let _ = cash;
+    }
+
+    #[test]
+    fn a_transferred_player_is_marked_and_cannot_be_sold_again() {
+        let mut w = World::synthetic(7);
+        for _ in 0..14 {
+            w.play_round();
+        }
+        let t = w
+            .transfers
+            .first()
+            .expect("some transfer in a season")
+            .clone();
+        let club = w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .find(|c| c.name == t.to)
+            .unwrap();
+        let idx = club
+            .names
+            .iter()
+            .position(|n| *n == t.player)
+            .expect("the buyer has the player");
+        assert!(club.slots[idx].fresh);
+        assert_ne!(crate::market::sale_blocker(club, idx), 0);
+    }
+
+    #[test]
+    fn the_market_state_survives_a_save() {
+        let mut a = World::synthetic(11);
+        for _ in 0..9 {
+            a.play_round();
+        }
+        let b = World::load(&a.save()).unwrap();
+        for (x, y) in a
+            .divisions
+            .iter()
+            .flatten()
+            .zip(b.divisions.iter().flatten())
+        {
+            assert_eq!(x.master, y.master);
+            assert_eq!(x.country, y.country);
+            assert_eq!(
+                x.slots
+                    .iter()
+                    .map(|s| (s.wage, s.fresh, s.nat))
+                    .collect::<Vec<_>>(),
+                y.slots
+                    .iter()
+                    .map(|s| (s.wage, s.fresh, s.nat))
+                    .collect::<Vec<_>>()
+            );
+        }
     }
 }

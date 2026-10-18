@@ -132,7 +132,7 @@ fn human_json(w: &World) -> String {
         .collect();
     let fin = &club.fin;
     let money = w.money_ctx(d);
-    let wage = elifoot_core::finance::wage_bill(&club.slots, fin.f, w.economy, w.scale);
+    let wage = elifoot_core::finance::wage_bill(&club.slots);
     let finance = format!(
         "{{\"cash\":{},\"loan\":{},\"f\":{:.4},\"stadium\":{},\"capacity\":{},\"gate\":{},\"sales\":{},\"purchases\":{},\"wages\":{},\"interest\":{},\"wageBill\":{},\"price\":{},\"scale\":{}}}",
         fin.cash,
@@ -276,9 +276,29 @@ fn world_json(w: &World) -> String {
         .map(|(d, r)| match_json(*d, r, w))
         .collect();
     out.push_str(&ms.join(","));
+    let transfers: Vec<String> = w
+        .transfers
+        .iter()
+        .rev()
+        .take(40)
+        .map(|t| {
+            format!(
+                "{{\"year\":{},\"round\":{},\"player\":{},\"pos\":{},\"str\":{},\"from\":{},\"to\":{},\"fee\":{}}}",
+                t.year,
+                t.round,
+                esc(&t.player),
+                t.position,
+                t.strength,
+                esc(&t.from),
+                esc(&t.to),
+                t.fee
+            )
+        })
+        .collect();
+    let _ = write!(out, "],\"transfers\":[{}]", transfers.join(","));
     let _ = write!(
         out,
-        "],\"cup\":{},\"cupLeft\":{},\"lastCup\":{},\"lastSeason\":",
+        ",\"cup\":{},\"cupLeft\":{},\"lastCup\":{},\"lastSeason\":",
         w.cup
             .iter()
             .any(|n| Some(n.as_str()) == w.human.as_ref().map(|h| h.club.as_str())),

@@ -6,6 +6,7 @@
 //! are not stored.
 use crate::economy::{DEFAULT_SCALE, INITIAL_INDEX};
 use crate::finance::Finance;
+use crate::market::{code, country_class};
 use crate::rng::DelphiRng;
 use crate::season::{Club, Plan, PlannedSub};
 use crate::sector::{Slot, Status};
@@ -70,7 +71,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -89,11 +90,15 @@ impl World {
                 c.fin.sales,
                 c.fin.purchases,
                 c.fin.wages,
-                c.fin.interest
+                c.fin.interest,
+                String::from_utf8_lossy(&c.country),
+                c.master,
+                c.bought,
+                c.bought_foreign
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
-                    "p|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+                    "p|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
                     clean(name),
                     slot.position,
                     slot.strength,
@@ -102,7 +107,10 @@ impl World {
                     slot.injured,
                     slot.rating,
                     status_code(slot.status),
-                    0
+                    0,
+                    String::from_utf8_lossy(&slot.nat),
+                    slot.wage,
+                    slot.fresh as u8
                 ));
             }
         };
@@ -130,6 +138,7 @@ impl World {
         let mut cup_champion: Option<String> = None;
         let mut has_cup = false;
         let mut has_finance = false;
+        let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
         let mut cash_ref = [0i64; 4];
         let mut divisions: [Vec<Club>; 4] = Default::default();
@@ -247,6 +256,13 @@ impl World {
                         };
                         has_finance = true;
                     }
+                    if let Some(cc) = f.get(20) {
+                        c.country = code(cc);
+                        c.master = f.get(21).and_then(|x| x.parse().ok()).unwrap_or(0);
+                        c.bought = f.get(22).and_then(|x| x.parse().ok()).unwrap_or(0);
+                        c.bought_foreign = f.get(23).and_then(|x| x.parse().ok()).unwrap_or(0);
+                        has_market = true;
+                    }
                     c.names.clear();
                     current = Some((num(n, &f, 1)? as usize, c));
                 }
@@ -271,6 +287,12 @@ impl World {
                     slot.ban = num(n, &f, 5)? as u8;
                     slot.injured = num(n, &f, 6)? as u8;
                     slot.rating = num(n, &f, 7)? as i32;
+                    if let Some(nat) = f.get(10) {
+                        slot.nat = code(nat);
+                        slot.wage = f.get(11).and_then(|x| x.parse().ok()).unwrap_or(0);
+                        slot.fresh = f.get(12).is_some_and(|x| *x == "1");
+                        slot.foreign = country_class(c.country, slot.nat);
+                    }
                     c.slots.push(slot);
                     c.names.push(name.to_string());
                 }
@@ -299,12 +321,16 @@ impl World {
             cup,
             last_cup: None,
             cup_champion,
+            transfers: Vec::new(),
         };
         if !has_cup {
             w.reset_cup();
         }
         if !has_finance {
             w.give_new_game_finances();
+        }
+        if !has_market {
+            w.give_market_defaults();
         }
         if w.human.is_none() || w.human_location().is_none() {
             w.pick_human();

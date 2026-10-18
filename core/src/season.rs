@@ -53,6 +53,13 @@ pub struct Club {
     /// Games played by the current coach (`coach+0x0c`, saturating at `i16::MAX`); reset when the coach is sacked.
     pub coach_games: u16,
     pub fin: Finance,
+    /// The club's country code (`team+4` object `+0x4a`); compared with the players' nationalities.
+    pub country: [u8; 3],
+    /// Position in the master list of all clubs (the order the transfer auction visits buyers).
+    pub master: u16,
+    /// `+0xc7` / `+0xc9`: signings (all / foreign) counted against the squad and foreigner limits.
+    pub bought: u16,
+    pub bought_foreign: u16,
 }
 
 /// Coach sacking (`1010:8b5d`): an AI coach with at least this many games ...
@@ -89,6 +96,10 @@ impl Club {
             goals_against: 0,
             coach_games: 0,
             fin: Finance::default(),
+            country: *b"???",
+            master: 0,
+            bought: 0,
+            bought_foreign: 0,
         }
     }
 }
@@ -491,10 +502,10 @@ pub fn play_round(
                 ac.draws += 1;
             }
         }
-        if let Some(m) = money {
+        if money.is_some() {
             hc.fin.book(gate, Category::Gate);
             for c in [&mut *hc, &mut *ac] {
-                let wages = finance::wage_bill(&c.slots, c.fin.f, m.e, m.g);
+                let wages = finance::wage_bill(&c.slots);
                 c.fin.book(-wages, Category::Wages);
             }
         }
@@ -536,6 +547,14 @@ pub fn end_of_round(rng: &mut DelphiRng, clubs: &mut [Club], base: i32) {
     }
     for (rank, i) in standings(clubs).into_iter().enumerate() {
         evolve_squad(rng, &mut clubs[i].slots, level_for_rank(base, rank));
+        // `1010:3e9c` clears `slot+0xc..0x13` of every player of a team whose coach has coached more than one game.
+        // The sample save shows the accumulators zeroed after round 2 for all but two teams, while the evolution of that
+        // round still used them, so the clear is applied after the evolution.
+        if clubs[i].coach_games > 1 {
+            for s in clubs[i].slots.iter_mut() {
+                s.rating = 0;
+            }
+        }
     }
 }
 

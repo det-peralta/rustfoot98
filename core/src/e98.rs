@@ -16,6 +16,7 @@
 use crate::cipher::read_pstr_n;
 use crate::economy::DEFAULT_SCALE;
 use crate::finance::Finance;
+use crate::market::{code, country_class};
 use crate::season::Club;
 use crate::sector::{Slot, Status};
 use crate::world::base_strength;
@@ -24,10 +25,14 @@ use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct E98Player {
+    pub id: u16,
     pub nationality: String,
     pub name: String,
     pub position: u8,
     pub strength: u16,
+    /// Stored wage (`+0x31`) and the "fresh" flag (`+0x16`).
+    pub wage: i64,
+    pub fresh: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -156,10 +161,13 @@ fn player_at(d: &[u8], o: usize) -> Option<(E98Player, u16, usize)> {
     }
     Some((
         E98Player {
+            id,
             nationality: nat,
             name,
             position: tail[0],
             strength,
+            wage: i32::from_le_bytes([tail[25], tail[26], tail[27], tail[28]]) as i64,
+            fresh: tail[14] != 0,
         },
         id,
         o3 + 48,
@@ -345,18 +353,24 @@ impl E98 {
     }
 }
 
-fn club_of(t: &E98Team, name: String, base: i32) -> Club {
+fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
+    let base = base_strength(rank);
     let slots: Vec<Slot> = t
         .players
         .iter()
         .map(|p| {
-            Slot::new(
+            let mut s = Slot::new(
                 &p.name,
                 p.position,
                 p.strength,
                 p.nationality == t.country,
                 Status::Out,
-            )
+            );
+            s.nat = code(&p.nationality);
+            s.foreign = country_class(code(&t.country), s.nat);
+            s.wage = p.wage;
+            s.fresh = p.fresh;
+            s
         })
         .collect();
     let mut c = Club::new(&name, slots);
@@ -376,6 +390,8 @@ fn club_of(t: &E98Team, name: String, base: i32) -> Club {
     c.fin.sales = t.ledger[1];
     c.fin.purchases = t.ledger[2];
     c.fin.wages = t.ledger[3];
+    c.country = code(&t.country);
+    c.master = rank as u16;
     c
 }
 
@@ -397,7 +413,7 @@ impl World {
         // team ids follow the master list, so the rank of the id is the list position that fixed the new-game values
         let mut by_id: Vec<usize> = (0..save.teams.len()).collect();
         by_id.sort_by_key(|&i| save.teams[i].id);
-        let base_of = |i: usize| base_strength(by_id.iter().position(|&x| x == i).unwrap_or(0));
+        let base_of = |i: usize| by_id.iter().position(|&x| x == i).unwrap_or(0);
         let mut in_league = std::collections::HashSet::new();
         let mut divisions: [Vec<Club>; 4] = Default::default();
         for (d, idx) in divs.iter().enumerate() {

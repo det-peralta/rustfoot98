@@ -2,7 +2,6 @@
 //! (see `docs/finance.md`): the per-game wage bill (`5a0a`), the gate (`9396` + `b0a1`), the division ticket price
 //! (`35e1`), new-game cash (`0373`) and the stadium capacity. Transfers, loans and the economic-factor smoothing
 //! (`6e48`) are only partly decoded and are approximated or left out where noted.
-use crate::economy::player_value;
 use crate::rng::DelphiRng;
 use crate::sector::Slot;
 
@@ -79,12 +78,9 @@ impl Finance {
     }
 }
 
-/// `1010:7ff4` summed over the squad, `1010:5992`: what a club pays in wages per game.
-pub fn wage_bill(slots: &[Slot], f: f64, e: f64, g: i64) -> i64 {
-    slots
-        .iter()
-        .map(|s| player_value(s.strength, f, e, g))
-        .sum()
+/// `1010:5992`: what a club pays in wages per game: the sum of the players' stored wages (`slot+0x31`).
+pub fn wage_bill(slots: &[Slot]) -> i64 {
+    slots.iter().map(|s| s.wage).sum()
 }
 
 /// `1010:4ec3`: the rounded mean strength of a squad.

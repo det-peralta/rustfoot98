@@ -135,7 +135,7 @@ global `Real` random walk at `10c8:2b46` clamped to [lo, hi] — role not decode
 For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)` (`1068:1079`, threshold 0.0):
 - `+1`: if not a goalkeeper (or a goalkeeper winning `Random(2)==0`), strength++ (max 50); undone if it exceeds `level+5`.
 - `-1`: `Random(2)==0` is **always drawn first**, then if strength > 1 it drops by 1; undone if below `level−5` or 1.
-- the rating is **not reset** between rounds (only when a coach takes over a team, `4f40`), so the sign keeps pushing:
+- the rating is reset by `1010:3e9c` after the evolution of every round once the coach has coached more than one game (and when a coach takes over a team, `4f40`); in the first round it accumulates, afterwards it reflects one round, so the sign is mostly "starter in that game" (earlier versions of this note said it was never reset):
   strong starters keep sliding down until they reach `level−5`, strong-by-position reserves climb to `level+5`.
   The effect is a steady pull of every squad toward its team's level window. (Matches the save: after 2 rounds most
   starters had lost 1–2 points and a reserve had gained 1.)

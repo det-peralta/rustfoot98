@@ -67,6 +67,14 @@ pub struct Slot {
     pub injured: u8,
     /// Season performance accumulator (`+0x0c`): -1 per pick while a starter, +1 while not (`1010:49e2`).
     pub rating: i32,
+    /// Nationality code (the class object's string at `+0x1b`).
+    pub nat: [u8; 3],
+    /// Stored wage (`+0x31`), which also drives the sale and bid logic. Lags behind the live value until `3e9c` renegotiates.
+    pub wage: i64,
+    /// `+0x16`: set when the wage was just renegotiated or the player changed club; such a player cannot be sold again.
+    pub fresh: bool,
+    /// `+0x35`: 0 same country as the club, 1 same country group (Bosman / PLOP), 2 foreigner.
+    pub foreign: u8,
 }
 
 impl Slot {
@@ -89,6 +97,10 @@ impl Slot {
             ban: 0,
             injured: 0,
             rating: 0,
+            nat: *b"???",
+            wage: 0,
+            fresh: false,
+            foreign: if same_country { 0 } else { 2 },
         }
     }
 
@@ -183,6 +195,10 @@ mod tests {
             ban: 0,
             injured: 0,
             rating: 0,
+            nat: *b"???",
+            wage: 0,
+            fresh: false,
+            foreign: 0,
         }
     }
     const S: Status = Status::Starter;
