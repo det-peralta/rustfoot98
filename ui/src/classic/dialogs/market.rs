@@ -678,6 +678,8 @@ fn search_bind(c: &Classic, d: &mut Dialog) {
         *t = t.to_uppercase();
     }
     let name = d.texts.get("textName").cloned().unwrap_or_default();
+    d.texts
+        .insert("textName.caret".into(), name.chars().count().to_string());
     if d.st.get("lastname") != Some(&name) {
         d.st.insert("lastname".into(), name.clone());
         d.set_num("changed", 1);
@@ -1331,6 +1333,13 @@ fn observed_key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
 
 pub fn bind(c: &Classic, d: &mut Dialog) {
     match &d.kind {
+        Kind::Auction => {
+            let n = d
+                .texts
+                .get("textHumanOffer")
+                .map_or(0, |t| t.chars().count());
+            d.texts.insert("textHumanOffer.caret".into(), n.to_string());
+        }
         Kind::Search => search_bind(c, d),
         Kind::Plantel => plantel_bind(c, d),
         Kind::Observed => observed_bind(c, d),
