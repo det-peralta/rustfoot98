@@ -30,6 +30,8 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::Shootout
         | Kind::CupDraw
         | Kind::EndOfSeason
+        | Kind::Invitation
+        | Kind::Lashes
         | Kind::RefereeAid => matchday::bind(c, d),
         Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
             tables::bind(c, d)
@@ -46,8 +48,7 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::CoachManager
         | Kind::CoachRanking
         | Kind::CoachProfile
-        | Kind::TeamHistory
-        | Kind::Invitation => coach::bind(c, d),
+        | Kind::TeamHistory => coach::bind(c, d),
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan | Kind::Other(_) => {
             misc::bind(c, d)
         }
@@ -65,6 +66,8 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::Shootout
         | Kind::CupDraw
         | Kind::EndOfSeason
+        | Kind::Invitation
+        | Kind::Lashes
         | Kind::RefereeAid => matchday::click(c, d, name),
         Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
             tables::click(c, d, name)
@@ -81,8 +84,7 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::CoachManager
         | Kind::CoachRanking
         | Kind::CoachProfile
-        | Kind::TeamHistory
-        | Kind::Invitation => coach::click(c, d, name),
+        | Kind::TeamHistory => coach::click(c, d, name),
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan | Kind::Other(_) => {
             misc::click(c, d, name)
         }
@@ -92,9 +94,14 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
 /// A key the generic handling did not use (arrows in lists, shortcut letters...). `None` when the dialog ignores it.
 pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
     match &d.kind {
-        Kind::Halftime | Kind::Penalty | Kind::Shootout | Kind::CupDraw | Kind::EndOfSeason => {
-            matchday::key(c, d, key)
-        }
+        Kind::Halftime
+        | Kind::ForcedSubstitution
+        | Kind::Penalty
+        | Kind::Shootout
+        | Kind::CupDraw
+        | Kind::EndOfSeason
+        | Kind::Invitation
+        | Kind::Lashes => matchday::key(c, d, key),
         Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
             tables::key(c, d, key)
         }
@@ -114,9 +121,14 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
     match &d.kind {
         Kind::About => about::tick(c, d, ms),
         Kind::Progress => newgame::tick(c, d, ms),
-        Kind::Halftime | Kind::Penalty | Kind::Shootout | Kind::CupDraw | Kind::EndOfSeason => {
-            matchday::tick(c, d, ms)
-        }
+        Kind::Halftime
+        | Kind::ForcedSubstitution
+        | Kind::Penalty
+        | Kind::Shootout
+        | Kind::CupDraw
+        | Kind::EndOfSeason
+        | Kind::Invitation
+        | Kind::Lashes => matchday::tick(c, d, ms),
         Kind::Standings | Kind::Calendar => tables::tick(c, d, ms),
         _ => Outcome::Keep,
     }

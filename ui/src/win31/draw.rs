@@ -560,6 +560,12 @@ fn groupbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
         return;
     };
+    let own_bg = cx.color_of(n, "bgcolor");
+    if let Some(b) = own_bg {
+        // the program painted the group box (the squads of the match day take the colours of the club)
+        fb.fill(x, y, w, h, b);
+    }
+    let bg = own_bg.unwrap_or(cx.bg);
     let top = y + font.height() / 2 - 1;
     let (fw, fh) = (w - 1, h - (top - y) - 1);
     for (dx, c) in [(0, GRAY), (1, WHITE)] {
@@ -571,11 +577,12 @@ fn groupbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     }
     let cap = caption(cx, n);
     let tw = font.width(cap);
-    fb.fill(x + 8, top, tw, 2, cx.bg);
+    fb.fill(x + 8, top, tw, 2, bg);
     text(fb, font, x + 8, y, cap, f.color, false);
     let sub = Ctx {
         ox: x,
         oy: y,
+        bg,
         ..cx.sub()
     };
     for c in &n.children {
@@ -806,9 +813,13 @@ fn balance_list(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32, r
 fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
     let flat = (!n.flag("Ctl3D", true) && n.flag("ParentColor", false))
-        || n.ident("BorderStyle") == Some("bsNone");
+        || n.ident("BorderStyle") == Some("bsNone")
+        || cx
+            .texts
+            .get(&format!("{}.flat", n.name))
+            .is_some_and(|v| v == "1");
     if flat {
-        fb.fill(x, y, w, h, cx.bg);
+        fb.fill(x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(cx.bg));
     } else {
         sunken_box(fb, x, y, w, h, cx.color_of(n, "bg").unwrap_or(WHITE));
     }

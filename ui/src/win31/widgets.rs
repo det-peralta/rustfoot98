@@ -418,6 +418,8 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         .or_else(|| n.props.get("ItemHeight").map(|_| n.int("ItemHeight", 0)))
         .filter(|&v| v > 0)
         .unwrap_or(font.height());
+    // `<name>.inset=0`: the rows start at the top edge of the box (owner-drawn lists without a border)
+    let inset = get_num(cx, n, "inset").unwrap_or(1);
     let inner_h = h - 2;
     let fit = (inner_h / ih).max(1) as usize;
     let scrolled = items.len() > fit;
@@ -428,16 +430,25 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         .map(|v| v as usize);
     let focused = cx.focus == n.name;
     let cols = columns(cx, n);
+    let bold_cols: Vec<usize> = get(cx, n, "boldcols")
+        .map(|v| v.split(',').filter_map(|t| t.trim().parse().ok()).collect())
+        .unwrap_or_default();
+    let bold = cx
+        .font(&FontSpec {
+            bold: true,
+            ..f.clone()
+        })
+        .unwrap_or(font);
     let enabled = is_enabled(cx, n);
     let old = fb.clip;
     fb.clip = (
         (x + 1).max(old.0),
-        (y + 1).max(old.1),
+        (y + inset).max(old.1),
         right.min(old.2),
         (y + h - 1).min(old.3),
     );
     for (r, i) in (top..items.len().min(top + fit + 1)).enumerate() {
-        let ry = y + 1 + r as i32 * ih;
+        let ry = y + inset + r as i32 * ih;
         let st = row_style(cx, n, i);
         let selected = sel == Some(i);
         let (fg, bg) = if selected {
@@ -471,6 +482,8 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
                     let Some(&(off, al)) = cols.get(k) else {
                         break;
                     };
+                    // `<name>.boldcols=1,2`: columns drawn in bold whatever the row's style
+                    let rf = if bold_cols.contains(&k) { bold } else { rf };
                     let tw = rf.width(cell);
                     let tx = match al {
                         'r' => x + off - tw,

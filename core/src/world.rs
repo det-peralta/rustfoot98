@@ -149,6 +149,8 @@ pub struct CupRound {
     pub matches: Vec<CupMatch>,
     /// Clubs still in the cup after this round.
     pub left: usize,
+    /// Index into `World::coach_changes` of the first sacking of this cup round (the ones before are the league round's).
+    pub coach_changes_from: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -1415,6 +1417,7 @@ impl World {
             return;
         }
         ctl.checkpoint(&mut self.rng);
+        let coach_changes_from = self.coach_changes.len();
         cup::shuffle(&mut self.rng, &mut self.cup);
         let n = self.cup.len();
         let (k, pairs) = cup::round_size(n);
@@ -1563,6 +1566,7 @@ impl World {
             name: cup::round_name(k),
             matches,
             left: self.cup.len(),
+            coach_changes_from,
         });
     }
 
@@ -2590,7 +2594,7 @@ mod tests {
 
     #[test]
     fn a_substitution_at_the_break_only_changes_the_users_second_half() {
-        use crate::season::PlannedSub;
+        use crate::matchsim::Side;
         for seed in [5u32, 11, 29] {
             let w0 = World::synthetic(seed);
             let (d, i) = w0.human_location().unwrap();
@@ -2610,28 +2614,33 @@ mod tests {
             let mut first = w0.clone();
             let mut ctl = Control::default();
             first.play_round_ctl(&mut ctl);
-            // the user substitutes at the break: restore the world, add the substitution and replay
+            let side = first
+                .last_round
+                .iter()
+                .find_map(|(dd, m)| {
+                    (*dd == d && (m.home == i || m.away == i)).then_some(if m.home == i {
+                        Side::Home
+                    } else {
+                        Side::Away
+                    })
+                })
+                .unwrap();
+            // the user substitutes at the break: restore the world, add the decision and replay
             let mut second = w0.clone();
-            let mut p = plan.clone();
-            p.subs.push(PlannedSub {
+            let sub = Decision::Planned {
+                side,
                 minute: 46,
                 out,
                 inn,
-            });
-            second.set_plan(p);
-            second.play_round_ctl(&mut Control::replay(ctl.log.clone(), vec![], vec![]));
-            let name = w0.human.as_ref().unwrap().club.clone();
-            let mine = |m: &MatchRecord, w: &World| {
-                let c = |x: usize| w.divisions[d][x].name == name;
-                c(m.home) || c(m.away)
             };
+            second.play_round_ctl(&mut Control::replay(ctl.log.clone(), vec![sub], vec![]));
             let (a, b) = (round_text(&first), round_text(&second));
             assert_eq!(a.len(), b.len());
             for (k, ((da, ma), (db, mb))) in
                 first.last_round.iter().zip(&second.last_round).enumerate()
             {
                 assert_eq!((da, ma.home, ma.away), (db, mb.home, mb.away));
-                if *da == d && mine(ma, &first) {
+                if *da == d && (ma.home == i || ma.away == i) {
                     let upto = |m: &MatchRecord| {
                         m.events
                             .iter()
@@ -2642,7 +2651,7 @@ mod tests {
                     assert_eq!(upto(ma), upto(mb), "first half of seed {seed}");
                     assert!(
                         mb.subs.iter().any(|s| s.minute == 46 && !s.auto),
-                        "the planned substitution happens (seed {seed})"
+                        "the substitution happens (seed {seed})"
                     );
                 } else {
                     assert_eq!(a[k], b[k], "game {k} of seed {seed} is not the user's");

@@ -1,6 +1,6 @@
 //! Input: mouse and keyboard events and the passing of time, routed to the dialogs, the menus and the main window.
 use super::dialog::{self, Dialog, KeyAct, Outcome};
-use super::{dialogs, main_win, menu, round_view, Classic, Ev, Key, Page, Request, Screen};
+use super::{dialogs, main_win, menu, Classic, Ev, Key, Page, Request, Screen};
 use elifoot_core::season::FORMATIONS;
 
 impl Classic {
@@ -13,6 +13,8 @@ impl Classic {
             self.dialog_event(ev);
         } else if matches!(self.screen, Screen::Main) {
             self.main_event(ev);
+        } else if let (Screen::Round(_), Ev::Down(x, y)) = (&self.screen, ev) {
+            self.round_click(x, y);
         }
         self.next_queued();
     }
@@ -26,46 +28,9 @@ impl Classic {
             self.next_queued();
             return;
         }
-        let mut finished = false;
-        let mut halftime = false;
-        if let Screen::Round(rv) = &mut self.screen {
-            let before = rv.minute;
-            if !rv.tick(ms) {
-                finished = true;
-            }
-            if before < 45 && rv.minute >= 45 && rv.human_plays() && !rv.halftime_seen {
-                rv.halftime_seen = true;
-                rv.minute = 45;
-                halftime = true;
-            }
-            self.dirty = true;
+        if matches!(self.screen, Screen::Round(_)) {
+            self.round_tick(ms);
         }
-        if halftime {
-            self.open(dialogs::matchday::halftime(self));
-        }
-        if finished {
-            self.finish_round();
-        }
-    }
-
-    /// Shows the round just played: the clock runs from 0 to 90.
-    pub fn start_round_view(&mut self) {
-        self.screen = Screen::Round(Box::new(round_view::RoundView::of_round(&self.world)));
-        self.dirty = true;
-    }
-
-    /// The final whistle: back to the main window, then the messages of the round.
-    pub fn finish_round(&mut self) {
-        self.screen = Screen::Main;
-        self.dirty = true;
-        dialogs::matchday::end_of_round(self);
-    }
-
-    /// Plays the next round of the league (and cup) and shows it.
-    pub fn play_round(&mut self) {
-        self.main.menu = None;
-        self.world.play_round();
-        self.start_round_view();
     }
 
     fn apply(&mut self, d: Dialog, out: Outcome) {

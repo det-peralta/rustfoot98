@@ -81,6 +81,30 @@ fn main() -> Result<(), String> {
                                 app.tick(20);
                             }
                         }
+                        "wait" => {
+                            // tick until a dialog opens (at most `ms`)
+                            for _ in 0..arg.parse::<u32>().unwrap_or(0) / 20 {
+                                if !app.dialogs.is_empty() {
+                                    break;
+                                }
+                                app.tick(20);
+                            }
+                            if let Some(d) = app.dialogs.last() {
+                                eprintln!("dialog {:?} ({})", d.kind, d.form);
+                            }
+                        }
+                        "idle" => {
+                            // tick until the main window is back with no dialog open (at most `ms`)
+                            for _ in 0..arg.parse::<u32>().unwrap_or(0) / 20 {
+                                if app.dialogs.is_empty()
+                                    && app.queue.is_empty()
+                                    && matches!(app.screen, elifoot_ui::classic::Screen::Main)
+                                {
+                                    break;
+                                }
+                                app.tick(20);
+                            }
+                        }
                         "key" => {
                             let k = match arg {
                                 "Enter" => Key::Enter,

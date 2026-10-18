@@ -197,6 +197,7 @@ fn main() -> Result<(), String> {
                         _ => EventKind::Goal,
                     },
                     player: p.to_string(),
+                    primary: false,
                 })
                 .collect();
         divisions[i / 4].push(Game {
@@ -213,17 +214,18 @@ fn main() -> Result<(), String> {
             ],
             events,
             human: false,
+            human_side: None,
+            src: i,
+            extra_time: false,
         });
     }
-    let view = RoundView {
-        title: "3ª Jornada - 2026".into(),
-        divisions,
-        minute,
-        acc_ms: 0,
-        halftime_seen: false,
-    };
+    let mut view = RoundView::blank("3ª Jornada - 2026".into(), false);
+    view.divisions = divisions;
+    view.minute = minute as i32;
+    // second half: the clock is red from minute 45
+    view.halftime_seen = minute > 45;
     let mut fb = Fb::new();
-    draw(&mut fb, &skin, &view);
+    draw(&mut fb, &skin, &view, true);
     std::fs::write(out, fb.bmp()).map_err(|e| e.to_string())?;
     Ok(())
 }

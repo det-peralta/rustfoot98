@@ -43,6 +43,8 @@ pub enum Kind {
     Auction,
     Invitation,
     RefereeAid,
+    /// "Chicotadas Psicológicas": the list of sacked coaches after a round.
+    Lashes,
     Plantel,
     Other(String),
 }
@@ -89,8 +91,8 @@ impl Dialog {
         }
     }
 
-    pub fn text(&mut self, k: &str, v: impl Into<String>) {
-        self.texts.insert(k.to_string(), v.into());
+    pub fn text(&mut self, k: impl AsRef<str>, v: impl Into<String>) {
+        self.texts.insert(k.as_ref().to_string(), v.into());
     }
 
     pub fn num(&self, k: &str) -> i64 {
@@ -237,10 +239,21 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
         .iter()
         .any(|h| h.name == d.focus && h.class == "TEdit");
     match key {
-        Key::Enter => match default_button(c, d) {
-            Some(b) => KeyAct::Press(b),
-            None => KeyAct::None,
-        },
+        Key::Enter => {
+            // a button that has the focus takes the key (Windows: the default button only when the focus is elsewhere)
+            let focused = d
+                .hits
+                .iter()
+                .find(|h| h.name == d.focus && matches!(h.class.as_str(), "TBitBtn" | "TButton"));
+            match focused {
+                Some(h) if h.enabled => KeyAct::Press(h.name.clone()),
+                Some(_) => KeyAct::Done,
+                None => match default_button(c, d) {
+                    Some(b) => KeyAct::Press(b),
+                    None => KeyAct::None,
+                },
+            }
+        }
         Key::Escape => match cancel_button(c, d) {
             Some(b) => KeyAct::Press(b),
             None => KeyAct::None,

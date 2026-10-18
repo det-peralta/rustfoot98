@@ -199,6 +199,13 @@ pub enum Decision {
     },
     /// The user closed the dialog of `minute` without substituting (the automatic substitution is skipped).
     NoSubstitution { side: Side, minute: u16 },
+    /// A substitution made in the break (`minute` 46, or 91 before extra time): like a planned one, but for this game only.
+    Planned {
+        side: Side,
+        minute: u16,
+        out: usize,
+        inn: usize,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -566,6 +573,19 @@ impl Match {
         for (side, minute, out, inn) in self.planned.clone() {
             if minute == self.minute {
                 self.planned_sub(side, out, inn);
+            }
+        }
+        for d in self.decisions.clone() {
+            if let Decision::Planned {
+                side,
+                minute,
+                out,
+                inn,
+            } = d
+            {
+                if minute == self.minute {
+                    self.planned_sub(side, out, inn);
+                }
             }
         }
         let happened = self.chances(rng) || self.red_card(rng) || self.injury(rng);

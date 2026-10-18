@@ -372,9 +372,17 @@ pub fn draw(c: &mut Classic) {
     // the hidden application window: a silver caption bar across the screen
     c.fb.fill(0, 0, 800, 18, SILVER);
     c.fb.fill(0, 18, 800, 1, BLACK);
-    if let Some(f) = c.skin.font("system", 13, true, false) {
+    if let Some(f) = c.skin.font("system", 13, false, false) {
         let w = f.width("Elifoot 98");
-        draw_text(&mut c.fb, f, (800 - w) / 2, 2, "Elifoot 98", BLACK, false);
+        draw_text(
+            &mut c.fb,
+            f,
+            (800 - w) / 2 + 1,
+            1,
+            "Elifoot 98",
+            BLACK,
+            false,
+        );
     }
     let Some(form) = c.forms.get("TPREPAREGAMEDLG") else {
         return;

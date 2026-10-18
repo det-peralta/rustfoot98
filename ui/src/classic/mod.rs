@@ -6,6 +6,7 @@ pub mod input;
 pub mod main_win;
 pub mod menu;
 pub mod round_view;
+pub mod session;
 pub mod text;
 
 use crate::win31::draw::Hit;
@@ -153,6 +154,8 @@ pub struct Classic {
     /// Dialogs to open one after the other when the current ones are closed (end of round messages, auctions...).
     pub queue: std::collections::VecDeque<dialog::Dialog>,
     pub requests: Vec<Request>,
+    /// The match day: options that act on it, the round being shown with what is needed to replay it, the dialogs still to come.
+    pub md: session::State,
     pub mouse: (i32, i32),
     pub hits: Vec<Hit>,
     /// Set whenever something changed that needs a new frame.
@@ -173,6 +176,7 @@ impl Classic {
             dialogs: Vec::new(),
             queue: Default::default(),
             requests: Vec::new(),
+            md: Default::default(),
             mouse: (0, 0),
             hits: Vec::new(),
             dirty: true,
@@ -196,7 +200,9 @@ impl Classic {
                     }
                 }
             }
-            Screen::Round(rv) => round_view::draw(&mut self.fb, &self.skin, rv),
+            Screen::Round(rv) => {
+                round_view::draw(&mut self.fb, &self.skin, rv, self.dialogs.is_empty())
+            }
         }
         let mut dialogs = std::mem::take(&mut self.dialogs);
         for d in dialogs.iter_mut() {
