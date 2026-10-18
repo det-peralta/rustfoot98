@@ -36,7 +36,7 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | Kind | form | file |
 |---|---|---|
 | About | TABOUTDLG | `dialogs/about.rs` |
-| SelectGame, CoachName, Progress | TSELECTGAMEDLG, TCOACHNAMEDLG, TPROGRESSDLG | `dialogs/newgame.rs` |
+| SelectGame, CoachName, Progress | TSELECTGAMEDLG, TGETTEAMSDLG (`CoachName`: the players' names and the draw of the club), TPROGRESSDLG | `dialogs/newgame.rs` |
 | Options, Stadium, Loan, Message | TOPTIONSDLG, TSTADIUMDLG, TLOANDLG, message boxes | `dialogs/misc.rs` |
 | Standings, Scorers, Calendar, Winners, AllTimeScorers | TCLASSIFICATIONDLG, list dialogs | `dialogs/tables.rs` |
 | Sell, Contract, Search, Observed, Transactions, Acquisitions, Auction, Plantel | main window pages, TCHECKPLAYERDLG, TOBSERVEDPLAYERSDLG, TSELLPLAYERDLG, TPLANTELDLG | `dialogs/market.rs` |
@@ -44,3 +44,15 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
 
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs.
+
+## Start, save and exit (`Classic::start`, `dialogs/newgame.rs`, `options.rs`)
+`Classic::start(skin, forms, data, teams, seed)` begins with no game: the desktop, the About box (OK leads on), `TSelectGameDlg`, a `TProgressDlg` while
+the world is built (`World::from_teams`, which already applies the start rule `pick_human`) or while the host answers `Request::Load(name)`, then for a
+new game `TGetTeamsDlg` ("Sortear equipas" shows the club the rule gave, OK enters the main window). Cancel in the choice quits.
+Host API: `cl_start`, `Classic::load_text(text)` (answer to `Request::Load`), `Classic::save_text()` (answer to `Request::Save`), `Classic.clock`
+(`dd/mm/yy hh:mm`, for the description of saves) and `Data::set_saves("NAME\tfirst line of the text\n...")`. The first line of a saved text is a header
+(`#elifoot-classic|coach=..|stamp=..|opts=..`) holding the coach and the options; texts without it load with defaults.
+The game saves after a round according to the option "Gravar o jogo" (`Options::saves_after`), on "Sair" (and then quits) but not on "Sair sem gravar".
+`Classic.opts` (`Options`) is read by the other dialogs: `show_lashes(human)`, `show_cup_draw(humans_in_cup)`, `view_computer_penalties`; the match speed and the
+half-time substitutions are already applied in `input.rs`. Options texts: combos use `<name>.items/.sel/.text/.open`, the notebook `TabbedNotebook1.tabs` and `.page`.
+`dialogs::paint_under` lets a dialog paint under its controls (the stadium's `TPaintBox`).

@@ -92,7 +92,13 @@ function put(kind, bytes) {
 function out() { return new Uint8Array(w.memory.buffer, w.cl_out_ptr(), w.cl_out_len()).slice(); }
 const text = (b) => new TextDecoder().decode(b);
 const savedNames = () => Object.keys(localStorage).filter((k) => k.startsWith(SAVE_PREFIX)).map((k) => k.slice(SAVE_PREFIX.length));
-const pushSaves = () => put(7, new TextEncoder().encode(savedNames().join("\n")));
+// one line per game: its name, a tab and the first line of its text (the header that describes it)
+const pushSaves = () => put(7, new TextEncoder().encode(savedNames().map((n) => {
+  let head = "";
+  try { head = (localStorage.getItem(SAVE_PREFIX + n) || "").split("\n", 1)[0]; } catch { /* storage blocked */ }
+  return n + "\t" + head;
+}).join("\n")));
+const pushClock = () => { const d = new Date(); w.cl_clock(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes()); };
 
 async function run(pack) {
   w = await wasmInstance();
@@ -103,6 +109,7 @@ async function run(pack) {
   const seed = (Date.now() & 0x7fffffff) || 1;
   if (!w.cl_start(seed)) { say("Erro ao iniciar: " + text(out())); return; }
   pushSaves();
+  pushClock();
   msg.style.display = "none";
   canvas.style.display = "block";
   fit();
@@ -144,17 +151,18 @@ function requests() {
     if (r === 1) { say("Jogo terminado. Recarrega a página para jogar outra vez."); w = null; return; }
     const name = text(out());
     if (r === 2) {
+      pushClock();
       w.cl_save();
       try { localStorage.setItem(SAVE_PREFIX + name, text(out())); } catch { /* storage full or blocked */ }
       pushSaves();
     } else if (r === 3) {
-      const t = localStorage.getItem(SAVE_PREFIX + name);
-      if (t) {
-        const b = new TextEncoder().encode(t);
-        const p = w.cl_alloc(b.length);
-        new Uint8Array(w.memory.buffer, p, b.length).set(b);
-        w.cl_load();
-      }
+      // an unreadable game comes back as an empty text: the interface tells the player
+      let t = null;
+      try { t = localStorage.getItem(SAVE_PREFIX + name); } catch { /* storage blocked */ }
+      const b = new TextEncoder().encode(t || "");
+      const p = w.cl_alloc(b.length);
+      new Uint8Array(w.memory.buffer, p, b.length).set(b);
+      w.cl_load();
     }
   }
 }

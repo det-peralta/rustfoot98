@@ -362,20 +362,24 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
 }
 
 /// Draws the desktop, the application's caption bar and the main window.
+/// The desktop with the hidden application window's silver caption bar across the screen: what shows behind every dialog.
+pub fn desktop(fb: &mut crate::win31::Fb, skin: &crate::win31::Skin) {
+    fb.fill(0, 0, 800, 600, DESKTOP);
+    fb.fill(0, 0, 800, 18, SILVER);
+    fb.fill(0, 18, 800, 1, BLACK);
+    if let Some(f) = skin.font("system", 13, false, false) {
+        let w = f.width("Elifoot 98");
+        draw_text(fb, f, (800 - w) / 2 + 1, 1, "Elifoot 98", BLACK, false);
+    }
+}
+
 pub fn draw(c: &mut Classic) {
     let Some(((_d, _i), club)) = human_club(c) else {
         return;
     };
     let page = c.main.page.unwrap_or(Page::Game);
     let v = view(c, &club, page);
-    c.fb.fill(0, 0, 800, 600, DESKTOP);
-    // the hidden application window: a silver caption bar across the screen
-    c.fb.fill(0, 0, 800, 18, SILVER);
-    c.fb.fill(0, 18, 800, 1, BLACK);
-    if let Some(f) = c.skin.font("system", 13, true, false) {
-        let w = f.width("Elifoot 98");
-        draw_text(&mut c.fb, f, (800 - w) / 2, 2, "Elifoot 98", BLACK, false);
-    }
+    desktop(&mut c.fb, &c.skin);
     let Some(form) = c.forms.get("TPREPAREGAMEDLG") else {
         return;
     };

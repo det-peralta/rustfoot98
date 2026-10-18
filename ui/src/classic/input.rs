@@ -30,10 +30,18 @@ impl Classic {
         let mut halftime = false;
         if let Screen::Round(rv) = &mut self.screen {
             let before = rv.minute;
+            // the "Tempo de jogo" option: a match minute lasts `minute_ms` instead of the replay's own pace
+            let ms =
+                (ms as u64 * round_view::MINUTE_MS as u64 / self.opts.minute_ms() as u64) as u32;
             if !rv.tick(ms) {
                 finished = true;
             }
-            if before < 45 && rv.minute >= 45 && rv.human_plays() && !rv.halftime_seen {
+            if before < 45
+                && rv.minute >= 45
+                && rv.human_plays()
+                && !rv.halftime_seen
+                && self.opts.half_time_subs
+            {
                 rv.halftime_seen = true;
                 rv.minute = 45;
                 halftime = true;
@@ -65,6 +73,9 @@ impl Classic {
     pub fn play_round(&mut self) {
         self.main.menu = None;
         self.world.play_round();
+        if self.opts.saves_after(self.world.round) {
+            self.save_now();
+        }
         self.start_round_view();
     }
 
@@ -314,7 +325,12 @@ impl Classic {
                     }
                 }
             }
-            "jogoSair" | "Sairsemgravar1" => self.requests.push(Request::Quit),
+            // "Sair" saves the game first, "Sair sem gravar" does not (`1018:3146`, `1018:3f07`)
+            "jogoSair" => {
+                self.save_now();
+                self.requests.push(Request::Quit);
+            }
+            "Sairsemgravar1" => self.requests.push(Request::Quit),
             "Vender1" => {
                 if self.main.selected.is_some() {
                     self.main.page = Some(Page::Sell);
