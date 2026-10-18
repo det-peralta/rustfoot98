@@ -170,6 +170,16 @@ impl Dialog {
                         | "TabSetTab"
                         | "TColorGrid"
                         | "TPaintBox"
+                        | "ComboItem"
+                        | "ScrollUp"
+                        | "ScrollDown"
+                        | "ScrollThumb"
+                        | "ScrollPage"
+                        | "NotebookTab"
+                        | "RadioItem"
+                        | "SpinUp"
+                        | "SpinDown"
+                        | "ColorCell"
                 )
         })
     }
@@ -226,12 +236,17 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
                     | "TListBox"
                     | "TComboBox"
                     | "TSpinEdit"
+                    | "TTabbedNotebook"
+                    | "TRadioGroup"
             )
     };
     let is_edit = d
         .hits
         .iter()
         .any(|h| h.name == d.focus && h.class == "TEdit");
+    if let Some(act) = super::widget_input::key(c, d, key) {
+        return act;
+    }
     match key {
         Key::Enter => match default_button(c, d) {
             Some(b) => KeyAct::Press(b),

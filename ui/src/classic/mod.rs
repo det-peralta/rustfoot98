@@ -7,6 +7,7 @@ pub mod main_win;
 pub mod menu;
 pub mod round_view;
 pub mod text;
+pub mod widget_input;
 
 use crate::win31::draw::Hit;
 use crate::win31::{Fb, Forms, Skin};

@@ -347,6 +347,16 @@ pub(super) fn vscroll(
     flat_button(fb, x0 + 1, y0 + h - 15, 15, 15);
     glyph(fb, x0 + 5, y0 + h - 15 + 4, &ARROW_DOWN, BLACK);
     fb.fill(x0, y0 + h - 16, 17, 1, BLACK);
+    // not a control: tells the program how many rows fit and how many there are (`w`, `h`)
+    cx.hits.borrow_mut().push(Hit {
+        name: format!("{name}#info"),
+        class: "ScrollInfo".into(),
+        x: 0,
+        y: 0,
+        w: fit as i32,
+        h: count as i32,
+        enabled: false,
+    });
     let range = count.saturating_sub(fit);
     let first = y0 + 15;
     let last = y0 + h - 16 - 16;
@@ -616,7 +626,12 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     // the closed combo box is a pixel shorter than the control's `Height`
     let h = n.int("Height", font.height() + 8) - 1;
     let enabled = is_enabled(cx, n);
-    sunken_box(fb, x, y, w, h, WHITE);
+    if n.flag("Ctl3D", true) {
+        sunken_box(fb, x, y, w, h, WHITE);
+    } else {
+        fb.fill(x, y, w, h, BLACK);
+        fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
+    }
     fb.fill(x + w - 17, y + 1, 1, h - 2, BLACK);
     flat_button(fb, x + w - 16, y + 1, 15, h - 2);
     glyph(
@@ -1250,5 +1265,128 @@ fn ellipse_part(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::win31::skin::Skin;
+    use std::cell::RefCell;
+    use std::collections::BTreeMap;
+
+    /// A skin with one tiny font, enough to build a drawing context.
+    fn skin() -> Skin {
+        let mut b = b"EFSK".to_vec();
+        b.extend_from_slice(&1u16.to_le_bytes());
+        b.push(1);
+        b.push(b'x');
+        b.extend_from_slice(&[10, 0, 0, 8, 2, 32, 1, 1, 10]);
+        for _ in 32..256 {
+            b.extend_from_slice(&[3, 0, 8, 0, 0]);
+        }
+        let mut g = b"EFGL".to_vec();
+        g.extend_from_slice(&0u16.to_le_bytes());
+        Skin::from_bytes(&b, &g).unwrap()
+    }
+
+    fn with_ctx<R>(f: impl FnOnce(&Ctx) -> R) -> R {
+        let skin = skin();
+        let (texts, lists) = (BTreeMap::new(), BTreeMap::new());
+        let hits = RefCell::new(Vec::new());
+        let cx = Ctx {
+            skin: &skin,
+            form: "T",
+            texts: &texts,
+            ox: 0,
+            oy: 0,
+            bg: SILVER,
+            focus: "",
+            lists: &lists,
+            hits: &hits,
+        };
+        f(&cx)
+    }
+
+    #[test]
+    fn a_checked_box_has_a_cross() {
+        let mut fb = Fb::new();
+        check_square(&mut fb, 10, 10, true, BLACK);
+        assert_eq!(fb.get(10, 10), 0x000000); // frame
+        assert_eq!(fb.get(11, 11), 0x000000); // cross starts in the corner of the inside
+        assert_eq!(fb.get(16, 16), 0x000000); // centre
+        assert_eq!(fb.get(12, 11), 0xc0c0c0);
+        check_square(&mut fb, 40, 10, false, BLACK);
+        assert_eq!(fb.get(46, 16), 0xc0c0c0);
+    }
+
+    #[test]
+    fn the_radio_dot_is_drawn_only_when_selected() {
+        let mut fb = Fb::new();
+        radio_ring(&mut fb, 0, 0, false, BLACK);
+        assert_eq!(fb.get(6, 6), 0);
+        radio_ring(&mut fb, 20, 0, true, BLACK);
+        assert_eq!(fb.get(26, 6), 0x000000);
+        assert_eq!(fb.get(26, 0), 0x000000); // ring top
+    }
+
+    #[test]
+    fn the_scroll_thumb_follows_the_position() {
+        // 497 rows high like the ranking list: thumb box top between 15 and h - 32 below the bar's first row
+        let tops = |top: usize| {
+            with_ctx(|cx| {
+                let mut fb = Fb::new();
+                vscroll(&mut fb, cx, "L", 100, 41, 497, top, 54, 31);
+                (0..497)
+                    .map(|r| 41 + r)
+                    .filter(|&y| fb.get(102, y) == 0 && fb.get(114, y) == 0)
+                    .collect::<Vec<_>>()
+            })
+        };
+        // black lines across: below the up button, thumb top and bottom, above the down button
+        assert_eq!(tops(0), vec![56, 72, 522]);
+        assert_eq!(tops(23), vec![56, 506, 522]);
+        assert_eq!(tops(10), vec![56, 250, 266, 522]);
+    }
+
+    #[test]
+    fn scroll_bars_tell_how_many_rows_fit() {
+        with_ctx(|cx| {
+            let mut fb = Fb::new();
+            vscroll(&mut fb, cx, "L", 0, 0, 100, 0, 40, 6);
+            let hits = cx.hits.borrow();
+            let info = hits.iter().find(|h| h.class == "ScrollInfo").unwrap();
+            assert_eq!((info.name.as_str(), info.w, info.h), ("L#info", 6, 40));
+            assert!(hits
+                .iter()
+                .any(|h| h.class == "ScrollUp" && h.name == "L#up"));
+            assert!(hits
+                .iter()
+                .any(|h| h.class == "ScrollPage" && h.name == "L#pgdn"));
+        });
+    }
+
+    #[test]
+    fn the_selected_tab_is_open_to_the_page() {
+        let mut fb = Fb::new();
+        fb.fill(0, 0, 400, 100, SILVER);
+        // page frame top at y = 30; tabs [2, 128] and [128, 254]; the first is selected
+        fb.fill(2, 30, 300, 1, BLACK);
+        tab_outline(&mut fb, 2, 128, 0, 30, true);
+        tab_outline(&mut fb, 128, 254, 0, 30, false);
+        assert_eq!(fb.get(60, 4), 0x000000); // top line
+        assert_eq!(fb.get(60, 30), 0xc0c0c0); // open under the selected tab
+        assert_eq!(fb.get(200, 30), 0x000000); // closed under the other
+        assert_eq!(fb.get(128, 20), 0x000000); // shared black edge
+        assert_eq!(fb.get(126, 20), 0x808080); // grey bevel of the selected tab
+    }
+
+    #[test]
+    fn the_focus_rectangle_inverts_what_is_below() {
+        let mut fb = Fb::new();
+        fb.fill(0, 0, 40, 40, NAVY);
+        focus_rect_not(&mut fb, 5, 5, 20, 10, 0, 0, true);
+        assert_eq!(fb.get(10, 5), 0xf8fc78);
+        assert_eq!(fb.get(5, 5), 0x000080); // corner untouched
     }
 }

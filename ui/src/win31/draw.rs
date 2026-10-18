@@ -517,26 +517,64 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     }
 }
 
+/// `TMemo`: the lines (`lists[name]`, else `texts[name]` split at newlines, else `Lines.Strings`) with the control's alignment. A bordered
+/// memo is a sunken box on its `Color` and shows a vertical scroll bar (`ScrollBars`) when the lines do not fit; `<name>.top` is the
+/// first visible line.
 fn memo(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
         return;
     };
-    let w = n.int("Width", 0);
-    for (i, line) in n.strings("Lines.Strings").iter().enumerate() {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let lines: Vec<String> = match (cx.lists.get(&n.name), cx.texts.get(&n.name)) {
+        (Some(v), _) => v.clone(),
+        (None, Some(t)) => t.split('\n').map(str::to_string).collect(),
+        _ => n.strings("Lines.Strings"),
+    };
+    let bordered = n.ident("BorderStyle") != Some("bsNone");
+    let (mut x0, mut y0, mut right, mut bottom) = (x, y, x + w, y + h);
+    if bordered {
+        sunken_box(fb, x, y, w, h, n.color("Color").unwrap_or(WHITE));
+        (x0, y0, right, bottom) = (x + 2, y + 1, x + w - 1, y + h - 1);
+    } else if let Some(c) = n.color("Color").filter(|_| !n.flag("ParentColor", false)) {
+        fb.fill(x, y, w, h, c);
+    }
+    let ih = font.height();
+    let fit = ((bottom - y0) / ih).max(1) as usize;
+    let vertical = matches!(n.ident("ScrollBars"), Some("ssVertical" | "ssBoth"));
+    let scrolled = bordered && vertical && lines.len() > fit;
+    if scrolled {
+        right -= 16;
+    }
+    let top = widgets::get_num(cx, n, "top").unwrap_or(0).max(0) as usize;
+    let top = top.min(lines.len().saturating_sub(fit));
+    let old = fb.clip;
+    fb.clip = (
+        x0.max(old.0),
+        y0.max(old.1),
+        right.min(old.2),
+        bottom.min(old.3),
+    );
+    for (r, line) in lines.iter().skip(top).enumerate() {
         let tw = font.width(line);
         let lx = match n.ident("Alignment") {
-            Some("taCenter") => x + (w - tw) / 2,
-            Some("taRightJustify") => x + w - tw,
-            _ => x,
+            Some("taCenter") => x0 + (right - x0 - tw) / 2,
+            Some("taRightJustify") => x0 + right - x0 - tw,
+            _ => x0,
         };
-        text(
+        text(fb, font, lx, y0 + r as i32 * ih, line, f.color, false);
+    }
+    fb.clip = old;
+    if scrolled {
+        widgets::vscroll(
             fb,
-            font,
-            lx,
-            y + i as i32 * font.height(),
-            line,
-            f.color,
-            false,
+            cx,
+            &n.name,
+            x + w - 17,
+            y + 1,
+            h - 2,
+            top,
+            lines.len(),
+            fit,
         );
     }
 }

@@ -45,23 +45,44 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs.
 
-## Widgets and their text keys (`win31/draw.rs`)
-All keys are in `Dialog::texts` (`<name>` is the control's name in the form). Anything not set keeps the form's design-time value.
+## Widgets and their text keys (`win31/widgets.rs`, `classic/widget_input.rs`)
+All keys are in `Dialog::texts` (`<name>` is the control's name in the form; list contents are in `Dialog::lists`). Anything not set keeps
+the form's design-time value. The renderer only draws what the texts say; `classic/widget_input.rs` implements the generic mouse and key
+behaviour (below) so that a dialog's `click` just reacts to the new state.
 
 | widget | keys |
 |---|---|
-| any control | `.visible=0\|1`, `.enabled=0\|1` (disabled look: dithered or embossed text, greyed glyphs), `.pos=x,y`, `.color=r,g,b` (font), `.bgcolor=r,g,b` |
-| `TCheckBox`, `TRadioButton`, `TSpeedButton` | `.checked=0\|1` (speed button: pressed down); caption `texts[name]` |
-| `TEdit` | text `texts[name]`; `.caret=N` (caret before character N, drawn when the control has the focus); `.selstart=N` and `.sellen=N` (highlighted range) |
-| `TComboBox` | edit text `<name>.text`; `<name>.items` (items separated by `\n`, or `lists[name]`); `<name>.sel` (highlighted row); `<name>.open=1` shows the drop-down list below the control; `<name>.top` first visible row of an open list |
-| `TListBox` | rows `lists[name]` (a row is `a\|b\|c` for several columns), `<name>.sel` (selected row), `<name>.top` (first visible row); a vertical scroll bar appears when the rows exceed the box; `<name>.cols=x1,x2,...` x offsets of the columns inside the box and `<name>.align=lrr...` per column (`l`, `r` or `c`); `<name>.rowcolors` and `<name>.colors` are not used: use `<name>.color` |
-| `TSpinEdit` | `<name>.value` |
-| `TRadioGroup` | `<name>.index` selected item (items are the form's `Items.Strings`) |
-| `TTabbedNotebook` | `<name>.page` (index of the visible `TTabPage`); the tab strip is drawn from the pages' captions |
-| `TColorGrid` | `<name>.index` selected colour |
-| `TPaintBox` | drawn by the dialog (`Dialog` supplies the content through `lists`/`texts`, see the stadium) |
-| `TGauge` | `.progress`; `TBiGauge`: `.value`, `.barcolor` |
+| any control | `.visible=0\|1`, `.enabled=0\|1` (disabled look: dithered text for check/radio buttons, embossed text for labels, buttons and speed buttons, grey text for edits, combos and lists), `.pos=x,y`, `.size=WxH` (run-time resize), `.color=r,g,b` (font colour) |
+| `TCheckBox`, `TRadioButton`, `TSpeedButton` | `.checked=0\|1` (speed button: pressed); caption `texts[name]`; the focus rectangle appears when the control is `focus` |
+| `TEdit` | text `texts[name]`; `.bgcolor=r,g,b`; `.caret=N` (caret before character N, drawn when focused); `.selstart=N` and `.sellen=N` (highlighted characters) |
+| `TComboBox` | shown text `<name>.text`, else the selected item; items `<name>.items` (separated by `\n`) or `lists[name]` or the form's `Items.Strings`; `<name>.sel` highlighted/selected row; `<name>.open=1` draws the drop-down (up to `DropDownCount` rows, scroll bar beyond); `<name>.top` first visible row; `<name>.cols` / `<name>.align` as for lists, a cell `@FORM/NAME` is a skin bitmap (flags) |
+| `TListBox`, `lbOwnerDrawFixed` lists | rows `lists[name]` (a row is `a\|b\|c`), `<name>.sel` selected row (navy, white text; dotted focus rectangle when focused), `<name>.top` first visible row, `<name>.caret` (row of the focus rectangle while nothing is selected, default 0), `<name>.itemheight`, `<name>.bold=1` (all rows bold); a vertical scroll bar appears when the rows do not fit. **Columns**: `<name>.cols=x1,x2,...` are x offsets of the cells from the list's left edge (cell text starts at `x + offset`) and `<name>.align=lrc...` the alignment of each cell (`l` text starts at the offset, `r` ends at it, `c` centred on it; an upper-case letter draws the cell bold); a cell `@FORM/NAME` draws that skin bitmap. **Row styles**: `lists["<name>.style"][i]` = `fg=r,g,b bg=r,g,b bold` (all optional) for row `i`. Without `cols` the whole row is drawn at `x + 3` |
+| `TMemo` | lines `lists[name]` or `texts[name]` (split at `\n`); `<name>.top`; a bordered memo is a sunken box with a scroll bar when `ScrollBars` asks for it |
+| `TSpinEdit` | `<name>.value` (approximate look: no capture of the original) |
+| `TRadioGroup` | `<name>.index` selected item (items: `lists[name]` or the form's `Items.Strings`) |
+| `TTabbedNotebook` | `<name>.page` (visible `TTabPage`), `<name>.tabcount=N` (only the first N pages get a tab: the options dialog hides its third, debugging page); the tab strip, page frame and the focus rectangle (when the notebook is `focus`) are drawn; page controls are drawn like the form's own |
+| `TColorGrid` | `<name>.index` (foreground colour, `F`), `<name>.bgindex` (`B`); approximate look |
+| `TPaintBox` | only the stadium's: `PaintBoxStadium.level=0..24` (stands; approximate, ~430 px off in the level-2 capture) |
+| `TGauge` / `TBiGauge` | `.progress` / `.value`, `.barcolor` |
 
-Hits recorded for the mouse (`Dialog::hits`, `Hit::class`): `TCheckBox`, `TRadioButton`, `TComboBox`, `TSpinEdit`, `TEdit`, `TListBox`;
-`ListRow` (rows named `Name#i`, `i` the index in the whole list), `ComboItem` (rows `Name#i` of an open drop-down), `ScrollUp`, `ScrollDown`,
-`ScrollThumb` (named `Name#up`, `Name#down`, `Name#thumb`) and `ScrollPage` (`Name#pgup`, `Name#pgdn`).
+Mouse hits recorded in `Dialog::hits` (`Hit::class`): `TCheckBox`, `TRadioButton`, `TComboBox`, `TSpinEdit`, `TEdit`, `TListBox`,
+`TSpeedButton`; `ListRow` (rows `Name#i`, `i` the index in the whole list), `ComboItem` (rows `Name#i` of an open drop-down), `ScrollUp`,
+`ScrollDown`, `ScrollThumb`, `ScrollPage` (`Name#up`, `Name#down`, `Name#thumb`, `Name#pgup`, `Name#pgdn`), `NotebookTab` (`Name#i`),
+`RadioItem` (`Group#i`), `SpinUp` / `SpinDown` (`Name#up`, `Name#down`), `ColorCell`. A `ScrollInfo` record (`Name#info`, `w` = rows that fit,
+`h` = rows) accompanies every scroll bar; it is not a control.
+
+**Generic behaviour** (`widget_input::mouse` / `key`, called by `input.rs` and `dialog::generic_key` before the dialog sees the event):
+a press on a check box toggles `.checked`; on a radio button sets `.checked=1` and clears its siblings; on a radio group item sets `.index`;
+on a combo box toggles `.open` (closing others); on a combo item sets `.sel` (and `.text` if the dialog keeps one) and closes the list; on a
+notebook tab sets `.page`; on a list row sets `.sel`; on scroll arrows / track changes `.top`; on a spin button changes `.value` within
+`MinValue`/`MaxValue`. The dialog's `click(name)` is then called with the control's name (`List#row` for list rows) except for a combo's
+own press and scroll bars. Keys: Space toggles a check box / selects a radio button, Up/Down move the selection of a list, combo
+(closed: changes it and calls `click`; open: moves the highlight, Enter accepts, Escape closes, F4 toggles the list), radio group and spin
+edit, Left/Right change the notebook page. Dragging the thumb and the mouse wheel are not handled.
+
+**Frame sizes.** The thick `bsDialog` frame surrounds a client area 4 pixels larger each way than the form's `ClientWidth/Height`
+(measured on the options, profile, stadium, progress, calendar and scorer dialogs), so `dialog::draw` uses `draw::form_client`
+(`ClientWidth + 4`, `ClientHeight + 4`; the new-game dialog is the one exception). A dialog the program resizes passes `@client=WxH`
+in those units (e.g. the scorers list: `@client=378x286`). `form_frame` draws the system menu box (the dash box at the left of the
+caption) unless the form's `BorderIcons` leave it out (the list dialogs of the game have it, the options and profile dialogs do not).
+
