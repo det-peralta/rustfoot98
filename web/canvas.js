@@ -5,6 +5,8 @@ const bytes = await (await fetch("elifoot_ui.wasm")).arrayBuffer();
 const { instance } = await WebAssembly.instantiate(bytes, {});
 const w = instance.exports;
 w.ui_new(1998);
+const THEME = "elifoot98-rea.classic";
+try { w.ui_set_classic(localStorage.getItem(THEME) === "1" ? 1 : 0); } catch {}
 
 const dec = new TextDecoder();
 function frame() {
@@ -61,7 +63,7 @@ const pos = (e) => {
 };
 canvas.addEventListener("pointermove", (e) => { const [x, y] = pos(e); w.ui_event(0, x, y); frame(); });
 canvas.addEventListener("pointerdown", (e) => { const [x, y] = pos(e); w.ui_event(1, x, y); frame(); });
-canvas.addEventListener("pointerup", (e) => { const [x, y] = pos(e); w.ui_event(2, x, y); frame(); serve(); frame(); });
+canvas.addEventListener("pointerup", (e) => { const [x, y] = pos(e); w.ui_event(2, x, y); frame(); serve(); try { localStorage.setItem(THEME, String(w.ui_classic())); } catch {} frame(); });
 canvas.addEventListener("wheel", (e) => { e.preventDefault(); w.ui_event(3, Math.sign(-e.deltaY), 0); frame(); }, { passive: false });
 const KEYS = { " ": 0, s: 1, S: 1, Tab: 2, 1: 3, 2: 4, 3: 5, 4: 6, ArrowUp: 7, ArrowDown: 8, Backspace: 9, Enter: 10, Escape: 11 };
 canvas.addEventListener("keydown", (e) => {

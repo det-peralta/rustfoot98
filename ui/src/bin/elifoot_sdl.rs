@@ -97,6 +97,7 @@ fn main() -> Result<(), String> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1998);
+    elifoot_ui::set_classic(std::env::var("ELIFOOT_THEME").is_ok_and(|t| t == "classic"));
     let mut app = App::new(seed);
     scan_slots(&mut app);
     if let Some(p) = std::env::var_os("ELIFOOT_LOAD") {

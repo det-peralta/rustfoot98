@@ -224,3 +224,14 @@ pub extern "C" fn ui_set_slot(n: u32, len: usize) {
         }
     });
 }
+
+/// Chooses the look (1 classic, 0 modern); `ui_classic()` reads it back so the page can remember it.
+#[no_mangle]
+pub extern "C" fn ui_set_classic(on: i32) {
+    elifoot_ui::set_classic(on != 0);
+}
+
+#[no_mangle]
+pub extern "C" fn ui_classic() -> i32 {
+    APP.with(|app| app.borrow().as_ref().is_some_and(App::classic) as i32)
+}

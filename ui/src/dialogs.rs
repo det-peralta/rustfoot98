@@ -80,19 +80,19 @@ pub fn tactics(app: &mut App, c: &mut dyn Canvas) {
         let y = left.y + 34 + n as i32 * 26;
         let row = Rect::new(left.x + 4, y - 2, left.w - 8, 24);
         let fill = if app.selected == Some(k) {
-            theme::ACCENT
+            theme::accent()
         } else if role(&plan, k) == 1 {
-            theme::BUTTON
+            theme::sel()
         } else if app.hot(row) {
-            theme::BUTTON_HOT
+            theme::button_hot()
         } else {
-            theme::PANEL
+            theme::panel()
         };
         c.fill(row, fill);
         let ink = if app.selected == Some(k) {
-            theme::BG
+            theme::bg()
         } else {
-            theme::TEXT
+            theme::text()
         };
         let label = match role(&plan, k) {
             1 => "Titular",
@@ -106,11 +106,17 @@ pub fn tactics(app: &mut App, c: &mut dyn Canvas) {
         } else {
             String::new()
         };
-        c.text(left.x + 12, y, POS[s.position as usize], theme::MUTED, 13);
+        c.text(left.x + 12, y, POS[s.position as usize], theme::muted(), 13);
         c.text(left.x + 50, y, &club.names[k], ink, 13);
-        c.text(left.x + 250, y, &s.strength.to_string(), theme::ACCENT, 13);
+        c.text(
+            left.x + 250,
+            y,
+            &s.strength.to_string(),
+            theme::accent(),
+            13,
+        );
         c.text(left.x + 290, y, label, ink, 13);
-        c.text(left.x + 350, y, &state, theme::BAD, 12);
+        c.text(left.x + 350, y, &state, theme::bad(), 12);
         if app.hot(row) && app.released_now() {
             match app.selected {
                 None => app.selected = Some(k),
@@ -144,7 +150,10 @@ pub fn tactics(app: &mut App, c: &mut dyn Canvas) {
         let label = format!("{}-{}-{}", f.0, f.1, f.2);
         let active = human.formation == n;
         if active {
-            c.fill(Rect::new(r.x - 2, r.y - 2, r.w + 4, r.h + 4), theme::ACCENT);
+            c.fill(
+                Rect::new(r.x - 2, r.y - 2, r.w + 4, r.h + 4),
+                theme::accent(),
+            );
         }
         if app.button(c, r, &label) {
             if app.world.set_formation(n) {
@@ -162,12 +171,12 @@ pub fn tactics(app: &mut App, c: &mut dyn Canvas) {
     for n in 0..plan.subs.len() {
         let y = subs.y + 34 + n as i32 * 62;
         let s = plan.subs[n];
-        c.text(subs.x + 10, y, "Minuto", theme::MUTED, 12);
+        c.text(subs.x + 10, y, "Minuto", theme::muted(), 12);
         if app.button(c, Rect::new(subs.x + 64, y - 4, 26, 24), "-") {
             plan.subs[n].minute = s.minute.saturating_sub(5).max(1);
             changed = true;
         }
-        c.text(subs.x + 98, y, &s.minute.to_string(), theme::TEXT, 13);
+        c.text(subs.x + 98, y, &s.minute.to_string(), theme::text(), 13);
         if app.button(c, Rect::new(subs.x + 124, y - 4, 26, 24), "+") {
             plan.subs[n].minute = (s.minute + 5).min(90);
             changed = true;
@@ -224,7 +233,7 @@ pub fn tactics(app: &mut App, c: &mut dyn Canvas) {
         subs.x + 200,
         subs.y + subs.h - 34,
         &format!("{}GR {}-{}-{}", counts[0], counts[1], counts[2], counts[3]),
-        theme::MUTED,
+        theme::muted(),
         13,
     );
     if changed {
@@ -254,7 +263,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             board.x + 10,
             y,
             &format!("{} ({})", l.player, l.seller),
-            theme::TEXT,
+            theme::text(),
             13,
         );
         let best = l
@@ -266,7 +275,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             board.x + 10,
             y + 16,
             &format!("pedido {} · {}", money(l.ask), best),
-            theme::MUTED,
+            theme::muted(),
             11,
         );
         let amount = l
@@ -290,7 +299,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             board.x + 10,
             board.y + 34,
             "Nenhum leilão aberto. Joga uma jornada.",
-            theme::MUTED,
+            theme::muted(),
             13,
         );
     }
@@ -316,15 +325,15 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             sell.x + 10,
             y + 4,
             POS[s.position as usize],
-            theme::MUTED,
+            theme::muted(),
             12,
         );
-        c.text(sell.x + 42, y + 4, &club.names[k], theme::TEXT, 13);
+        c.text(sell.x + 42, y + 4, &club.names[k], theme::text(), 13);
         c.text(
             sell.x + 220,
             y + 4,
             &s.strength.to_string(),
-            theme::ACCENT,
+            theme::accent(),
             13,
         );
         let value = player_value(s.strength, club.fin.f, app.world.economy, app.world.scale);
@@ -358,7 +367,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             Some(p) => Some(p + 1),
         };
     }
-    c.text(find.x + 10, find.y + 70, "Força mínima", theme::MUTED, 13);
+    c.text(find.x + 10, find.y + 70, "Força mínima", theme::muted(), 13);
     if app.button(c, Rect::new(find.x + 120, find.y + 64, 28, 26), "-") {
         app.query.min_strength = app.query.min_strength.saturating_sub(1);
     }
@@ -366,7 +375,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
         find.x + 156,
         find.y + 70,
         &app.query.min_strength.to_string(),
-        theme::TEXT,
+        theme::text(),
         13,
     );
     if app.button(c, Rect::new(find.x + 188, find.y + 64, 28, 26), "+") {
@@ -389,7 +398,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
         find.x + 140,
         find.y + 104,
         &format!("{} compras a chegar", app.world.pending.len()),
-        theme::MUTED,
+        theme::muted(),
         12,
     );
     let rows = 9usize;
@@ -401,14 +410,14 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             find.x + 10,
             y,
             &format!("{} · {} {}", o.player, POS[o.position as usize], o.strength),
-            theme::TEXT,
+            theme::text(),
             13,
         );
         c.text(
             find.x + 10,
             y + 16,
             &format!("{} · {}", o.club, String::from_utf8_lossy(&o.nationality)),
-            theme::MUTED,
+            theme::muted(),
             11,
         );
         if app.button(
@@ -433,7 +442,7 @@ pub fn market(app: &mut App, c: &mut dyn Canvas) {
             find.x + 10,
             find.y + 146,
             "Define os critérios e carrega em Procurar.",
-            theme::MUTED,
+            theme::muted(),
             13,
         );
     }
@@ -458,11 +467,23 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
     ) {
         app.request = Some(Request::Import);
     }
+    let look = if app.classic() {
+        "clássico"
+    } else {
+        "moderno"
+    };
+    if app.button(
+        c,
+        Rect::new(r.x + 254, r.y + 70, 120, 30),
+        &format!("Visual: {look}"),
+    ) {
+        crate::set_classic(!app.classic());
+    }
     c.text(
         r.x + 14,
         r.y + 112,
         &format!("Índice de inflação: {:.4}", app.world.economy),
-        theme::MUTED,
+        theme::muted(),
         13,
     );
 
@@ -472,15 +493,15 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
         slots.x + 4,
         slots.y + 4,
         "Jogos gravados",
-        theme::ACCENT,
+        theme::accent(),
         14,
     );
     for n in 0..crate::SLOTS {
         let y = slots.y + 36 + n as i32 * 54;
-        c.text(slots.x + 4, y, &format!("{}.", n + 1), theme::MUTED, 13);
+        c.text(slots.x + 4, y, &format!("{}.", n + 1), theme::muted(), 13);
         match &app.slots[n] {
-            Some(label) => c.text(slots.x + 24, y, label, theme::TEXT, 13),
-            None => c.text(slots.x + 24, y, "(vazio)", theme::MUTED, 13),
+            Some(label) => c.text(slots.x + 24, y, label, theme::text(), 13),
+            None => c.text(slots.x + 24, y, "(vazio)", theme::muted(), 13),
         }
         let filled = app.slots[n].is_some();
         if app.button(c, Rect::new(slots.x + 24, y + 18, 120, 26), "Gravar") {
@@ -513,27 +534,27 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
         .enumerate()
     {
         let x = r.x + 14 + col as i32 * 186;
-        c.text(x, r.y + 140, title, theme::ACCENT, 14);
+        c.text(x, r.y + 140, title, theme::accent(), 14);
         for (n, (name, v)) in list.iter().take(6).enumerate() {
             let short: String = name.chars().take(13).collect();
-            c.text(x, r.y + 166 + n as i32 * 20, &short, theme::TEXT, 12);
+            c.text(x, r.y + 166 + n as i32 * 20, &short, theme::text(), 12);
             c.text(
                 x + 100,
                 r.y + 166 + n as i32 * 20,
                 &money(*v),
-                theme::MUTED,
+                theme::muted(),
                 12,
             );
         }
         if list.is_empty() {
-            c.text(x, r.y + 166, "Nenhuma.", theme::MUTED, 13);
+            c.text(x, r.y + 166, "Nenhuma.", theme::muted(), 13);
         }
     }
     c.text(
         r.x + 14,
         r.y + 306,
         "Treinadores (última jornada)",
-        theme::ACCENT,
+        theme::accent(),
         14,
     );
     let mut y = r.y + 332;
@@ -542,7 +563,7 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
             r.x + 14,
             y,
             &format!("O teu treinador passou de {from} para {to}."),
-            theme::GOOD,
+            theme::good(),
             12,
         );
         y += 20;
@@ -552,11 +573,17 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
             .chars()
             .take(52)
             .collect();
-        c.text(r.x + 14, y, &line, theme::TEXT, 12);
+        c.text(r.x + 14, y, &line, theme::text(), 12);
         y += 20;
     }
     if app.world.coach_changes.is_empty() && app.world.human_moved.is_none() {
-        c.text(r.x + 14, y, "Sem mudanças de treinador.", theme::MUTED, 13);
+        c.text(
+            r.x + 14,
+            y,
+            "Sem mudanças de treinador.",
+            theme::muted(),
+            13,
+        );
     }
     footer(app, c);
 }

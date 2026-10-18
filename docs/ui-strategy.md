@@ -69,6 +69,18 @@ The existing DOM page stays as the accessible, most complete front end until the
 4. Sound/animation hooks (match ticker) behind a `Host` trait so back ends can opt in.
 5. **Decided: the DOM page is kept** as the accessible front end (a screen reader cannot read a canvas) and as the most complete one for now. It got the same 8 save slots, stored under the same localStorage keys and format as the canvas UI, so a game saved in one opens in the other. New features go to `core/` + the shared UI first; the DOM page follows when a feature matters for accessibility.
 
+## Look and feel: the original's, without its assets
+The original is a Windows 3.1 program: green desktop (`clGreen`), silver bevelled buttons, navy title bars and selections, yellow captions, 640x480
+dialogs. The shared UI has two looks (`Opções` -> "Visual", `ELIFOOT_THEME=classic` for SDL, remembered by the canvas page):
+* **moderno**: the dark theme;
+* **clássico**: the same screens in the original's palette and widget style (`ui/src/lib.rs`: `theme`, `bevel`), drawn by our code.
+Not reproduced, on purpose: the original bitmaps (button glyphs, logos), its bitmap fonts and its exact pixel layouts: they are copyrighted and live in
+the owner's copy of the game, not in this repository. A later option is a skin loader that reads the bitmaps from the user's own install at run time
+(the NE resources can be extracted locally with a tool, like the forms), never committed.
+Balance sheet (`Finanças`, right panel) and referee aid (`Liga`, bottom right: the fixture bonuses of the user's next game as gauges) were ported;
+the salary-demand dialog is not (wages are renegotiated by the computer, as the original's coach options allow), nor is the interactive invitation dialog
+(`Opções` has the on/off switch), nor the per-player history.
+
 ## Saving, loading and importing
 The screens never touch files: `Opções` lists **8 save slots** (label, Gravar / Carregar / Apagar) and a "Importar .e98 original" button. A click sets
 `App::request` (`Save(n)`, `Load(n)`, `Delete(n)`, `Import`); the host serves it (`App::take_request`), then calls `App::save_text` / `load_text` /

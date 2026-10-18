@@ -15,18 +15,79 @@ use std::collections::HashMap;
 pub const WIDTH: i32 = 800;
 pub const HEIGHT: i32 = 600;
 
+/// The two looks. `Modern` is the dark default; `Classic` imitates the original's Windows 3.1 look (green desktop, silver
+/// bevelled buttons, navy selections, yellow captions) with our own drawing: no bitmaps or fonts of the game are used.
 pub mod theme {
     use super::Rgb;
-    pub const BG: Rgb = Rgb(18, 22, 30);
-    pub const PANEL: Rgb = Rgb(28, 34, 46);
-    pub const LINE: Rgb = Rgb(52, 62, 80);
-    pub const TEXT: Rgb = Rgb(226, 232, 240);
-    pub const MUTED: Rgb = Rgb(138, 150, 168);
-    pub const ACCENT: Rgb = Rgb(56, 189, 248);
-    pub const GOOD: Rgb = Rgb(74, 222, 128);
-    pub const BAD: Rgb = Rgb(248, 113, 113);
-    pub const BUTTON: Rgb = Rgb(40, 52, 72);
-    pub const BUTTON_HOT: Rgb = Rgb(58, 76, 106);
+    use std::cell::Cell;
+
+    thread_local! {
+        static CLASSIC: Cell<bool> = const { Cell::new(false) };
+    }
+
+    pub fn set_classic(on: bool) {
+        CLASSIC.with(|c| c.set(on));
+    }
+
+    pub fn classic() -> bool {
+        CLASSIC.with(Cell::get)
+    }
+
+    fn pick(modern: Rgb, classic_: Rgb) -> Rgb {
+        if classic() {
+            classic_
+        } else {
+            modern
+        }
+    }
+
+    pub fn bg() -> Rgb {
+        pick(Rgb(18, 22, 30), Rgb(0, 128, 0))
+    }
+    pub fn panel() -> Rgb {
+        pick(Rgb(28, 34, 46), Rgb(0, 128, 0))
+    }
+    pub fn line() -> Rgb {
+        pick(Rgb(52, 62, 80), Rgb(192, 192, 192))
+    }
+    pub fn text() -> Rgb {
+        pick(Rgb(226, 232, 240), Rgb(255, 255, 255))
+    }
+    pub fn muted() -> Rgb {
+        pick(Rgb(138, 150, 168), Rgb(200, 224, 200))
+    }
+    pub fn accent() -> Rgb {
+        pick(Rgb(56, 189, 248), Rgb(255, 255, 0))
+    }
+    pub fn good() -> Rgb {
+        pick(Rgb(74, 222, 128), Rgb(170, 255, 170))
+    }
+    pub fn bad() -> Rgb {
+        pick(Rgb(248, 113, 113), Rgb(255, 150, 150))
+    }
+    pub fn button() -> Rgb {
+        pick(Rgb(40, 52, 72), Rgb(192, 192, 192))
+    }
+    pub fn button_hot() -> Rgb {
+        pick(Rgb(58, 76, 106), Rgb(214, 214, 214))
+    }
+    /// Label colour on a button face.
+    pub fn button_text() -> Rgb {
+        pick(Rgb(226, 232, 240), Rgb(0, 0, 0))
+    }
+    /// Highlighted rows (starters, the user's club).
+    pub fn sel() -> Rgb {
+        pick(Rgb(40, 52, 72), Rgb(0, 0, 128))
+    }
+    pub fn header_bg() -> Rgb {
+        pick(Rgb(28, 34, 46), Rgb(192, 192, 192))
+    }
+    pub fn header_text() -> Rgb {
+        pick(Rgb(138, 150, 168), Rgb(0, 0, 0))
+    }
+    pub fn title() -> Rgb {
+        pick(Rgb(56, 189, 248), Rgb(0, 0, 128))
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -194,6 +255,10 @@ impl App {
     }
 
     /// The pending host request, if any (the host calls this after every batch of events).
+    pub fn classic(&self) -> bool {
+        theme::classic()
+    }
+
     pub fn take_request(&mut self) -> Option<Request> {
         self.request.take()
     }
@@ -282,7 +347,7 @@ impl App {
 
     /// Draws one frame. Call after feeding the events of the frame.
     pub fn draw(&mut self, c: &mut dyn Canvas) {
-        c.fill(Rect::new(0, 0, WIDTH, HEIGHT), theme::BG);
+        c.fill(Rect::new(0, 0, WIDTH, HEIGHT), theme::bg());
         self.header(c);
         match self.screen {
             Screen::League => screens::league(self, c),
@@ -301,13 +366,36 @@ impl App {
     }
 
     fn header(&mut self, c: &mut dyn Canvas) {
-        c.fill(Rect::new(0, 0, WIDTH, 44), theme::PANEL);
-        c.text(12, 10, "Elifoot 98", theme::ACCENT, 20);
+        c.fill(Rect::new(0, 0, WIDTH, 44), theme::header_bg());
+        if theme::classic() {
+            c.fill(Rect::new(0, 44, WIDTH, 2), Rgb(0, 0, 0));
+        }
+        c.text(
+            12,
+            10,
+            "Elifoot 98",
+            if theme::classic() {
+                theme::header_text()
+            } else {
+                theme::title()
+            },
+            20,
+        );
         let status = format!(
             "Época {} · J{}/14 · Eco {:.2}",
             self.world.year, self.world.round, self.world.economy
         );
-        c.text(140, 14, &status, theme::MUTED, 13);
+        c.text(
+            140,
+            14,
+            &status,
+            if theme::classic() {
+                theme::header_text()
+            } else {
+                theme::muted()
+            },
+            13,
+        );
         let mut x = 338;
         for (s, label) in SCREENS {
             let r = Rect::new(x, 8, 64, 28);
@@ -333,23 +421,38 @@ impl App {
     /// Draws a button and returns true when it was clicked this frame.
     pub fn button(&mut self, c: &mut dyn Canvas, r: Rect, label: &str) -> bool {
         let hot = self.hot(r);
-        c.fill(
-            r,
-            if hot && self.down {
-                theme::ACCENT
-            } else if hot {
-                theme::BUTTON_HOT
-            } else {
-                theme::BUTTON
-            },
-        );
-        c.outline(r, theme::LINE);
+        let pressed = hot && self.down;
+        if theme::classic() {
+            bevel(
+                c,
+                r,
+                pressed,
+                if hot {
+                    theme::button_hot()
+                } else {
+                    theme::button()
+                },
+            );
+        } else {
+            c.fill(
+                r,
+                if pressed {
+                    theme::accent()
+                } else if hot {
+                    theme::button_hot()
+                } else {
+                    theme::button()
+                },
+            );
+            c.outline(r, theme::line());
+        }
         let w = c.text_width(label, 14);
+        let nudge = (theme::classic() && pressed) as i32;
         c.text(
-            r.x + (r.w - w) / 2,
-            r.y + (r.h - 14) / 2 - 1,
+            r.x + (r.w - w) / 2 + nudge,
+            r.y + (r.h - 14) / 2 - 1 + nudge,
             label,
-            theme::TEXT,
+            theme::button_text(),
             14,
         );
         hot && self.released
@@ -368,39 +471,95 @@ impl App {
             self.focus = Some(id);
             self.field_hit = true;
         }
-        c.fill(r, theme::BG);
-        c.outline(r, if focused { theme::ACCENT } else { theme::LINE });
+        c.fill(r, theme::bg());
+        c.outline(
+            r,
+            if focused {
+                theme::accent()
+            } else {
+                theme::line()
+            },
+        );
         let text = self.fields.get(id).cloned().unwrap_or_default();
         if text.is_empty() && !focused {
-            c.text(r.x + 6, r.y + (r.h - 13) / 2 - 1, hint, theme::MUTED, 13);
+            c.text(r.x + 6, r.y + (r.h - 13) / 2 - 1, hint, theme::muted(), 13);
         } else {
             let shown = if focused {
                 format!("{text}|")
             } else {
                 text.clone()
             };
-            c.text(r.x + 6, r.y + (r.h - 13) / 2 - 1, &shown, theme::TEXT, 13);
+            c.text(r.x + 6, r.y + (r.h - 13) / 2 - 1, &shown, theme::text(), 13);
         }
         text
     }
 
     fn tab(&mut self, c: &mut dyn Canvas, r: Rect, label: &str, selected: bool) -> bool {
         let hot = self.hot(r);
-        c.fill(
-            r,
+        if theme::classic() {
             if selected {
-                theme::ACCENT
-            } else if hot {
-                theme::BUTTON_HOT
+                bevel(c, r, true, theme::sel());
             } else {
-                theme::BUTTON
-            },
-        );
+                bevel(
+                    c,
+                    r,
+                    false,
+                    if hot {
+                        theme::button_hot()
+                    } else {
+                        theme::button()
+                    },
+                );
+            }
+        } else {
+            c.fill(
+                r,
+                if selected {
+                    theme::accent()
+                } else if hot {
+                    theme::button_hot()
+                } else {
+                    theme::button()
+                },
+            );
+        }
         let w = c.text_width(label, 12);
-        let col = if selected { theme::BG } else { theme::TEXT };
-        c.text(r.x + (r.w - w) / 2, r.y + 7, label, col, 12);
+        let col = match (selected, theme::classic()) {
+            (true, true) => Rgb(255, 255, 255),
+            (true, false) => theme::bg(),
+            (false, _) => theme::button_text(),
+        };
+        c.text(
+            r.x + (r.w - w) / 2,
+            r.y + (r.h - 12) / 2 - 1,
+            label,
+            col,
+            12,
+        );
         hot && self.released
     }
+}
+
+/// A Windows 3.1 style button face: black frame, white top-left edge, grey shade bottom-right (inverted when pressed).
+fn bevel(c: &mut dyn Canvas, r: Rect, pressed: bool, face: Rgb) {
+    c.fill(r, Rgb(0, 0, 0));
+    let inner = Rect::new(r.x + 1, r.y + 1, r.w - 2, r.h - 2);
+    let (light, shade) = if pressed {
+        (Rgb(128, 128, 128), Rgb(255, 255, 255))
+    } else {
+        (Rgb(255, 255, 255), Rgb(128, 128, 128))
+    };
+    c.fill(inner, shade);
+    c.fill(Rect::new(inner.x, inner.y, inner.w - 1, inner.h - 1), light);
+    c.fill(
+        Rect::new(inner.x + 2, inner.y + 2, inner.w - 4, inner.h - 4),
+        face,
+    );
+}
+
+/// Chooses the look; the choice is process-wide.
+pub fn set_classic(on: bool) {
+    theme::set_classic(on);
 }
 
 #[cfg(feature = "sdl")]
@@ -589,6 +748,32 @@ mod tests {
         click(&mut app, Rect::new(26, 124, 230, 30));
         assert_eq!(app.take_request(), Some(Request::Import));
         assert!(app.import_e98(&[0; 10], 1).is_err());
+    }
+
+    #[test]
+    fn the_balance_and_the_referee_aid_are_shown() {
+        let mut app = App::new(8);
+        let dl = frame(&mut app);
+        assert!(dl.texts().contains(&"Ajuda do árbitro"));
+        app.screen = Screen::Finance;
+        let dl = frame(&mut app);
+        assert!(dl.texts().contains(&"Balanço da época"));
+        assert!(dl.texts().contains(&"Resultado"));
+    }
+
+    #[test]
+    fn the_classic_look_is_a_green_desktop() {
+        let mut app = App::new(9);
+        app.screen = Screen::Options;
+        let first_fill = |dl: &DrawList| match dl.cmds[0] {
+            canvas::Cmd::Fill(_, c) => c,
+            _ => panic!("the frame starts with the background"),
+        };
+        assert_ne!(first_fill(&frame(&mut app)), Rgb(0, 128, 0));
+        click(&mut app, Rect::new(266, 124, 120, 30)); // Visual
+        assert!(app.classic());
+        assert_eq!(first_fill(&frame(&mut app)), Rgb(0, 128, 0));
+        set_classic(false);
     }
 
     #[test]
