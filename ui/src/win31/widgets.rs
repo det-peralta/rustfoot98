@@ -73,14 +73,25 @@ pub(super) fn focus_rect_not(
     }
 }
 
-/// The focus rectangle of a notebook tab: lit dots black, the others get their blue channel inverted.
-pub(super) fn focus_rect_tab(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, wx: i32, wy: i32) {
+/// The focus rectangle of a notebook tab: lit dots black, the others are XORed with the tab text colour.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn focus_rect_tab(
+    fb: &mut Fb,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    wx: i32,
+    wy: i32,
+    ink: Rgb,
+) {
     let dot = |fb: &mut Fb, px: i32, py: i32| {
         if (px - wx + py - wy).rem_euclid(2) == 1 {
             fb.set(px, py, BLACK);
         } else {
             let c = under(fb, px, py);
-            fb.set(px, py, Rgb(c.0, c.1, c.2 ^ 0xf8));
+            let k = ink.q();
+            fb.set(px, py, Rgb(c.0 ^ k.0, c.1 ^ k.1, c.2 ^ k.2));
         }
     };
     for i in 1..w - 1 {
@@ -176,7 +187,7 @@ pub(super) fn checkbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     };
     let cap = caption(cx, n).replace('&', "");
     let ty = y + (h - font.ascent) / 2;
-    let tw = button_text(fb, font, x + 19, ty, &cap, f, enabled);
+    let tw = button_text(fb, font, x + 18, ty, &cap, f, enabled);
     if cx.focus == n.name {
         focus_rect(fb, x + 16, y + 1, tw + 6, h - 1, x, y);
     }
@@ -545,15 +556,15 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         if enabled { BLACK } else { GRAY },
     );
     let ty = y + 1 + (h - 2 - font.height()) / 2;
-    let focused = cx.focus == n.name && enabled;
+    let focused = cx.focus == n.name && enabled && !flag(cx, n, "open");
     let list_style = n.ident("Style") != Some("csDropDown");
     let old = fb.clip;
     fb.clip = (x + 1, y + 1, x + w - 17, y + h - 1);
     if focused && list_style {
         let hw = w - 19 - 2;
-        fb.fill(x + 2, y + 2, hw + 1, h - 5, NAVY);
+        fb.fill(x + 2, y + 2, hw + 1, h - 4, NAVY);
         text(fb, font, x + 3, ty, &shown, WHITE, false);
-        focus_rect_not(fb, x + 2, y + 2, hw + 1, h - 5, x, y, true);
+        focus_rect_not(fb, x + 2, y + 2, hw + 1, h - 4, x, y, true);
     } else if enabled {
         text(fb, font, x + 3, ty, &shown, f.color, false);
     } else {
@@ -565,7 +576,29 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         fb.fill(x + 3 + cw, ty, 1, font.height(), BLACK);
     }
     if flag(cx, n, "open") && !items.is_empty() {
-        combo_dropdown(fb, cx, n, f, x, y, w, h, &items, sel);
+        // drawn after every other control so that it covers them
+        OVERLAYS.with(|o| o.borrow_mut().push((n.name.clone(), x, y, w, h, f.clone())));
+    }
+}
+
+thread_local! {
+    /// Open combo boxes of the frame being drawn: name, position, size and font.
+    static OVERLAYS: std::cell::RefCell<Vec<(String, i32, i32, i32, i32, FontSpec)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Draws what has to be on top of all controls: the open drop-down lists.
+pub(super) fn draw_overlays(fb: &mut Fb, cx: &Ctx, root: &Node) {
+    let list = OVERLAYS.with(|o| std::mem::take(&mut *o.borrow_mut()));
+    for (name, x, y, w, h, f) in list {
+        let Some(n) = root.find(&name) else {
+            continue;
+        };
+        let items = combo_items(cx, n);
+        let sel = get_num(cx, n, "sel")
+            .filter(|&v| v >= 0)
+            .map(|v| v as usize);
+        combo_dropdown(fb, cx, n, &f, x, y, w, h, &items, sel);
     }
 }
 
@@ -807,12 +840,13 @@ pub(super) fn tabbed_notebook(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: 
         let th = cx.font(&bold_font).map_or(13, |t| t.height());
         focus_rect_tab(
             fb,
-            l + (tw - tab_text_w) / 2 - 1,
+            l + (tw - tab_text_w + 1) / 2 - 2,
             y + TAB_TEXT_Y,
             tab_text_w + 4,
             th + 2,
             x,
             y,
+            tab_font.color,
         );
     }
     let sub = Ctx {
@@ -838,7 +872,7 @@ fn tab_label(fb: &mut Fb, cx: &Ctx, f: &FontSpec, page: &Node, l: i32, tw: i32, 
     text(
         fb,
         font,
-        l + (tw - w) / 2 + 1,
+        l + (tw - w + 1) / 2,
         y + TAB_TEXT_Y,
         &cap,
         f.color,

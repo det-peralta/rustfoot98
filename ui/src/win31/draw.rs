@@ -306,6 +306,7 @@ pub fn controls(fb: &mut Fb, cx: &Ctx, root: &Node) {
     for n in &root.children {
         control(fb, cx, n, &base);
     }
+    widgets::draw_overlays(fb, cx, root);
 }
 
 pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
@@ -588,10 +589,10 @@ fn groupbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 pub(super) fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: Rgb) {
     fb.fill(x, y, w, h, BLACK);
     fb.fill(x + 1, y + 1, w - 2, h - 2, interior);
-    fb.fill(x - 1, y - 1, w, 1, GRAY);
-    fb.fill(x - 1, y - 1, 1, h, GRAY);
-    fb.fill(x - 1, y + h, w + 1, 1, WHITE);
-    fb.fill(x + w, y - 1, 1, h + 1, WHITE);
+    fb.fill(x - 1, y - 1, w + 1, 1, GRAY);
+    fb.fill(x - 1, y - 1, 1, h + 1, GRAY);
+    fb.fill(x, y + h, w + 1, 1, WHITE);
+    fb.fill(x + w, y, 1, h + 1, WHITE);
 }
 
 fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
@@ -1146,8 +1147,6 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let default = (enabled && cx.focus == n.name)
         || ((n.flag("Default", false) || n.ident("Kind") == Some("bkOK"))
             && !FOCUS_ON_BUTTON.with(|c| c.get()));
-    // content of the thin-framed button sits one pixel up and to the right of the default button's
-    let (ix, iy) = if default { (0, 2) } else { (1, 1) };
     button_face(fb, x, y, w, h, default);
     let kind = n.ident("Kind").unwrap_or("bkCustom");
     let std = match kind {
@@ -1203,12 +1202,14 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let ty = if spaced {
             y + 2 + glyph_margin(cx, n, h, gh, f) + gh + n.int("Spacing", 4)
         } else {
-            y + h
-                - 2
-                - n.int("Margin", 4)
-                - font.tm_height
-                - if font.height() == font.tm_height {
-                    2 - iy
+            y + h - 2 - n.int("Margin", 4) - font.tm_height
+                + if font.height() != font.tm_height {
+                    0
+                } else if font.face == "ms sans serif" {
+                    1
+                } else if !default && !font.bold {
+                    // a thin-framed button raises the caption of a regular raster font by a pixel
+                    -1
                 } else {
                     0
                 }
@@ -1217,7 +1218,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let (tx, ty) = if n.class == "TButton" {
             (x + (w - tw) / 2 - 1, y + (h - font.height()) / 2 + 1)
         } else {
-            (x + ix + (w - tw) / 2, ty)
+            (x + (w - tw + 1) / 2, ty)
         };
         if enabled {
             text(fb, font, tx, ty, &label, f.color, false);
@@ -1228,7 +1229,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         if cx.focus == n.name {
             focus_rect(
                 fb,
-                x + ix + (w - tw) / 2 - 1,
+                x + (w - tw + 1) / 2 - 1,
                 ty - 1,
                 tw + 2,
                 font.height() + 2,
