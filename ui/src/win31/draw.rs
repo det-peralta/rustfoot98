@@ -176,6 +176,39 @@ pub fn dialog_frame(
     (x + 1, y + 20)
 }
 
+/// A `bsSingle` form with a menu bar: the caption bar, then an 18-pixel white bar with the top-level items in the bold System font.
+/// Returns the origin of the client area.
+pub fn dialog_frame_menu(
+    fb: &mut Fb,
+    skin: &Skin,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+    items: &[String],
+) -> (i32, i32) {
+    let (ow, oh) = (cw + 2, ch + 40);
+    let (x, y) = ((super::fb::W - ow) / 2, (super::fb::H - oh) / 2);
+    fb.fill(x, y, ow, oh, BLACK);
+    fb.fill(x + 1, y + 1, cw, 18, NAVY);
+    fb.fill(x + 1, y + 20, cw, 18, WHITE);
+    fb.fill(x + 1, y + 39, cw, ch, bg);
+    if let Some(f) = skin.font("system", 13, false, false) {
+        let w = f.width(caption);
+        text(fb, f, x + 1 + (cw - w) / 2, y + 2, caption, WHITE, false);
+    }
+    if let Some(f) = skin.font("system", 13, false, false) {
+        let mut pen = x + 1 + 8;
+        for it in items {
+            let label = it.replace('&', "");
+            let w = f.width(&label);
+            text(fb, f, pen, y + 20, &label, BLACK, false);
+            pen += w + 16;
+        }
+    }
+    (x + 1, y + 39)
+}
+
 /// A form with `bsDialog` (thick frame): black outline, 4 navy pixels, a caption bar with a white line on three sides and a black rule
 /// below it. The client area starts 5 pixels in and 24 down; the frame hides 4 pixels of the declared client size on each axis.
 pub fn dialog_frame_thick(
@@ -234,7 +267,13 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
     if !n.flag("Visible", true) {
         return;
     }
-    let f = parent.inherit(n);
+    let mut f = parent.inherit(n);
+    if let Some(c) = cx.texts.get(&format!("{}.color", n.name)) {
+        let v: Vec<u8> = c.split(',').filter_map(|p| p.parse().ok()).collect();
+        if v.len() == 3 {
+            f.color = Rgb(v[0], v[1], v[2]);
+        }
+    }
     let (x, y) = (cx.ox + n.int("Left", 0), cx.oy + n.int("Top", 0));
     match n.class.as_str() {
         "TLabel" => label(fb, cx, n, &f, x, y),
@@ -246,6 +285,8 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TEdit" => edit(fb, cx, n, &f, x, y),
         "TListBox" => listbox(fb, cx, n, &f, x, y),
         "TRadioButton" => radio(fb, cx, n, &f, x, y),
+        "TGauge" => gauge(fb, cx, n, &f, x, y),
+        "TImage" => image(fb, cx, n, x, y),
         _ => {}
     }
 }
@@ -283,7 +324,7 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let lines = if n.flag("WordWrap", false) {
         wrap(font, s, w)
     } else {
-        vec![s.to_string()]
+        s.split('\n').map(str::to_string).collect()
     };
     for (i, line) in lines.iter().enumerate() {
         let tw = font.width(line);
@@ -458,12 +499,88 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     }
 }
 
+/// The owner-drawn squad list of the main screen: rows `pos|name|strength|wage|mark`, 16 pixels high, grouped by position with a black
+/// rule and 4 extra pixels above the first row of every group but the first.
+fn roster(
+    fb: &mut Fb,
+    cx: &Ctx,
+    n: &Node,
+    font: &Font,
+    color: Rgb,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    rows: &[String],
+) {
+    let old = fb.clip;
+    fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
+    let mut top = y + 1;
+    let mut last = String::new();
+    let focus: Option<usize> = cx
+        .texts
+        .get(&format!("{}.focus", n.name))
+        .and_then(|s| s.parse().ok());
+    for (i, row) in rows.iter().enumerate() {
+        let c: Vec<&str> = row.split('|').collect();
+        let pos = c.first().copied().unwrap_or("");
+        let first_of_group = i > 0 && pos != last;
+        if first_of_group {
+            fb.fill(x + 1, top, w - 2, 1, BLACK);
+            top += 4;
+        }
+        last = pos.to_string();
+        let ty = top;
+        text(fb, font, x + 23, ty, pos, color, false);
+        text(
+            fb,
+            font,
+            x + 38,
+            ty,
+            c.get(1).copied().unwrap_or(""),
+            color,
+            false,
+        );
+        text(
+            fb,
+            font,
+            x + 172,
+            ty,
+            c.get(2).copied().unwrap_or(""),
+            color,
+            false,
+        );
+        let wage = c.get(3).copied().unwrap_or("");
+        text(fb, font, x + 318 - font.width(wage), ty, wage, color, false);
+        text(
+            fb,
+            font,
+            x + 330,
+            ty,
+            c.get(4).copied().unwrap_or(""),
+            color,
+            false,
+        );
+        if focus == Some(i) {
+            focus_rect(fb, x + 1, ty, w - 2, 16, x + 1, y + 1);
+        }
+        top = ty + 16;
+    }
+    fb.clip = old;
+}
+
 fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
     sunken_box(fb, x, y, w, h);
     let Some(font) = cx.font(f) else {
         return;
     };
+    if n.ident("Style") == Some("lbOwnerDrawVariable") {
+        if let Some(rows) = cx.lists.get(&n.name) {
+            roster(fb, cx, n, font, f.color, x, y, w, h, rows);
+        }
+        return;
+    }
     let items: Vec<String> = match cx.lists.get(&n.name) {
         Some(v) => v.clone(),
         None => n.strings("Items.Strings"),
@@ -507,7 +624,7 @@ fn radio(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     }
     if let Some(font) = cx.font(f) {
         let cap = caption(cx, n).replace('&', "");
-        let ty = y + ((h - font.height()) / 2).max(0);
+        let ty = y + (h - font.ascent) / 2;
         if enabled {
             text(fb, font, x + 18, ty, &cap, ink, false);
         } else {
@@ -517,6 +634,60 @@ fn radio(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 }
 
 const DITHER_PARITY: i32 = 0;
+
+/// `TImage`: a bitmap of the skin, named by `<name>.image=FORM/NAME` (e.g. `FLAGS/BRA`) in the texts.
+fn image(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
+    let Some(spec) = cx.texts.get(&format!("{}.image", n.name)) else {
+        return;
+    };
+    let Some((form, name)) = spec.split_once('/') else {
+        return;
+    };
+    if let Some(b) = cx.skin.bitmap(form, name) {
+        for r in 0..b.h {
+            for c in 0..b.w {
+                let p = b.px[(r * b.w + c) as usize];
+                fb.set(x + c, y + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
+            }
+        }
+    }
+}
+
+/// `TGauge` (Delphi's sample component): a black bar that fills from the left with `Progress` percent, white behind it, a black frame
+/// on the right, and the percentage written over both with inverted colours. `<name>.progress` in the texts sets the value.
+fn gauge(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let p: i32 = cx
+        .texts
+        .get(&format!("{}.progress", n.name))
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(n.int("Progress", 0));
+    let bw = w - 10;
+    let filled = bw * p.clamp(0, 100) / 100;
+    fb.fill(x, y, w, h, SILVER);
+    fb.fill(x + 5, y, bw, h, WHITE);
+    fb.fill(x + 5, y, filled, h, BLACK);
+    fb.fill(x + 5 + bw - 1, y, 1, h, BLACK);
+    fb.fill(x + 5, y, bw, 1, BLACK);
+    fb.fill(x + 5, y + h - 1, bw, 1, BLACK);
+    if let Some(font) = cx.font(f) {
+        let s = format!("{p}%");
+        let tw = font.width(&s);
+        let (tx, ty) = (x + 5 + (bw - tw) / 2 - 1, y + (h - font.height()) / 2);
+        // inverted colours: draw the glyphs, then flip them
+        let mut mask = Fb::new();
+        text(&mut mask, font, tx, ty, &s, WHITE, false);
+        for yy in ty..ty + font.height() {
+            for xx in tx..tx + tw + 2 {
+                if mask.get(xx, yy) != 0 {
+                    let under = fb.get(xx, yy);
+                    let inv = Rgb(!(under >> 16) as u8, !(under >> 8) as u8, !under as u8);
+                    fb.set(xx, yy, inv);
+                }
+            }
+        }
+    }
+}
 
 /// `TBanner`: the scrolling text; `texts["Banner1.pos"]`-style state: `<name>.scroll` is how many pixels the text has moved left.
 fn banner(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
@@ -604,7 +775,15 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if let Some(font) = cx.font(f) {
         let label: String = cap.replace('&', "");
         let tw = font.width(&label);
-        let ty = y + h - 2 - n.int("Margin", 4) - font.tm_height - if font.height() == font.tm_height { 2 - iy } else { 0 };
+        let ty = y + h
+            - 2
+            - n.int("Margin", 4)
+            - font.tm_height
+            - if font.height() == font.tm_height {
+                2 - iy
+            } else {
+                0
+            };
         let _ = gh;
         let tx = x + ix + (w - tw) / 2;
         if enabled {
@@ -620,24 +799,28 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
                 ty - 1,
                 tw + 2,
                 font.height() + 2,
+                x,
+                y,
             );
         }
     }
 }
 
-/// `DrawFocusRect`: a dotted rectangle (every other pixel, `(x + y)` even), corners left out.
-pub fn focus_rect(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32) {
-    for i in 0..w {
-        for yy in [y, y + h - 1] {
-            if (x + i + yy) % 2 == 0 && i != 0 && i != w - 1 {
-                fb.set(x + i, yy, BLACK);
+/// `DrawFocusRect`: a dotted rectangle; the dots follow a checkerboard anchored at the origin `(wx, wy)` of the window it is drawn in
+/// (lit where the offsets from that origin add up to an odd number); the corners stay dark.
+pub fn focus_rect(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, wx: i32, wy: i32) {
+    let lit = |px: i32, py: i32| (px - wx + py - wy).rem_euclid(2) == 1;
+    for i in 1..w - 1 {
+        for j in [0, h - 1] {
+            if lit(x + i, y + j) {
+                fb.set(x + i, y + j, BLACK);
             }
         }
     }
     for j in 1..h - 1 {
-        for xx in [x, x + w - 1] {
-            if (xx + y + j) % 2 == 0 {
-                fb.set(xx, y + j, BLACK);
+        for i in [0, w - 1] {
+            if lit(x + i, y + j) {
+                fb.set(x + i, y + j, BLACK);
             }
         }
     }
@@ -667,11 +850,11 @@ mod tests {
     fn the_focus_rectangle_is_dotted_without_corners() {
         let mut fb = Fb::new();
         fb.fill(0, 0, 50, 50, SILVER);
-        focus_rect(&mut fb, 10, 10, 16, 13);
+        focus_rect(&mut fb, 10, 10, 16, 13, 10, 10);
         assert_eq!(fb.get(10, 10), 0xc0c0c0);
-        assert_eq!(fb.get(11, 10), 0xc0c0c0); // (x + y) odd: off
-        assert_eq!(fb.get(12, 10), 0x000000); // even: on
-        assert_eq!(fb.get(10, 12), 0x000000);
+        assert_eq!(fb.get(11, 10), 0x000000); // offsets add up to an odd number: lit
+        assert_eq!(fb.get(12, 10), 0xc0c0c0);
+        assert_eq!(fb.get(10, 11), 0x000000);
     }
 
     #[test]

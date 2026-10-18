@@ -92,6 +92,29 @@ def fill(polys, x0, y0, w, h, eps=EPS):
     return rows
 
 
+def vdmx_entry(path, px):
+    """(yMax, yMin) of the font's VDMX table for `px` pixels per em, the ascent and descent GDI uses for hinted fonts (None if absent)."""
+    import struct
+    d = open(path, 'rb').read()
+    n = struct.unpack('>H', d[4:6])[0]
+    tab = {}
+    for i in range(n):
+        tag, cs, off, ln = struct.unpack('>4sIII', d[12 + 16 * i:28 + 16 * i])
+        tab[tag] = off
+    if b'VDMX' not in tab:
+        return None
+    o = tab[b'VDMX']
+    nrat = struct.unpack('>H', d[o + 4:o + 6])[0]
+    off = struct.unpack('>H', d[o + 6 + 4 * nrat + 2 * (nrat - 1):o + 8 + 4 * nrat + 2 * (nrat - 1)])[0]  # the default (last) group
+    g = o + off
+    rec = struct.unpack('>H', d[g:g + 2])[0]
+    for k in range(rec):
+        y, mx, mn = struct.unpack('>Hhh', d[g + 4 + 6 * k:g + 10 + 6 * k])
+        if y == px:
+            return mx, mn
+    return None
+
+
 class Face:
     def __init__(self, path, px):
         self.f = freetype.Face(path)
@@ -101,6 +124,9 @@ class Face:
         # GDI's tmAscent of these fonts is one more than FreeType's hinted ascender (measured against the original)
         self.ascent = (m.ascender >> 6) + 1
         self.descent = -(m.descender >> 6)
+        v = vdmx_entry(path, px)
+        if v:
+            self.ascent, self.descent = v[0], -v[1]
         self.tm_height = (m.ascender >> 6) - (m.descender >> 6)  # GDI's tmHeight: the hinted height (the line pitch of labels is one more)
         self.height = m.height >> 6
 

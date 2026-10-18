@@ -164,6 +164,12 @@ def pack_glyphs():
                 ncol = struct.unpack_from('<I', dib, 32)[0] or (1 << bpp)
                 hdr = b'BM' + struct.pack('<IHHI', 14 + len(dib), 0, 0, 14 + hs + 4 * ncol)
                 items.append(('*', nm, hdr + dib))
+    # country flags of the game (FLAGS\\*.BMP, 39x29 with their own frame)
+    flags = os.path.join(ROOT, 'original', 'elifoot98', 'FLAGS')
+    if os.path.isdir(flags):
+        for f in sorted(os.listdir(flags)):
+            if f.upper().endswith('.BMP'):
+                items.append(('FLAGS', f[:-4].upper(), open(os.path.join(flags, f), 'rb').read()))
     out += struct.pack('<H', len(items))
     for form, name, bmp in items:
         a, b = form.encode(), name.encode()
