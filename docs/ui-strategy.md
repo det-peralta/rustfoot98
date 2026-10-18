@@ -70,11 +70,14 @@ The existing DOM page stays as the accessible, most complete front end until the
 5. Decide whether the DOM page is retired or kept as the accessible front end (screen readers cannot read a canvas).
 
 ## Saving, loading and importing
-The screens never touch files: `Opções` sets `App::request` (`Save`, `Load`, `Import`) and the host serves it (`App::take_request`), then calls
-`App::save_text` / `load_text` / `import_e98`.
-* SDL2: save slot `$ELIFOOT_SAVES/elifoot.sav` (default `~/.local/share/elifoot98-rea/`); drop a `.e98` or a `.sav` on the window to open it;
-  `ELIFOOT_LOAD=file` opens one at start-up (also in headless shots).
-* Web canvas: localStorage key `elifoot98-rea.save`; "Importar .e98" opens a file picker (`.e98` is parsed by `core/src/e98.rs`, anything else is read as our save text).
+The screens never touch files: `Opções` lists **8 save slots** (label, Gravar / Carregar / Apagar) and a "Importar .e98 original" button. A click sets
+`App::request` (`Save(n)`, `Load(n)`, `Delete(n)`, `Import`); the host serves it (`App::take_request`), then calls `App::save_text` / `load_text` /
+`import_e98` and reports what a slot holds with `App::set_slot(n, label)` (`App::slot_label` gives "Época 2026 · J2/14 · club").
+* SDL2: `$ELIFOOT_SAVES` (default `~/.local/share/elifoot98-rea/`) holds `slotN.sav` + `slotN.label`; slots are scanned at start-up; drop a `.e98`
+  or a `.sav` on the window to open it; `ELIFOOT_LOAD=file` opens one at start-up (also in headless shots).
+* Web canvas: localStorage `elifoot98-rea.slot.N` = `{label, text}`; "Importar .e98" opens a file picker (`.e98` is parsed by `core/src/e98.rs`,
+  anything else is read as our save text). ABI: `ui_take_request` (`1+n` save, `11+n` load, `21+n` delete, 30 import), `ui_alloc`/`io_ptr`/`io_len`,
+  `ui_save`, `ui_slot_label`, `ui_set_slot`, `ui_load`, `ui_import_e98`, `ui_notice`.
 
 ## Commands
 ```bash

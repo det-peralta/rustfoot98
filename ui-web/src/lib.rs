@@ -117,15 +117,16 @@ pub extern "C" fn text_width(len: usize, size: i32) -> i32 {
     DrawList::default().text_width(&"x".repeat(len), size)
 }
 
-/// Host request taken after an event: 0 none, 1 save, 2 load, 3 import an `.e98` file.
+/// Host request taken after an event: 0 none, `1 + n` save slot `n`, `11 + n` load it, `21 + n` delete it, 30 import an `.e98` file.
 #[no_mangle]
 pub extern "C" fn ui_take_request() -> i32 {
     APP.with(
         |app| match app.borrow_mut().as_mut().and_then(App::take_request) {
             None => 0,
-            Some(elifoot_ui::Request::Save) => 1,
-            Some(elifoot_ui::Request::Load) => 2,
-            Some(elifoot_ui::Request::Import) => 3,
+            Some(elifoot_ui::Request::Save(n)) => 1 + n as i32,
+            Some(elifoot_ui::Request::Load(n)) => 11 + n as i32,
+            Some(elifoot_ui::Request::Delete(n)) => 21 + n as i32,
+            Some(elifoot_ui::Request::Import) => 30,
         },
     )
 }
@@ -196,6 +197,30 @@ pub extern "C" fn ui_notice(code: i32) {
                 _ => "O navegador não permitiu gravar.",
             }
             .into();
+        }
+    });
+}
+
+/// The one-line label of the current game (read it from `io_ptr()` / `io_len()` after calling this).
+#[no_mangle]
+pub extern "C" fn ui_slot_label() {
+    let l = APP.with(|app| {
+        app.borrow()
+            .as_ref()
+            .map(App::slot_label)
+            .unwrap_or_default()
+    });
+    IO.with(|b| *b.borrow_mut() = l.into_bytes());
+}
+
+/// Tells the screens what slot `n` holds: the label is read from the I/O buffer (`len` bytes); `len == 0` marks it empty.
+#[no_mangle]
+pub extern "C" fn ui_set_slot(n: u32, len: usize) {
+    let label =
+        IO.with(|b| String::from_utf8_lossy(&b.borrow()[..len.min(b.borrow().len())]).to_string());
+    APP.with(|app| {
+        if let Some(a) = app.borrow_mut().as_mut() {
+            a.set_slot(n as usize, (len > 0).then_some(label));
         }
     });
 }

@@ -156,10 +156,12 @@ try {
   const box = await q.locator('#c').boundingBox();
   const tap = async (x, y) => { await q.mouse.click(box.x + x * box.width / 800, box.y + y * box.height / 600); await q.waitForTimeout(150); };
   await tap(766, 22); // Opções tab
-  await tap(100, 140); // Gravar jogo
-  const saved = await q.evaluate(() => localStorage.getItem('elifoot98-rea.save'));
-  check('canvas UI saves the game in localStorage', !!saved && saved.length > 1000, String(saved && saved.length));
-  await tap(260, 140); // Carregar jogo
+  await tap(476, 125); // slot 1: Gravar
+  const saved = await q.evaluate(() => localStorage.getItem('elifoot98-rea.slot.0'));
+  check('canvas UI saves the game in slot 1', !!saved && saved.length > 1000 && saved.includes('label'), String(saved && saved.length));
+  await tap(606, 125); // slot 1: Carregar
+  await tap(716, 125); // slot 1: Apagar
+  check('canvas UI erases the slot', (await q.evaluate(() => localStorage.getItem('elifoot98-rea.slot.0'))) === null);
   check('canvas UI loads it back without errors', qerr.length === 0, qerr.join(' | '));
   await q.screenshot({ path: 'analysis/shots/web_canvas.png' });
   check('canvas UI has no page errors', qerr.length === 0, qerr.join(' | '));

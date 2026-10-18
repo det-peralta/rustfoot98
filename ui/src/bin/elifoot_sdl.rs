@@ -1,7 +1,7 @@
 //! Desktop front end: `cargo run -p elifoot-ui --features sdl --release`.
 //! Headless screenshot (CI, docs): `SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=out.bmp [ELIFOOT_KEYS=space,space,tab] elifoot-sdl`.
 use elifoot_ui::sdl::{find_font, map_event, Backend};
-use elifoot_ui::{App, Event, Key, Request, HEIGHT, WIDTH};
+use elifoot_ui::{App, Event, Key, Request, HEIGHT, SLOTS, WIDTH};
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::surface::Surface;
 use std::path::PathBuf;
@@ -19,15 +19,28 @@ fn key_by_name(n: &str) -> Option<Key> {
     })
 }
 
-/// The save slot: `$ELIFOOT_SAVES` or `~/.local/share/elifoot98-rea` (created on demand), file `elifoot.sav`.
-fn save_path() -> PathBuf {
-    let dir = std::env::var_os("ELIFOOT_SAVES")
+/// Save directory: `$ELIFOOT_SAVES` or `~/.local/share/elifoot98-rea`. Slot `n` is `slotN.sav` plus a one-line `slotN.label`.
+fn save_dir() -> PathBuf {
+    std::env::var_os("ELIFOOT_SAVES")
         .map(PathBuf::from)
         .or_else(|| {
             std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share/elifoot98-rea"))
         })
-        .unwrap_or_else(|| PathBuf::from("."));
-    dir.join("elifoot.sav")
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn slot_path(n: usize) -> PathBuf {
+    save_dir().join(format!("slot{}.sav", n + 1))
+}
+
+fn scan_slots(app: &mut App) {
+    for n in 0..SLOTS {
+        let label = std::fs::read_to_string(slot_path(n).with_extension("label"))
+            .ok()
+            .filter(|_| slot_path(n).exists())
+            .map(|l| l.trim().to_string());
+        app.set_slot(n, label);
+    }
 }
 
 /// Opens a file the user dropped on the window (or passed in `ELIFOOT_LOAD`): an original `.e98` save or one of ours.
@@ -48,17 +61,28 @@ fn open_file(app: &mut App, path: &std::path::Path, seed: u32) {
 
 fn serve(app: &mut App, seed: u32) {
     match app.take_request() {
-        Some(Request::Save) => {
-            let path = save_path();
-            if let Some(dir) = path.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            app.message = match std::fs::write(&path, app.save_text()) {
-                Ok(()) => format!("Jogo gravado em {}.", path.display()),
+        Some(Request::Save(n)) => {
+            let path = slot_path(n);
+            let _ = std::fs::create_dir_all(save_dir());
+            let label = app.slot_label();
+            let written = std::fs::write(&path, app.save_text())
+                .and_then(|()| std::fs::write(path.with_extension("label"), &label));
+            app.message = match written {
+                Ok(()) => {
+                    app.set_slot(n, Some(label));
+                    format!("Jogo gravado na ranhura {}.", n + 1)
+                }
                 Err(e) => format!("Não foi possível gravar: {e}"),
             };
         }
-        Some(Request::Load) => open_file(app, &save_path(), seed),
+        Some(Request::Load(n)) => open_file(app, &slot_path(n), seed),
+        Some(Request::Delete(n)) => {
+            let path = slot_path(n);
+            let _ = std::fs::remove_file(path.with_extension("label"));
+            let _ = std::fs::remove_file(&path);
+            app.set_slot(n, None);
+            app.message = format!("Ranhura {} apagada.", n + 1);
+        }
         Some(Request::Import) => {
             app.message = "Arrasta um ficheiro .e98 para a janela para o importar.".into();
         }
@@ -74,6 +98,7 @@ fn main() -> Result<(), String> {
         .and_then(|s| s.parse().ok())
         .unwrap_or(1998);
     let mut app = App::new(seed);
+    scan_slots(&mut app);
     if let Some(p) = std::env::var_os("ELIFOOT_LOAD") {
         open_file(&mut app, std::path::Path::new(&p), seed);
     }

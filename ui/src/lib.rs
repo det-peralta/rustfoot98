@@ -79,13 +79,18 @@ pub const SCREENS: [(Screen, &str); 7] = [
 /// What the screens ask the host (the window, the page) to do: only it can touch files or browser storage.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Request {
-    /// Write `App::save_text()` to the save slot, then report in `App::message`.
-    Save,
-    /// Read the save slot and call `App::load_text`.
-    Load,
+    /// Write `App::save_text()` to slot `n`, then call `App::set_slot(n, Some(label))` and report in `App::message`.
+    Save(usize),
+    /// Read slot `n` and call `App::load_text`.
+    Load(usize),
+    /// Erase slot `n`, then `App::set_slot(n, None)`.
+    Delete(usize),
     /// Ask for an original `.e98` file and call `App::import_e98`.
     Import,
 }
+
+/// Number of save slots offered by the options screen.
+pub const SLOTS: usize = 8;
 
 pub struct App {
     pub world: World,
@@ -105,6 +110,8 @@ pub struct App {
     pub offers: Vec<Offer>,
     /// A pending request for the host; see [`App::take_request`].
     pub request: Option<Request>,
+    /// What each save slot holds (a one-line label), as reported by the host.
+    pub slots: [Option<String>; SLOTS],
     field_hit: bool,
     mouse: (i32, i32),
     down: bool,
@@ -128,6 +135,7 @@ impl App {
             query: Search::default(),
             offers: Vec::new(),
             request: None,
+            slots: Default::default(),
             field_hit: false,
             mouse: (0, 0),
             down: false,
@@ -188,6 +196,22 @@ impl App {
     /// The pending host request, if any (the host calls this after every batch of events).
     pub fn take_request(&mut self) -> Option<Request> {
         self.request.take()
+    }
+
+    /// One line describing the game, stored next to a save: season, round and the user's club.
+    pub fn slot_label(&self) -> String {
+        let club = self.world.human.as_ref().map_or("-", |h| h.club.as_str());
+        format!(
+            "Época {} · J{}/14 · {}",
+            self.world.year, self.world.round, club
+        )
+    }
+
+    /// The host reports what slot `n` holds now.
+    pub fn set_slot(&mut self, n: usize, label: Option<String>) {
+        if let Some(s) = self.slots.get_mut(n) {
+            *s = label;
+        }
     }
 
     /// The game as text, for the host to store.
@@ -530,16 +554,27 @@ mod tests {
     }
 
     #[test]
-    fn save_and_load_round_trip_through_the_host_requests() {
+    fn save_slots_round_trip_through_the_host_requests() {
         let mut app = App::new(21);
         app.screen = Screen::Options;
         app.play_round();
-        click(&mut app, Rect::new(26, 124, 150, 30)); // Gravar
-        assert_eq!(app.take_request(), Some(Request::Save));
+        // slot rows start at y 112 and are 54 apart; buttons Gravar (x 416), Carregar (x 546), Apagar (x 676)
+        let row = |n: i32, b: i32| {
+            Rect::new(
+                [416, 546, 676][b as usize],
+                112 + 54 * n,
+                if b == 2 { 80 } else { 120 },
+                26,
+            )
+        };
+        click(&mut app, row(2, 0));
+        assert_eq!(app.take_request(), Some(Request::Save(2)));
         let text = app.save_text();
+        let label = app.slot_label();
+        assert!(label.contains("J1/14"));
+        app.set_slot(2, Some(label.clone()));
         let (round, cash) = (app.world.round, app.world.divisions[0][0].fin.cash);
         app.play_season();
-        assert_ne!(app.world.round, round);
         app.load_text(&text).unwrap();
         assert_eq!(
             (app.world.round, app.world.divisions[0][0].fin.cash),
@@ -547,9 +582,11 @@ mod tests {
         );
         assert!(app.load_text("not a save").is_err());
         assert!(app.message.contains("carregar"));
-        click(&mut app, Rect::new(186, 124, 150, 30)); // Carregar
-        assert_eq!(app.take_request(), Some(Request::Load));
-        click(&mut app, Rect::new(346, 124, 190, 30)); // Importar
+        click(&mut app, row(2, 1));
+        assert_eq!(app.take_request(), Some(Request::Load(2)));
+        click(&mut app, row(2, 2));
+        assert_eq!(app.take_request(), Some(Request::Delete(2)));
+        click(&mut app, Rect::new(26, 124, 230, 30));
         assert_eq!(app.take_request(), Some(Request::Import));
         assert!(app.import_e98(&[0; 10], 1).is_err());
     }

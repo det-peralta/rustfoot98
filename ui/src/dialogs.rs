@@ -451,24 +451,48 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
     if app.button(c, Rect::new(r.x + 14, r.y + 34, 330, 30), &label) {
         app.world.accept_invitations = !on;
     }
+    if app.button(
+        c,
+        Rect::new(r.x + 14, r.y + 70, 230, 30),
+        "Importar .e98 original",
+    ) {
+        app.request = Some(Request::Import);
+    }
     c.text(
-        r.x + 360,
-        r.y + 42,
+        r.x + 14,
+        r.y + 112,
         &format!("Índice de inflação: {:.4}", app.world.economy),
         theme::MUTED,
         13,
     );
-    for (n, (label, w, req)) in [
-        ("Gravar jogo", 150, Request::Save),
-        ("Carregar jogo", 150, Request::Load),
-        ("Importar .e98 original", 190, Request::Import),
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let x = r.x + 14 + [0, 160, 320][n];
-        if app.button(c, Rect::new(x, r.y + 70, w, 30), label) {
-            app.request = Some(req);
+
+    // save slots
+    let slots = Rect::new(r.x + 380, r.y + 4, 384, 474);
+    c.text(
+        slots.x + 4,
+        slots.y + 4,
+        "Jogos gravados",
+        theme::ACCENT,
+        14,
+    );
+    for n in 0..crate::SLOTS {
+        let y = slots.y + 36 + n as i32 * 54;
+        c.text(slots.x + 4, y, &format!("{}.", n + 1), theme::MUTED, 13);
+        match &app.slots[n] {
+            Some(label) => c.text(slots.x + 24, y, label, theme::TEXT, 13),
+            None => c.text(slots.x + 24, y, "(vazio)", theme::MUTED, 13),
+        }
+        let filled = app.slots[n].is_some();
+        if app.button(c, Rect::new(slots.x + 24, y + 18, 120, 26), "Gravar") {
+            app.request = Some(Request::Save(n));
+        }
+        if filled {
+            if app.button(c, Rect::new(slots.x + 154, y + 18, 120, 26), "Carregar") {
+                app.request = Some(Request::Load(n));
+            }
+            if app.button(c, Rect::new(slots.x + 284, y + 18, 80, 26), "Apagar") {
+                app.request = Some(Request::Delete(n));
+            }
         }
     }
 
@@ -484,56 +508,52 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
     }
     loans.sort_by_key(|&(_, v)| std::cmp::Reverse(v));
     debts.sort_by_key(|&(_, v)| v);
-    for (col, (title, list)) in [
-        ("Equipas com empréstimos", &loans),
-        ("Equipas endividadas", &debts),
-    ]
-    .iter()
-    .enumerate()
+    for (col, (title, list)) in [("Com empréstimos", &loans), ("Endividadas", &debts)]
+        .iter()
+        .enumerate()
     {
-        let x = r.x + 14 + col as i32 * 380;
-        c.text(x, r.y + 124, title, theme::ACCENT, 14);
-        for (n, (name, v)) in list.iter().take(8).enumerate() {
-            c.text(x, r.y + 150 + n as i32 * 22, name, theme::TEXT, 13);
+        let x = r.x + 14 + col as i32 * 186;
+        c.text(x, r.y + 140, title, theme::ACCENT, 14);
+        for (n, (name, v)) in list.iter().take(6).enumerate() {
+            let short: String = name.chars().take(13).collect();
+            c.text(x, r.y + 166 + n as i32 * 20, &short, theme::TEXT, 12);
             c.text(
-                x + 230,
-                r.y + 150 + n as i32 * 22,
+                x + 100,
+                r.y + 166 + n as i32 * 20,
                 &money(*v),
                 theme::MUTED,
-                13,
+                12,
             );
         }
         if list.is_empty() {
-            c.text(x, r.y + 150, "Nenhuma.", theme::MUTED, 13);
+            c.text(x, r.y + 166, "Nenhuma.", theme::MUTED, 13);
         }
     }
     c.text(
         r.x + 14,
-        r.y + 340,
+        r.y + 306,
         "Treinadores (última jornada)",
         theme::ACCENT,
         14,
     );
-    let mut y = r.y + 366;
+    let mut y = r.y + 332;
     if let Some((from, to)) = &app.world.human_moved {
         c.text(
             r.x + 14,
             y,
             &format!("O teu treinador passou de {from} para {to}."),
             theme::GOOD,
-            13,
+            12,
         );
-        y += 22;
+        y += 20;
     }
-    for (a, b) in app.world.coach_changes.iter().take(6) {
-        c.text(
-            r.x + 14,
-            y,
-            &format!("{a} trocou de treinador com {b}."),
-            theme::TEXT,
-            13,
-        );
-        y += 22;
+    for (a, b) in app.world.coach_changes.iter().take(5) {
+        let line: String = format!("{a} trocou de treinador com {b}.")
+            .chars()
+            .take(52)
+            .collect();
+        c.text(r.x + 14, y, &line, theme::TEXT, 12);
+        y += 20;
     }
     if app.world.coach_changes.is_empty() && app.world.human_moved.is_none() {
         c.text(r.x + 14, y, "Sem mudanças de treinador.", theme::MUTED, 13);

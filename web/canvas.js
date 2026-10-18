@@ -23,24 +23,28 @@ function frame() {
 }
 
 // host requests of the shared UI: save / load in localStorage, import an original .e98 through a file picker
-const SLOT = "elifoot98-rea.save";
+const KEY = (n) => `elifoot98-rea.slot.${n}`;
 const picker = Object.assign(document.createElement("input"), { type: "file", accept: ".e98,.sav,.txt" });
 const put = (bytes) => { const p = w.ui_alloc(bytes.length); new Uint8Array(w.memory.buffer, p, bytes.length).set(bytes); };
+const take = () => dec.decode(new Uint8Array(w.memory.buffer, w.io_ptr(), w.io_len()));
+const setSlot = (n, label) => { const b = new TextEncoder().encode(label || ""); put(b); w.ui_set_slot(n, b.length); };
+const readSlot = (n) => { try { return JSON.parse(localStorage.getItem(KEY(n))); } catch { return null; } };
+for (let n = 0; n < 8; n++) setSlot(n, readSlot(n)?.label);
 function serve() {
-  switch (w.ui_take_request()) {
-    case 1: {
-      w.ui_save();
-      try { localStorage.setItem(SLOT, dec.decode(new Uint8Array(w.memory.buffer, w.io_ptr(), w.io_len()))); w.ui_notice(1); }
-      catch { w.ui_notice(3); }
-      break;
-    }
-    case 2: {
-      let text = null;
-      try { text = localStorage.getItem(SLOT); } catch {}
-      if (text == null) w.ui_notice(2); else { put(new TextEncoder().encode(text)); w.ui_load(); }
-      break;
-    }
-    case 3: picker.click(); break;
+  const r = w.ui_take_request();
+  if (r === 0) return;
+  if (r === 30) { picker.click(); return; }
+  const slot = r < 11 ? r - 1 : r < 21 ? r - 11 : r - 21;
+  if (r < 11) {
+    w.ui_save(); const text = take(); w.ui_slot_label(); const label = take();
+    try { localStorage.setItem(KEY(slot), JSON.stringify({ label, text })); setSlot(slot, label); w.ui_notice(1); }
+    catch { w.ui_notice(3); }
+  } else if (r < 21) {
+    const s = readSlot(slot);
+    if (!s) w.ui_notice(2); else { put(new TextEncoder().encode(s.text)); w.ui_load(); }
+  } else {
+    try { localStorage.removeItem(KEY(slot)); } catch {}
+    setSlot(slot, "");
   }
 }
 picker.onchange = async () => {
