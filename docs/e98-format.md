@@ -53,3 +53,19 @@ three lists (`2e6b`, `2f10`, `2fb5`: fixture entries) · the squad list (`1c26`:
 
 `core/src/e98.rs` implements the pieces needed to continue a game (teams, squads with status/goals/wage/fresh/ban/injury, standings, `K`,
 cash/loan/`F`, ledger, year, economy). Not imported yet: the fixture/calendar lists, the cup list, the news lists and the second human.
+
+## Verified end-to-end
+`tools/e98/strict.py <file.e98>` walks a whole save with exactly the structure above and prints each section's offsets. On all three local
+saves (new game, after two rounds, a two-human game) it consumes the file **to the last byte**. Final layout after the header:
+
+| list | loader | element |
+|---|---|---|
+| `2702` | `1106` | `8382`: `u16 id`, pstr, `u8`, `u8`, `u16`, `i32`, `i32`, 5 bytes, `u16 n` + n x 7 bytes `(u8, i32, u16)` (54 entries; id/year/event history) |
+| `2706` | `17e2` | `c770`: `u16 id`, `u8`, pstr (name), pstr (country) (182 entries) |
+| `26f6` | `0651(1)` | team (record above); `26fe` is not read: it is the global player list filled while the squads load |
+| `26f2` | `0651(0)` | `u16` team ids (cup entrants) |
+| `26fa` | `0c40` | division (`u32`, `u16`, 21 bytes, `u16 n` + n ids) |
+| `270a` | `1285` | game: `u8`, 41 bytes, `u16`, `u16`, 10 bytes, `i32`, `u16`, `u16`, `u16`, `u8` (20 entries = the current round) |
+| news | `1b1b` | repeated `(u16 team id != 0, u16 n, n x u16)`, terminated by `0` |
+| `270e` | `1c18` | `u16 n` + n x 10 bytes (`ca77`) |
+| `2712` | `1cc1` | `u16 n` + n x 12 bytes (`cf1f`) |
