@@ -88,7 +88,7 @@ def pack_fonts():
             ch = bytes([code]).decode('cp1252', 'replace')
             adv, left, top, w, rows = f.glyph(ch)
             glyphs.append((adv, left, top, w, rows))
-        entries.append((face, px, bold, italic, f.ascent, f.descent, glyphs, underline(ttf(TT[key]), px)))
+        entries.append((face, px, bold, italic, f.ascent, f.descent, glyphs, underline(ttf(TT[key]), px), f.tm_height))
     # bitmap fonts of the Windows 3.1 install: "MS Sans Serif" (8, 12, 24 pt) and "System"; bold is GDI's emulation (smear by one pixel)
     import fon
     def bitmap(path, face, wanted, only=None, as_face=None, as_px=None):
@@ -107,15 +107,15 @@ def pack_fonts():
                         glyphs.append((adv, 0, f['ascent'], w, [r << 0 for r in rows]))
                     # the window's px size in Delphi terms: 8 pt -> 11, 12 pt -> 16, 24 pt -> 32; System -> 13
                     px = {8: 11, 12: 16, 24: 32}.get(f['points'], 13) if face != 'system' else 13
-                    entries.append((as_face or face, as_px or px, bold, 0, f['ascent'], f['height'] - f['ascent'], glyphs, (f['ascent'] + 1, 1)))
+                    entries.append((as_face or face, as_px or px, bold, 0, f['ascent'], f['height'] - f['ascent'], glyphs, (f['ascent'] + 1, 1), f['height']))
     bitmap(os.path.join(SYSTEM, 'SSERIFE.FON'), 'ms sans serif', {8, 12, 24})
     bitmap(os.path.join(SYSTEM, 'VGASYS.FON'), 'system', {10})
     # the Windows 3.1 font mapper draws Arial at 9 pixels with the raster font MS Serif 7 pt (measured against the original)
     bitmap(os.path.join(SYSTEM, 'SMALLE.FON'), 'ms serif', {7}, only='MS Serif', as_face='arial', as_px=9)
     out += struct.pack('<H', len(entries))
-    for face, px, bold, italic, asc, desc, glyphs, ul in entries:
+    for face, px, bold, italic, asc, desc, glyphs, ul, tmh in entries:
         nm = face.encode()
-        out += struct.pack('<B', len(nm)) + nm + struct.pack('<BBBBBBBB', px, bold, italic, asc, desc, 32, ul[0], ul[1])
+        out += struct.pack('<B', len(nm)) + nm + struct.pack('<BBBBBBBBB', px, bold, italic, asc, desc, 32, ul[0], ul[1], tmh)
         for adv, left, top, w, rows in glyphs:
             out += struct.pack('<BbbBB', adv, left, top, w, len(rows))
             nb = (w + 7) // 8

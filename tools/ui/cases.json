@@ -1,0 +1,6 @@
+[
+  {"form": "TABOUTDLG", "golden": "analysis/shots/guest1.png", "region": [142, 86, 515, 428],
+   "args": ["textGameName=Elifoot 98", "textSubVersion=98.003", "Banner1.scroll=437"], "note": "mouse cursor in the capture: 126 px"},
+  {"form": "TSELECTGAMEDLG", "golden": "analysis/shots/guest3.png", "region": [160, 114, 479, 372],
+   "args": ["@caption=Elifoot 98", "RadioContinueGame.enabled=0", "@focus=CancelBtn"], "note": "mouse cursor in the capture: 53 px"}
+]

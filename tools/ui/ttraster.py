@@ -101,6 +101,7 @@ class Face:
         # GDI's tmAscent of these fonts is one more than FreeType's hinted ascender (measured against the original)
         self.ascent = (m.ascender >> 6) + 1
         self.descent = -(m.descender >> 6)
+        self.tm_height = (m.ascender >> 6) - (m.descender >> 6)  # GDI's tmHeight: the hinted height (the line pitch of labels is one more)
         self.height = m.height >> 6
 
     def glyph(self, ch):

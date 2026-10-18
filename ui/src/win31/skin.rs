@@ -20,6 +20,8 @@ pub struct Font {
     /// Underline: offset of its top below the baseline, and thickness.
     pub ul_pos: i32,
     pub ul_thick: i32,
+    /// GDI's `tmHeight` (the cell a button caption is aligned with); `height()` is the line pitch of labels.
+    pub tm_height: i32,
     first: u8,
     glyphs: Vec<Glyph>,
 }
@@ -105,7 +107,8 @@ impl Skin {
         let mut list = Vec::new();
         for _ in 0..r.u16()? {
             let face = r.pstr()?;
-            let (px, bold, italic, ascent, descent, first, ul_pos, ul_thick) = (
+            let (px, bold, italic, ascent, descent, first, ul_pos, ul_thick, tm_height) = (
+                r.u8()?,
                 r.u8()?,
                 r.u8()?,
                 r.u8()?,
@@ -145,6 +148,7 @@ impl Skin {
                 descent: descent as i32,
                 ul_pos: ul_pos as i32,
                 ul_thick: ul_thick as i32,
+                tm_height: tm_height as i32,
                 first,
                 glyphs: gl,
             });

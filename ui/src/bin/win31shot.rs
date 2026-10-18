@@ -1,6 +1,6 @@
 //! Renders one of the original forms with the pixel-exact Windows 3.1 renderer into a BMP file.
 //! `win31shot TABOUTDLG out.bmp [Control=text ...]`; reads `analysis/out/forms` and `analysis/out/skin` (see `tools/ui/skin.py`).
-use elifoot_ui::win31::draw::{controls, dialog_frame, Ctx, DESKTOP};
+use elifoot_ui::win31::draw::{controls, dialog_frame, dialog_frame_thick, Ctx, DESKTOP};
 use elifoot_ui::win31::{Fb, Node, Skin};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -29,14 +29,16 @@ fn main() -> Result<(), String> {
     fb.fill(0, 0, 800, 600, DESKTOP);
     let (cw, ch) = (node.int("ClientWidth", 400), node.int("ClientHeight", 300));
     let bg = node.color("Color").unwrap_or(elifoot_ui::win31::fb::SILVER);
-    let (ox, oy) = dialog_frame(
-        &mut fb,
-        &skin,
-        node.str("Caption").unwrap_or(""),
-        cw,
-        ch,
-        bg,
-    );
+    let caption = texts
+        .get("@caption")
+        .map(String::as_str)
+        .or(node.str("Caption"))
+        .unwrap_or("");
+    let (ox, oy) = if node.ident("BorderStyle") == Some("bsDialog") {
+        dialog_frame_thick(&mut fb, &skin, caption, cw, ch, bg)
+    } else {
+        dialog_frame(&mut fb, &skin, caption, cw, ch, bg)
+    };
     let fname = form.to_uppercase();
     let cx = Ctx {
         skin: &skin,
@@ -45,7 +47,12 @@ fn main() -> Result<(), String> {
         ox,
         oy,
         bg,
-        focus: node.ident("ActiveControl").unwrap_or(""),
+        focus: texts
+            .get("@focus")
+            .map(String::as_str)
+            .or(node.ident("ActiveControl"))
+            .unwrap_or(""),
+        lists: &BTreeMap::new(),
     };
     controls(&mut fb, &cx, &node);
     std::fs::write(&out, fb.bmp()).map_err(|e| e.to_string())?;

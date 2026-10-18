@@ -62,6 +62,24 @@ pub struct Ctx<'a> {
     pub bg: Rgb,
     /// Name of the control that has the keyboard focus (the form's `ActiveControl`).
     pub focus: &'a str,
+    /// Contents of list boxes set by the program, by control name.
+    pub lists: &'a BTreeMap<String, Vec<String>>,
+}
+
+impl<'a> Ctx<'a> {
+    /// A copy of the context (for drawing the children of a container).
+    pub fn sub(&self) -> Ctx<'a> {
+        Ctx {
+            skin: self.skin,
+            form: self.form,
+            texts: self.texts,
+            ox: self.ox,
+            oy: self.oy,
+            bg: self.bg,
+            focus: self.focus,
+            lists: self.lists,
+        }
+    }
 }
 
 impl Ctx<'_> {
@@ -91,6 +109,26 @@ pub fn text(fb: &mut Fb, font: &Font, x: i32, y: i32, s: &str, color: Rgb, under
         fb.fill(x, base + font.ul_pos, pen - x, font.ul_thick, color);
     }
     pen - x
+}
+
+/// Disabled text of a button-class control (`GrayString`): the glyphs masked with a checkerboard.
+pub fn text_dithered(fb: &mut Fb, font: &Font, x: i32, y: i32, s: &str, color: Rgb, parity: i32) {
+    let base = y + font.ascent;
+    let mut pen = x;
+    for c in s.chars() {
+        let Some(g) = font.glyph(ansi(c)) else {
+            continue;
+        };
+        for (r, bits) in g.rows.iter().enumerate() {
+            for k in 0..g.w {
+                let (px, py) = (pen + g.left + k, base - g.top + r as i32);
+                if bits >> (g.w - 1 - k) & 1 == 1 && (px + py).rem_euclid(2) == parity {
+                    fb.set(px, py, color);
+                }
+            }
+        }
+        pen += g.adv;
+    }
 }
 
 /// Splits `s` into lines no wider than `width` (spaces break lines), like `DrawText` with `DT_WORDBREAK`.
@@ -138,6 +176,32 @@ pub fn dialog_frame(
     (x + 1, y + 20)
 }
 
+/// A form with `bsDialog` (thick frame): black outline, 4 navy pixels, a caption bar with a white line on three sides and a black rule
+/// below it. The client area starts 5 pixels in and 24 down; the frame hides 4 pixels of the declared client size on each axis.
+pub fn dialog_frame_thick(
+    fb: &mut Fb,
+    skin: &Skin,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+) -> (i32, i32) {
+    let (w, h) = (cw + 6, ch + 25);
+    let (x, y) = ((super::fb::W - w) / 2, (super::fb::H - h) / 2);
+    fb.fill(x, y, w, h, BLACK);
+    fb.fill(x + 1, y + 1, w - 2, h - 2, NAVY);
+    fb.fill(x + 5, y + 24, w - 10, h - 29, bg);
+    fb.fill(x + 5, y + 4, w - 10, 1, WHITE);
+    fb.fill(x + 5, y + 4, 1, 20, WHITE);
+    fb.fill(x + w - 6, y + 4, 1, 20, WHITE);
+    fb.fill(x + 6, y + 23, w - 12, 1, BLACK);
+    if let Some(f) = skin.font("system", 13, false, false) {
+        let tw = f.width(caption);
+        text(fb, f, x + (w - tw) / 2, y + 6, caption, WHITE, false);
+    }
+    (x + 5, y + 24)
+}
+
 /// The face of a `TBitBtn`/`TButton` in its normal state: a black outline with cut corners (2 pixels for the default
 /// button, 1 for the others), a white and a grey bevel of 2 pixels.
 pub fn button_face(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, default: bool) {
@@ -177,8 +241,29 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TBitBtn" | "TButton" => bitbtn(fb, cx, n, &f, x, y),
         "TMemo" => memo(fb, cx, n, &f, x, y),
         "TBanner" => banner(fb, cx, n, &f, x, y),
+        "TBevel" => bevel(fb, n, x, y),
+        "TPanel" => panel(fb, cx, n, &f, x, y),
+        "TEdit" => edit(fb, cx, n, &f, x, y),
+        "TListBox" => listbox(fb, cx, n, &f, x, y),
+        "TRadioButton" => radio(fb, cx, n, &f, x, y),
         _ => {}
     }
+}
+
+/// Whether a control is enabled: its `Enabled` property unless the program changed it (`<name>.enabled=0|1` in the texts).
+fn is_enabled(cx: &Ctx, n: &Node) -> bool {
+    match cx.texts.get(&format!("{}.enabled", n.name)) {
+        Some(v) => v != "0",
+        None => n.flag("Enabled", true),
+    }
+}
+
+fn caption_or<'a>(cx: &'a Ctx, n: &'a Node, prop: &str) -> &'a str {
+    cx.texts
+        .get(&n.name)
+        .map(String::as_str)
+        .or_else(|| n.str(prop))
+        .unwrap_or("")
 }
 
 fn caption<'a>(cx: &'a Ctx, n: &'a Node) -> &'a str {
@@ -243,6 +328,196 @@ fn memo(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     }
 }
 
+/// Delphi's `Frame3D`: a 1-pixel rectangle lit from the top left (`tl` there, `br` on the other two sides).
+fn frame3d(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, tl: Rgb, br: Rgb) {
+    fb.fill(x, y, w - 1, 1, tl);
+    fb.fill(x, y, 1, h - 1, tl);
+    fb.fill(x, y + h - 1, w, 1, br);
+    fb.fill(x + w - 1, y, 1, h, br);
+}
+
+/// `TBevel`: a lowered (default) or raised line, box or frame.
+fn bevel(fb: &mut Fb, n: &Node, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let raised = n.ident("Style") == Some("bsRaised");
+    let (dark, light) = if raised { (WHITE, GRAY) } else { (GRAY, WHITE) };
+    match n.ident("Shape").unwrap_or("bsBox") {
+        "bsFrame" => {
+            frame3d(fb, x, y, w, h, dark, light);
+            frame3d(fb, x + 1, y + 1, w - 2, h - 2, light, dark);
+        }
+        "bsTopLine" => {
+            fb.fill(x, y, w, 1, dark);
+            fb.fill(x, y + 1, w, 1, light);
+        }
+        "bsBottomLine" => {
+            fb.fill(x, y + h - 2, w, 1, dark);
+            fb.fill(x, y + h - 1, w, 1, light);
+        }
+        "bsLeftLine" => {
+            fb.fill(x, y, 1, h, dark);
+            fb.fill(x + 1, y, 1, h, light);
+        }
+        "bsRightLine" => {
+            fb.fill(x + w - 2, y, 1, h, dark);
+            fb.fill(x + w - 1, y, 1, h, light);
+        }
+        _ => frame3d(fb, x, y, w, h, dark, light),
+    }
+}
+
+/// `TPanel`: face colour, an optional bevel and a centred caption.
+fn panel(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let color = if n.flag("ParentColor", false) {
+        cx.bg
+    } else {
+        n.color("Color").unwrap_or(SILVER)
+    };
+    fb.fill(x, y, w, h, color);
+    let bw = n.int("BevelWidth", 1);
+    let (outer, inner) = (
+        n.ident("BevelOuter").unwrap_or("bvRaised"),
+        n.ident("BevelInner").unwrap_or("bvNone"),
+    );
+    let mut inset = 0;
+    for (kind, _) in [(outer, 0), (inner, 1)] {
+        let (tl, br) = match kind {
+            "bvRaised" => (WHITE, GRAY),
+            "bvLowered" => (GRAY, WHITE),
+            _ => continue,
+        };
+        for k in 0..bw {
+            frame3d(
+                fb,
+                x + inset + k,
+                y + inset + k,
+                w - 2 * (inset + k),
+                h - 2 * (inset + k),
+                tl,
+                br,
+            );
+        }
+        inset += bw;
+    }
+    if let Some(font) = cx.font(f) {
+        let cap = caption(cx, n);
+        if !cap.is_empty() && h >= font.height() {
+            let tw = font.width(cap);
+            text(
+                fb,
+                font,
+                x + (w - tw) / 2,
+                y + (h - font.height()) / 2,
+                cap,
+                f.color,
+                false,
+            );
+        }
+    }
+    let child_font = f.clone();
+    let (cx2, cy2) = (x, y);
+    let sub = Ctx {
+        ox: cx2,
+        oy: cy2,
+        ..cx.sub()
+    };
+    for c in &n.children {
+        control(fb, &sub, c, &child_font);
+    }
+}
+
+/// The 3-D frame Ctl3D draws around edits and list boxes: grey outside top/left, white outside bottom/right, a black border and a
+/// white interior.
+fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32) {
+    fb.fill(x, y, w, h, BLACK);
+    fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
+    fb.fill(x - 1, y - 1, w, 1, GRAY);
+    fb.fill(x - 1, y - 1, 1, h, GRAY);
+    fb.fill(x - 1, y + h, w + 1, 1, WHITE);
+    fb.fill(x + w, y - 1, 1, h + 1, WHITE);
+}
+
+fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    sunken_box(fb, x, y, w, h);
+    if let Some(font) = cx.font(f) {
+        let s = caption_or(cx, n, "Text");
+        let old = fb.clip;
+        fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
+        text(
+            fb,
+            font,
+            x + 2,
+            y + (h - font.height()) / 2,
+            s,
+            f.color,
+            false,
+        );
+        fb.clip = old;
+    }
+}
+
+fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    sunken_box(fb, x, y, w, h);
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let items: Vec<String> = match cx.lists.get(&n.name) {
+        Some(v) => v.clone(),
+        None => n.strings("Items.Strings"),
+    };
+    let ih = n.int("ItemHeight", font.height());
+    let old = fb.clip;
+    fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
+    for (i, it) in items.iter().enumerate() {
+        text(fb, font, x + 2, y + 1 + i as i32 * ih, it, f.color, false);
+    }
+    fb.clip = old;
+}
+
+/// `TRadioButton` (Windows 3.1 button class): a 13-pixel circle, then the caption.
+fn radio(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    const RING: [&str; 13] = [
+        ".....XXX.....",
+        "...XX...XX...",
+        "..X.......X..",
+        ".X.........X.",
+        ".X.........X.",
+        "X...........X",
+        "X...........X",
+        "X...........X",
+        ".X.........X.",
+        ".X.........X.",
+        "..X.......X..",
+        "...XX...XX...",
+        ".....XXX.....",
+    ];
+    let h = n.int("Height", 17);
+    let enabled = is_enabled(cx, n);
+    let ink = if enabled { f.color } else { BLACK };
+    let top = y + (h - 13) / 2;
+    for (r, row) in RING.iter().enumerate() {
+        for (c, ch) in row.chars().enumerate() {
+            if ch == 'X' {
+                fb.set(x + c as i32, top + r as i32, f.color);
+            }
+        }
+    }
+    if let Some(font) = cx.font(f) {
+        let cap = caption(cx, n).replace('&', "");
+        let ty = y + ((h - font.height()) / 2).max(0);
+        if enabled {
+            text(fb, font, x + 18, ty, &cap, ink, false);
+        } else {
+            text_dithered(fb, font, x + 18, ty, &cap, BLACK, DITHER_PARITY);
+        }
+    }
+}
+
+const DITHER_PARITY: i32 = 0;
+
 /// `TBanner`: the scrolling text; `texts["Banner1.pos"]`-style state: `<name>.scroll` is how many pixels the text has moved left.
 fn banner(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
@@ -275,7 +550,8 @@ fn banner(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 
 fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 64), n.int("Height", 64));
-    let default = cx.focus == n.name || n.flag("Default", false);
+    let enabled = is_enabled(cx, n);
+    let default = enabled && (cx.focus == n.name || n.flag("Default", false));
     // content of the thin-framed button sits one pixel up and to the right of the default button's
     let (ix, iy) = if default { (0, 2) } else { (1, 1) };
     button_face(fb, x, y, w, h, default);
@@ -311,9 +587,10 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let gw = b.w / glyphs;
         let key = b.px[((b.h - 1) * b.w) as usize];
         let (gx, gy) = (x + (w - gw) / 2, y + 2 + n.int("Margin", 4));
+        let gi = if !enabled && glyphs > 1 { gw } else { 0 };
         for r in 0..b.h {
             for c in 0..gw {
-                let p = b.px[(r * b.w + c) as usize];
+                let p = b.px[(r * b.w + c + gi) as usize];
                 if p != key {
                     fb.set(
                         gx + c,
@@ -327,11 +604,23 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if let Some(font) = cx.font(f) {
         let label: String = cap.replace('&', "");
         let tw = font.width(&label);
-        let ty = y + h - 2 - n.int("Margin", 4) - font.height() - (2 - iy);
+        let ty = y + h - 2 - n.int("Margin", 4) - font.tm_height - if font.height() == font.tm_height { 2 - iy } else { 0 };
         let _ = gh;
-        text(fb, font, x + ix + (w - tw) / 2, ty, &label, f.color, false);
+        let tx = x + ix + (w - tw) / 2;
+        if enabled {
+            text(fb, font, tx, ty, &label, f.color, false);
+        } else {
+            text(fb, font, tx + 1, ty + 1, &label, WHITE, false);
+            text(fb, font, tx, ty, &label, GRAY, false);
+        }
         if cx.focus == n.name {
-            focus_rect(fb, x + (w - tw) / 2 - 1, ty - 1, tw + 2, font.height() + 2);
+            focus_rect(
+                fb,
+                x + ix + (w - tw) / 2 - 1,
+                ty - 1,
+                tw + 2,
+                font.height() + 2,
+            );
         }
     }
 }
