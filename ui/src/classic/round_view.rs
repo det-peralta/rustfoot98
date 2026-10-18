@@ -276,17 +276,17 @@ impl RoundView {
         n.saturating_sub(1) / 20
     }
 
-    /// Advances the clock by one tick of the game timer when `ms` has passed; returns the number of minutes that passed.
-    pub fn advance(&mut self, ms: u32) -> usize {
+    /// Time passes: the clock moves on by one minute when the interval of the game timer has elapsed (at most one per call, so
+    /// that nothing the user is asked at a minute is skipped); returns whether it did.
+    pub fn advance(&mut self, ms: u32) -> bool {
         self.acc_ms += ms;
-        let mut n = 0;
-        while self.acc_ms >= self.interval.max(1) && self.minute <= self.max + 5 {
-            self.acc_ms -= self.interval.max(1);
+        let step = self.interval.max(1);
+        if self.acc_ms >= step && self.minute <= self.max + 5 {
+            self.acc_ms -= step;
             self.minute += 1;
-            n += 1;
-            break;
+            return true;
         }
-        n
+        false
     }
 
     /// The window closes five minutes after the end.
@@ -299,15 +299,15 @@ fn grouped(n: i64) -> String {
     n.to_string()
 }
 
-/// Colour of the pie and the part of the range that is filled.
-fn clock_state(v: &RoundView) -> (Rgb, f64) {
-    let m = v.minute.max(0) as f64;
+/// Colour of the pie and the progress in minutes of the phase (the gauge's `Progress`, over its range of 60).
+fn clock_state(v: &RoundView) -> (Rgb, i32) {
+    let m = v.minute.max(0);
     if v.extra_seen {
-        (PURPLE, (m - 90.0) / 60.0)
+        (PURPLE, m - 90)
     } else if v.halftime_seen {
-        (RED, (m - 45.0) / 60.0)
+        (RED, m - 45)
     } else {
-        (BLUE, m / 60.0)
+        (BLUE, m)
     }
 }
 
@@ -387,8 +387,8 @@ pub fn draw(fb: &mut Fb, skin: &Skin, v: &RoundView, active: bool) {
             }
         }
     }
-    let (color, part) = clock_state(v);
-    clock(fb, color, part);
+    let (color, progress) = clock_state(v);
+    clock(fb, color, progress);
 }
 
 /// The `<` and `>` buttons at the bottom right (visible only when there is more than one page).
@@ -581,27 +581,83 @@ const DISC: [(i32, i32); 45] = [
     (18, 26),
 ];
 
-/// The pie: the ring is always in the colour of the phase, the fill grows clockwise from 12 o'clock (`part` of the circle).
-fn clock(fb: &mut Fb, color: Rgb, part: f64) {
+/// The line of Bresenham as the display driver draws it (ties go to the minor axis).
+fn line(x0: i32, y0: i32, x1: i32, y1: i32) -> Vec<(i32, i32)> {
+    let (mut x, mut y) = (x0, y0);
+    let (dx, dy) = ((x1 - x0).abs(), -(y1 - y0).abs());
+    let (sx, sy) = (if x0 < x1 { 1 } else { -1 }, if y0 < y1 { 1 } else { -1 });
+    let mut err = dx + dy;
+    let mut pts = Vec::new();
+    loop {
+        pts.push((x, y));
+        if x == x1 && y == y1 {
+            break;
+        }
+        let e2 = 2 * err;
+        if e2 > dy {
+            err += dy;
+            x += sx;
+        }
+        if e2 < dx {
+            err += dx;
+            y += sy;
+        }
+    }
+    pts
+}
+
+/// The pie (`TGauge`, `gkPie`): the ring in the colour of the phase, and when the progress is more than zero a sector from 12 o'clock
+/// clockwise. The gauge truncates the progress to whole per cent, takes the end of the sector at `Round(22 * (1 - cos/sin))` of the
+/// angle `pi * (percent / 50 + 0.5)` and has GDI draw the pie: the pen draws the two radial lines in the colour.
+fn clock(fb: &mut Fb, color: Rgb, progress: i32) {
     let (ox, oy) = (751, 25);
-    let angle = part.clamp(0.0, 1.0) * 360.0;
+    let percent = (100 * progress.max(0)) / 60;
     let inside = |x: i32, y: i32| {
-        DISC.get(y as usize)
-            .is_some_and(|&(a, b)| (a..=b).contains(&x))
+        y >= 0
+            && DISC
+                .get(y as usize)
+                .is_some_and(|&(a, b)| (a..=b).contains(&x))
     };
+    let mut on = [[false; 45]; 45];
     for (y, &(a, b)) in DISC.iter().enumerate() {
         for x in a..=b {
-            let (dx, dy) = (x as f64 - 22.0, y as f64 - 22.0);
-            let mut t = dx.atan2(-dy).to_degrees();
-            if t < 0.0 {
-                t += 360.0;
-            }
             let edge = !(inside(x - 1, y as i32)
                 && inside(x + 1, y as i32)
                 && inside(x, y as i32 - 1)
                 && inside(x, y as i32 + 1));
-            let on = edge || (angle > 0.0 && t <= angle);
-            fb.set(ox + x, oy + y as i32, if on { color } else { WHITE });
+            on[y][x as usize] = edge;
+        }
+    }
+    if percent > 0 {
+        let a = std::f64::consts::PI * (percent as f64 / 50.0 + 0.5);
+        let sx = (22.0 * (1.0 - a.cos()) + 0.5).floor() as i32;
+        let sy = (22.0 * (1.0 - a.sin()) + 0.5).floor() as i32;
+        let mut th = ((sx - 22) as f64).atan2((22 - sy) as f64);
+        if th < 0.0 {
+            th += 2.0 * std::f64::consts::PI;
+        }
+        for (y, &(a0, b0)) in DISC.iter().enumerate() {
+            for x in a0..=b0 {
+                let mut t = ((x - 22) as f64).atan2(-((y as i32 - 22) as f64));
+                if t < 0.0 {
+                    t += 2.0 * std::f64::consts::PI;
+                }
+                if t <= th + 1e-9 {
+                    on[y][x as usize] = true;
+                }
+            }
+        }
+        for (x, y) in line(22, 22, sx, sy).into_iter().chain(line(22, 22, 22, 0)) {
+            if inside(x, y) {
+                on[y as usize][x as usize] = true;
+            }
+        }
+    }
+    for (y, row) in on.iter().enumerate() {
+        for (x, &c) in row.iter().enumerate() {
+            if inside(x as i32, y as i32) {
+                fb.set(ox + x as i32, oy + y as i32, if c { color } else { WHITE });
+            }
         }
     }
 }
@@ -614,4 +670,152 @@ pub fn record<'a>(world: &'a World, g: &Game) -> Option<&'a MatchRecord> {
 /// The cup tie of a game of a cup view.
 pub fn tie<'a>(world: &'a World, g: &Game) -> Option<&'a CupMatch> {
     world.last_cup.as_ref().and_then(|c| c.matches.get(g.src))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn game(events: Vec<Ev>) -> Game {
+        let club = |n: &str| Club {
+            name: n.into(),
+            colors: (BLACK, WHITE),
+        };
+        Game {
+            attendance: 1000,
+            clubs: [club("A"), club("B")],
+            events,
+            human: false,
+            human_side: None,
+            src: 0,
+            extra_time: false,
+        }
+    }
+
+    fn ev(minute: u16, side: usize, kind: EventKind) -> Ev {
+        Ev {
+            minute,
+            side,
+            kind,
+            player: "X".into(),
+            primary: false,
+        }
+    }
+
+    #[test]
+    fn the_timer_interval_follows_the_profile_and_the_humans() {
+        // Médio: 100 ms without a human, 800 ms with one, 150 ms more for every further human coach
+        assert_eq!(interval(2, 0), 100);
+        assert_eq!(interval(2, 1), 800);
+        assert_eq!(interval(2, 2), 950);
+        assert_eq!(interval(1, 1), 1000);
+        assert_eq!(interval(6, 1), 50);
+        assert_eq!(interval(6, 0), 50);
+        // out-of-range profiles fall back to the nearest one
+        assert_eq!(interval(0, 1), 1000);
+        assert_eq!(interval(9, 1), 50);
+    }
+
+    #[test]
+    fn the_clock_starts_five_ticks_early_and_the_window_closes_five_ticks_late() {
+        let mut v = RoundView::blank("t".into(), false);
+        v.interval = 100;
+        assert_eq!(v.minute, -5);
+        for _ in 0..95 {
+            v.advance(100);
+        }
+        assert_eq!(v.minute, 90);
+        assert!(!v.over());
+        for _ in 0..5 {
+            v.advance(100);
+            assert!(!v.over());
+        }
+        v.advance(100);
+        assert!(v.over(), "minute {}", v.minute);
+        // a tick shorter than the interval does not move the clock
+        let mut w = RoundView::blank("t".into(), false);
+        w.interval = 100;
+        w.advance(60);
+        assert_eq!(w.minute, -5);
+        w.advance(60);
+        assert_eq!(w.minute, -4);
+    }
+
+    #[test]
+    fn the_pie_turns_six_degrees_a_minute_blue_red_and_purple() {
+        let mut v = RoundView::blank("t".into(), false);
+        v.minute = 30;
+        assert_eq!(clock_state(&v), (BLUE, 30));
+        v.minute = 45;
+        assert_eq!(clock_state(&v), (BLUE, 45));
+        v.halftime_seen = true;
+        assert_eq!(clock_state(&v), (RED, 0));
+        v.minute = 90;
+        assert_eq!(clock_state(&v), (RED, 45));
+        v.extra_seen = true;
+        v.minute = 105;
+        assert_eq!(clock_state(&v), (PURPLE, 15));
+    }
+
+    #[test]
+    fn the_score_and_the_latest_event_follow_the_clock() {
+        let g = game(vec![
+            ev(10, 0, EventKind::Goal),
+            ev(20, 1, EventKind::RedCard),
+            ev(30, 1, EventKind::Goal),
+            ev(31, 1, EventKind::Annulled),
+        ]);
+        assert_eq!(g.score(9), [0, 0]);
+        assert_eq!(g.score(25), [1, 0]);
+        // a goal that was annulled no longer counts
+        assert_eq!(g.score(40), [1, 1]);
+        assert_eq!(g.latest(5).map(|e| e.minute), None);
+        assert_eq!(g.latest(25).map(|e| e.kind), Some(EventKind::RedCard));
+        assert_eq!(g.latest(40).map(|e| e.kind), Some(EventKind::Annulled));
+    }
+
+    #[test]
+    fn clicks_find_the_club_of_a_game_and_the_page_buttons() {
+        let mut v = RoundView::blank("t".into(), false);
+        for d in 0..4 {
+            for _ in 0..4 {
+                v.divisions[d].push(game(vec![]));
+            }
+        }
+        // the first game of the first division: home chip, away chip, between them nothing
+        assert!(matches!(game_at(&v, 100, 100), Some((_, 0))));
+        assert!(matches!(game_at(&v, 300, 100), Some((_, 1))));
+        assert!(game_at(&v, 250, 100).is_none());
+        assert!(game_at(&v, 100, 85).is_none());
+        // 4th division, last row
+        assert!(game_at(&v, 100, 422 + 66 + 5).is_some());
+        // a cup list of 45 ties has three pages and the buttons answer only then
+        let mut c = RoundView::blank("t".into(), true);
+        assert_eq!(button_at(&c, 770, 550), None);
+        for _ in 0..45 {
+            c.games.push(game(vec![]));
+        }
+        assert_eq!(c.last_page(), 2);
+        assert_eq!(button_at(&c, 770, 550), Some("nextGamePageBtn"));
+        assert_eq!(button_at(&c, 740, 550), Some("previousGamePageBtn"));
+        c.page = 2;
+        assert!(matches!(game_at(&c, 100, 92 + 22 * 4), Some((_, 0))));
+        assert!(
+            game_at(&c, 100, 92 + 22 * 5).is_none(),
+            "five ties on the last page"
+        );
+    }
+
+    #[test]
+    fn after_minute_90_a_cup_list_keeps_only_the_ties_in_extra_time() {
+        let mut v = RoundView::blank("t".into(), true);
+        for k in 0..6 {
+            let mut g = game(vec![]);
+            g.extra_time = k % 3 == 0;
+            v.games.push(g);
+        }
+        assert_eq!(v.shown().count(), 6);
+        v.cut = true;
+        assert_eq!(v.shown().count(), 2);
+    }
 }

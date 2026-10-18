@@ -58,6 +58,8 @@ pub struct Bitmap {
     pub px: Vec<u32>,
 }
 
+/// The skin pack; the default one is empty (nothing draws), which is enough to test the logic of the interface.
+#[derive(Default)]
 pub struct Skin {
     fonts: Vec<Font>,
     bitmaps: Vec<(String, String, Bitmap)>,

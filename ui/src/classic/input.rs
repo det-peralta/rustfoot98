@@ -33,7 +33,7 @@ impl Classic {
         }
     }
 
-    fn apply(&mut self, d: Dialog, out: Outcome) {
+    pub(crate) fn apply(&mut self, d: Dialog, out: Outcome) {
         match out {
             Outcome::Keep => self.dialogs.push(d),
             Outcome::Close => {}

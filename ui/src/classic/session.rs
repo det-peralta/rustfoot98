@@ -568,3 +568,247 @@ pub fn is_matchday(kind: &Kind) -> bool {
             | Kind::Lashes
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::classic::Data;
+    use crate::win31::{Forms, Skin};
+
+    fn classic(seed: u32) -> Classic {
+        Classic::new(
+            World::synthetic(seed),
+            Skin::default(),
+            Forms::default(),
+            Data::default(),
+        )
+    }
+
+    /// Lets the clock run until a dialog opens or the main window is back.
+    fn run(c: &mut Classic) {
+        for _ in 0..200_000 {
+            if !c.dialogs.is_empty() || matches!(c.screen, Screen::Main) {
+                return;
+            }
+            c.tick(20);
+        }
+        panic!("the round did not end");
+    }
+
+    /// Presses a control of the dialog on top (what a click on it would do).
+    fn press(c: &mut Classic, name: &str) {
+        let mut d = c.dialogs.pop().expect("a dialog is open");
+        let out = dialogs::click(c, &mut d, name);
+        c.apply(d, out);
+    }
+
+    fn top_kind(c: &Classic) -> Option<Kind> {
+        c.dialogs.last().map(|d| d.kind.clone())
+    }
+
+    /// Plays rounds like a user who answers every dialog by closing it; the injuries are answered with the first player of the bench.
+    fn play_through(c: &mut Classic) -> Vec<Kind> {
+        let mut seen = Vec::new();
+        for _ in 0..2000 {
+            run(c);
+            let Some(kind) = top_kind(c) else {
+                return seen;
+            };
+            seen.push(kind.clone());
+            match kind {
+                Kind::ForcedSubstitution => {
+                    press(c, "ListBoxOfSubstitutePlayers#0");
+                    press(c, "OKBtn");
+                }
+                Kind::Penalty => {
+                    let attack = c.dialogs.last().unwrap().num("attack") != 0;
+                    if attack {
+                        press(c, "ListBoxOfPlayers#0");
+                        press(c, "shootBtn");
+                    }
+                    // the dialog closes by itself after five seconds
+                    for _ in 0..300 {
+                        c.tick(20);
+                    }
+                    c.dialogs.clear();
+                }
+                Kind::Halftime | Kind::Invitation => press(c, "OKBtn"),
+                _ => {
+                    c.dialogs.pop();
+                }
+            }
+        }
+        panic!("too many dialogs");
+    }
+
+    fn text(w: &World) -> Vec<String> {
+        w.last_round
+            .iter()
+            .map(|(d, m)| {
+                format!(
+                    "{d} {} {} {}-{} {:?} {:?}",
+                    m.home, m.away, m.home_goals, m.away_goals, m.events, m.subs
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_round_nobody_touches_is_the_round_the_core_plays() {
+        let mut compared = 0;
+        for seed in [3, 8, 21, 22, 23, 24, 25, 26] {
+            let mut c = classic(seed);
+            let mut plain = c.world.clone();
+            plain.play_round();
+            c.md.opts.halftime_subs = false;
+            c.play_round();
+            // no decision is taken: the dialogs that ask something are not answered, the replay never happens
+            run(&mut c);
+            while let Some(k) = top_kind(&c) {
+                match k {
+                    Kind::Penalty if c.dialogs.last().unwrap().num("attack") == 0 => {
+                        c.dialogs.pop();
+                    }
+                    Kind::Penalty | Kind::ForcedSubstitution => break,
+                    _ => {
+                        c.dialogs.pop();
+                    }
+                }
+                run(&mut c);
+            }
+            if matches!(c.screen, Screen::Main) {
+                assert_eq!(text(&c.world), text(&plain), "seed {seed}");
+                assert_eq!(c.world.rng.seed(), plain.rng.seed());
+                compared += 1;
+            }
+        }
+        assert!(
+            compared >= 2,
+            "only {compared} seeds ran without a question"
+        );
+    }
+
+    #[test]
+    fn the_clock_pauses_for_the_break_and_the_dialog_shows_the_score() {
+        let mut c = classic(5);
+        c.play_round();
+        run(&mut c);
+        // the first thing that stops the clock may be a primary chance or an injury before the break; skip those
+        let mut guard = 0;
+        while top_kind(&c) != Some(Kind::Halftime) && guard < 40 {
+            match top_kind(&c) {
+                Some(Kind::ForcedSubstitution) => {
+                    press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                    press(&mut c, "OKBtn");
+                }
+                Some(_) => c.dialogs.clear(),
+                None => {}
+            }
+            run(&mut c);
+            guard += 1;
+        }
+        assert_eq!(top_kind(&c), Some(Kind::Halftime));
+        let Screen::Round(rv) = &c.screen else {
+            panic!("the round view is showing");
+        };
+        assert_eq!(rv.minute, 45);
+        assert!(!rv.halftime_seen, "the clock turns red after the break");
+        press(&mut c, "OKBtn");
+        let Screen::Round(rv) = &c.screen else {
+            panic!("the round view is showing");
+        };
+        assert!(rv.halftime_seen);
+    }
+
+    #[test]
+    fn a_substitution_made_at_the_break_is_played_in_the_second_half_only() {
+        use elifoot_core::sector::Status;
+        let mut c = classic(11);
+        let (d, i) = c.world.human_location().unwrap();
+        let before = c.world.clone();
+        c.play_round();
+        let mut guard = 0;
+        // answer what comes before the break, up to the dialog of the break
+        while top_kind(&c) != Some(Kind::Halftime) && guard < 40 {
+            run(&mut c);
+            match top_kind(&c) {
+                Some(Kind::ForcedSubstitution) => {
+                    press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                    press(&mut c, "OKBtn");
+                }
+                Some(Kind::Halftime) | None => {}
+                Some(_) => c.dialogs.clear(),
+            }
+            guard += 1;
+        }
+        let Some(Kind::Halftime) = top_kind(&c) else {
+            panic!("no break dialog");
+        };
+        // pick an outfield starter and a bench player of the user's squad as the dialog lists them
+        let (src, side) = {
+            let dlg = c.dialogs.last().unwrap();
+            (dlg.num("src") as usize, dlg.num("side") as usize)
+        };
+        let info = info(&c.world, false, src).unwrap();
+        let st = dialog_status_for_test(&info, side, 45);
+        let out = (0..st.len())
+            .find(|&k| st[k] == Status::Starter && info.start[side][k].position == 3)
+            .unwrap();
+        let inn = (0..st.len())
+            .find(|&k| st[k] == Status::Sub && info.start[side][k].position != 0)
+            .unwrap();
+        let first_half: Vec<String> = info
+            .events
+            .iter()
+            .filter(|e| e.minute <= 45)
+            .map(|e| format!("{e:?}"))
+            .collect();
+        let others: Vec<String> = text(&c.world);
+        {
+            let dlg = c.dialogs.last_mut().unwrap();
+            dlg.st.insert("pend".into(), format!("{out}:{inn}"));
+        }
+        press(&mut c, "OKBtn");
+        let info = super::info(&c.world, false, src).unwrap();
+        assert!(info
+            .subs
+            .iter()
+            .any(|s| s.minute == 46 && !s.auto && s.out == out && s.inn == inn));
+        let again: Vec<String> = info
+            .events
+            .iter()
+            .filter(|e| e.minute <= 45)
+            .map(|e| format!("{e:?}"))
+            .collect();
+        assert_eq!(first_half, again, "the first half does not change");
+        // the other games of the round are the ones the user saw
+        let now = text(&c.world);
+        for (k, (a, b)) in others.iter().zip(&now).enumerate() {
+            if k != src {
+                assert_eq!(a, b, "game {k}");
+            }
+        }
+        let _ = (d, i, before);
+        play_through(&mut c);
+    }
+
+    /// The status of the squad at the break, for the tests.
+    fn dialog_status_for_test(info: &Info, side: usize, minute: u16) -> Vec<Status> {
+        info.squad_at(side, minute, true)
+    }
+
+    #[test]
+    fn many_rounds_with_a_user_who_answers_everything_stay_consistent() {
+        let mut c = classic(2);
+        let start = c.world.year;
+        for _ in 0..16 {
+            c.play_round();
+            let seen = play_through(&mut c);
+            assert!(seen.contains(&Kind::Halftime));
+            assert!(matches!(c.screen, Screen::Main));
+            assert!(c.md.todo.is_empty());
+        }
+        // 16 rounds: a season and two rounds; the end of the season was shown once
+        assert!(c.world.year > start);
+    }
+}

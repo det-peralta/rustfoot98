@@ -24,6 +24,11 @@ fn colors(club: Option<&Club>) -> (String, String) {
     }
 }
 
+fn parse_rgb(s: &str) -> Option<crate::win31::fb::Rgb> {
+    let v: Vec<u8> = s.split(',').filter_map(|p| p.parse().ok()).collect();
+    (v.len() == 3).then(|| crate::win31::fb::Rgb(v[0], v[1], v[2]))
+}
+
 fn star(s: &Slot) -> bool {
     s.g >= 8 && s.position >= 2
 }
@@ -326,6 +331,14 @@ fn bind_squad(c: &Classic, d: &mut Dialog) {
     // (measured on the captures: the real form is 470 pixels wide; `Height` is the bottom of the squads' box + the caption's
     // 20 pixels + 5, or only the caption + the box's top - 2 for the clubs of the others)
     d.text("@client", if me { "470x377" } else { "470x169" });
+    // (the squads' box lies below the cut-short form)
+    for n in [
+        "groupBoxSubstitution",
+        "ListBoxOfSelectedPlayers",
+        "listBoxOfSubstitutePlayers",
+    ] {
+        d.text(format!("{n}.visible"), (me as u8).to_string());
+    }
     let (ink, form) = colors(find_club(&c.world, &info.clubs[side]));
     d.text("groupBoxSubstitution", info.clubs[side].clone());
     d.text("groupBoxSubstitution.color", ink.clone());
@@ -396,7 +409,7 @@ fn bind_forced(c: &Classic, d: &mut Dialog) {
     };
     let player = d.num("player") as usize;
     let (ink, form) = colors(find_club(&c.world, &info.clubs[side]));
-    d.text("@color", form.clone());
+    d.bg = parse_rgb(&form);
     d.text(
         "Label1",
         format!(
@@ -474,7 +487,7 @@ fn bind_penalty(c: &Classic, d: &mut Dialog) {
     };
     let (ink, form) = colors(find_club(&c.world, &info.clubs[side]));
     d.text("@caption", info.clubs[side].clone());
-    d.text("@color", form.clone());
+    d.bg = parse_rgb(&form);
     for n in ["Label1", "LabelChoose", "labelResult"] {
         d.text(format!("{n}.color"), ink.clone());
     }
@@ -594,6 +607,10 @@ fn bind_shootout(c: &Classic, d: &mut Dialog) {
         "ListBoxPenalties".into(),
         table.iter().map(|r| r.join("|")).collect(),
     );
+    // the sizeable form at its design position (Left 0, Top 113), 640x357 with its frame
+    d.text("@frame", "thick");
+    d.text("@client", "634x332");
+    d.text("@origin", "0,113");
     d.text("ListBoxPenalties.cols", "8,140,290,420");
     d.text("ListBoxPenalties.align", "llll");
     d.text("ListBoxPenalties.itemheight", "22");
@@ -778,12 +795,14 @@ fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
         lines.push(format!("Troca com {} ({gave})", coach(gave)));
         lines.push(String::new());
     }
-    if lines.is_empty() {
-        return None;
-    }
+    (!lines.is_empty()).then(|| lashes_dialog(lines))
+}
+
+/// The list of sacked coaches ("Chicotadas Psicológicas") with these lines.
+pub fn lashes_dialog(lines: Vec<String>) -> Dialog {
     let mut d = Dialog::new(Kind::Lashes, "TPRINTLISTDLG");
     d.lists.insert("lines".into(), lines);
-    Some(d)
+    d
 }
 
 pub fn key(_c: &mut Classic, _d: &mut Dialog, _key: Key) -> Option<Outcome> {

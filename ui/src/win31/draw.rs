@@ -188,6 +188,15 @@ pub fn wrap(font: &Font, s: &str, width: i32) -> Vec<String> {
     lines
 }
 
+thread_local! {
+    /// Top-left corner of the next dialog frame when the form is not centred (`Position` poDesigned: the form's own Left/Top).
+    pub static FRAME_ORIGIN: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
+}
+
+fn frame_origin(centre: (i32, i32)) -> (i32, i32) {
+    FRAME_ORIGIN.with(|o| o.get()).unwrap_or(centre)
+}
+
 /// A form with a caption bar (`bsSingle`): a black frame, a navy caption bar 18 pixels high and a black rule below it.
 /// Returns the origin of the client area.
 pub fn dialog_frame(
@@ -199,7 +208,7 @@ pub fn dialog_frame(
     bg: Rgb,
 ) -> (i32, i32) {
     let (ow, oh) = (cw + 2, ch + 21);
-    let (x, y) = ((super::fb::W - ow) / 2, (super::fb::H - oh) / 2);
+    let (x, y) = frame_origin(((super::fb::W - ow) / 2, (super::fb::H - oh) / 2));
     fb.fill(x, y, ow, oh, BLACK);
     fb.fill(x + 1, y + 1, cw, 18, NAVY);
     fb.fill(x + 1, y + 20, cw, ch, bg);
@@ -254,7 +263,7 @@ pub fn dialog_frame_thick(
     bg: Rgb,
 ) -> (i32, i32) {
     let (w, h) = (cw + 6, ch + 25);
-    let (x, y) = ((super::fb::W - w) / 2, (super::fb::H - h) / 2);
+    let (x, y) = frame_origin(((super::fb::W - w) / 2, (super::fb::H - h) / 2));
     fb.fill(x, y, w, h, BLACK);
     fb.fill(x + 1, y + 1, w - 2, h - 2, NAVY);
     fb.fill(x + 5, y + 24, w - 10, h - 29, bg);
