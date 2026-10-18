@@ -350,6 +350,9 @@ fn club_from_eft(
     club.names = names;
     club.fin = Finance::new_game(base, DEFAULT_SCALE);
     club.country = code(&t.country);
+    club.colors = (t.background, t.foreground);
+    club.full_name = t.full_name.clone();
+    club.coach_name = t.coach.clone();
     club.master = master as u16;
     Ok(club)
 }

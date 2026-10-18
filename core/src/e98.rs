@@ -31,6 +31,12 @@ pub struct E98Player {
     /// Games of suspension and injury left (`+0x27`, `+0x29`).
     pub ban: u8,
     pub injured: u8,
+    /// Aggression (`+0x2d`), injury proneness (`+0x2f`) and talent `g` (`+0x2b`).
+    pub aggression: u16,
+    pub proneness: u16,
+    pub g: u16,
+    /// Career history (`+0x17..0x26`): games, goals, red cards, injuries.
+    pub history: [u32; 4],
 }
 
 #[derive(Clone, Debug)]
@@ -40,6 +46,8 @@ pub struct E98Team {
     pub short_name: String,
     pub country: String,
     pub level: u8,
+    /// Background and foreground colours of the `.EFT` object (RGB).
+    pub colors: ([u8; 3], [u8; 3]),
     pub wins: u16,
     pub draws: u16,
     pub losses: u16,
@@ -58,6 +66,7 @@ pub struct E98Team {
     pub coach_games: u16,
     pub coach_score: i64,
     pub coach_human: bool,
+    pub coach_name: String,
     /// Team ids of the opponents in the fixture list (each twice); empty for clubs outside the league.
     pub opponents: Vec<u16>,
 }
@@ -175,6 +184,10 @@ fn player(c: &mut Cur) -> Result<E98Player, String> {
         status: tail[8],
         ban: tail[15],
         injured: tail[19],
+        aggression: u16::from_le_bytes([tail[17], tail[18]]),
+        proneness: u16::from_le_bytes([tail[21], tail[22]]),
+        g: u16::from_le_bytes([tail[23], tail[24]]),
+        history: [0, 1, 2, 3].map(|k| long(tail, 32 + 4 * k) as u32),
     })
 }
 
@@ -184,7 +197,8 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
     c.raw(50)?;
     let full_name = c.pstr()?;
     let short_name = c.pstr()?;
-    c.raw(8)?;
+    let col = c.raw(8)?;
+    let colors = ([col[0], col[1], col[2]], [col[4], col[5], col[6]]);
     let country = c.pstr()?;
     let level = c.u8()?;
     let block = c.raw(0x37)?; // standings, ledger (+0x16..)
@@ -222,6 +236,7 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         short_name,
         country,
         level,
+        colors,
         wins: w(0),
         draws: w(1),
         losses: w(2),
@@ -238,6 +253,7 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         coach_games: 0,
         coach_score: 0,
         coach_human: false,
+        coach_name: String::new(),
         opponents,
     })
 }
@@ -255,14 +271,14 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     c.raw(n + 2 + 2 + 1 + 2 + 4 + 10 + 10 + 101)?;
     let coaches = c.list(|c| {
         let id = c.u16()?;
-        c.pstr()?;
+        let name = c.pstr()?;
         let human = c.u8()? != 0;
         c.u8()?;
         let games = c.u16()?;
         let rest = c.raw(4 + 4 + 5)?;
         let score = long(rest, 0);
         c.list(|c| c.raw(7).map(|_| ()))?;
-        Ok((id, human, games, score))
+        Ok((id, human, games, score, name))
     })?;
     c.list(|c| {
         c.raw(3)?;
@@ -272,10 +288,11 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     })?;
     let mut teams = c.list(team)?;
     for t in &mut teams {
-        if let Some(&(_, human, games, score)) = coaches.iter().find(|k| k.0 == t.coach) {
-            t.coach_human = human;
-            t.coach_games = games;
-            t.coach_score = score;
+        if let Some((_, human, games, score, name)) = coaches.iter().find(|k| k.0 == t.coach) {
+            t.coach_human = *human;
+            t.coach_games = *games;
+            t.coach_score = *score;
+            t.coach_name = name.clone();
         }
     }
     let cup = c.list(|c| c.u16())?;
@@ -356,6 +373,9 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
             s.foreign = country_class(code(&t.country), s.nat);
             s.wage = p.wage;
             s.fresh = p.fresh;
+            s.aggression = p.aggression.min(255) as u8;
+            s.proneness = p.proneness.min(255) as u8;
+            s.g = p.g.min(255) as u8;
             s.goals = p.goals;
             s.ban = p.ban;
             s.injured = p.injured;
@@ -378,6 +398,9 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c.goals_against = t.goals_against as i32;
     c.coach_games = t.coach_games;
     c.coach_score = t.coach_score;
+    c.colors = t.colors;
+    c.full_name = t.full_name.clone();
+    c.coach_name = t.coach_name.clone();
     c.fin = Finance::new_game(base, DEFAULT_SCALE); // stadium level: the save's stadium object was not located
     c.fin.cash = t.cash;
     c.fin.loan = t.loan;

@@ -178,6 +178,24 @@ def pack_glyphs():
     print('glyphs.bin', len(items), 'bitmaps', len(out), 'bytes')
 
 
+def pack_forms():
+    """All forms of the game in one JSON object (name -> form tree): the layout data of the original's windows."""
+    forms = {}
+    for p in sorted(glob.glob(os.path.join(FORMS, '*.json'))):
+        forms[os.path.basename(p)[:-5]] = json.load(open(p))
+    # the glyph pictures are in glyphs.bin; drop them from the layout data
+    def strip(x):
+        for k in [k for k, v in x['props'].items() if isinstance(v, dict) and 'hex' in v]:
+            del x['props'][k]
+        for y in x['children']:
+            strip(y)
+    for f in forms.values():
+        strip(f)
+    path = os.path.join(OUT, 'forms.json')
+    json.dump(forms, open(path, 'w'), separators=(',', ':'), ensure_ascii=False)
+    print('forms.json', len(forms), 'forms', os.path.getsize(path), 'bytes')
+
+
 if __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for name in ('TIMES', 'TIMESBD', 'TIMESBI', 'TIMESI'):
@@ -187,3 +205,4 @@ if __name__ == '__main__':
             print('missing', name)
     pack_fonts()
     pack_glyphs()
+    pack_forms()

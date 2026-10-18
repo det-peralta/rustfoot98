@@ -119,3 +119,26 @@ pub fn color_ident(id: &str) -> Option<Rgb> {
         _ => return None,
     })
 }
+
+/// All forms of the game by name (`TABOUTDLG`, ...), from the skin pack's `forms.json`.
+#[derive(Default)]
+pub struct Forms {
+    pub map: BTreeMap<String, Node>,
+}
+
+impl Forms {
+    pub fn from_json(text: &str) -> Result<Forms, String> {
+        let Json::Obj(m) = parse(text)? else {
+            return Err("forms.json is not an object".into());
+        };
+        let mut map = BTreeMap::new();
+        for (k, v) in &m {
+            map.insert(k.clone(), Node::from(v)?);
+        }
+        Ok(Forms { map })
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Node> {
+        self.map.get(name)
+    }
+}

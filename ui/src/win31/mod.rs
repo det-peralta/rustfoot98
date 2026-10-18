@@ -11,5 +11,5 @@ pub mod json;
 pub mod skin;
 
 pub use fb::Fb;
-pub use form::{Form, Node};
+pub use form::{Form, Forms, Node};
 pub use skin::Skin;

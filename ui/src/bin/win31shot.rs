@@ -87,6 +87,7 @@ fn main() -> Result<(), String> {
             .or(node.ident("ActiveControl"))
             .unwrap_or(""),
         lists: &lists,
+        hits: &std::cell::RefCell::new(Vec::new()),
     };
     controls(&mut fb, &cx, &node);
     std::fs::write(&out, fb.bmp()).map_err(|e| e.to_string())?;

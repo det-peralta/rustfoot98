@@ -2,6 +2,7 @@
 use super::fb::{Fb, Rgb, BLACK, GRAY, GREEN, NAVY, SILVER, WHITE};
 use super::form::Node;
 use super::skin::{ansi, Font, Skin};
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 /// The effective font of a control: Delphi inherits the parent's font unless the control sets its own.
@@ -50,6 +51,24 @@ impl FontSpec {
     }
 }
 
+/// A control that was drawn: the screen rectangle the mouse can hit.
+#[derive(Clone, Debug)]
+pub struct Hit {
+    pub name: String,
+    pub class: String,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+    pub enabled: bool,
+}
+
+impl Hit {
+    pub fn contains(&self, px: i32, py: i32) -> bool {
+        px >= self.x && px < self.x + self.w && py >= self.y && py < self.y + self.h
+    }
+}
+
 /// Everything a control needs to draw itself.
 pub struct Ctx<'a> {
     pub skin: &'a Skin,
@@ -64,6 +83,8 @@ pub struct Ctx<'a> {
     pub focus: &'a str,
     /// Contents of list boxes set by the program, by control name.
     pub lists: &'a BTreeMap<String, Vec<String>>,
+    /// Every control drawn is recorded here (in drawing order), for hit testing.
+    pub hits: &'a RefCell<Vec<Hit>>,
 }
 
 impl<'a> Ctx<'a> {
@@ -78,11 +99,23 @@ impl<'a> Ctx<'a> {
             bg: self.bg,
             focus: self.focus,
             lists: self.lists,
+            hits: self.hits,
         }
     }
 }
 
 impl Ctx<'_> {
+    /// A colour set by the program for a control: `<name>.<key>=r,g,b` in the texts.
+    pub fn color_of(&self, n: &Node, key: &str) -> Option<Rgb> {
+        let v: Vec<u8> = self
+            .texts
+            .get(&format!("{}.{key}", n.name))?
+            .split(',')
+            .filter_map(|p| p.parse().ok())
+            .collect();
+        (v.len() == 3).then(|| Rgb(v[0], v[1], v[2]))
+    }
+
     pub fn font(&self, f: &FontSpec) -> Option<&Font> {
         self.skin.font(&f.name, f.px, f.bold, f.italic)
     }
@@ -287,6 +320,15 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         }
     }
     let (x, y) = (cx.ox + left, cx.oy + top);
+    cx.hits.borrow_mut().push(Hit {
+        name: n.name.clone(),
+        class: n.class.clone(),
+        x,
+        y,
+        w: n.int("Width", 0),
+        h: n.int("Height", 0),
+        enabled: is_enabled(cx, n),
+    });
     match n.class.as_str() {
         "TLabel" => label(fb, cx, n, &f, x, y),
         "TBitBtn" | "TButton" => bitbtn(fb, cx, n, &f, x, y),
@@ -335,6 +377,15 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         return;
     };
     let w = n.int("Width", 0);
+    if let Some(b) = cx.color_of(n, "bgcolor") {
+        fb.fill(x, y, w, n.int("Height", 0), b);
+    }
+    let pad: i32 = cx
+        .texts
+        .get(&format!("{}.pad", n.name))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let (x, w) = (x + pad, w - pad);
     let s = caption(cx, n);
     let lines = if n.flag("WordWrap", false) {
         wrap(font, s, w)
@@ -485,9 +536,9 @@ fn panel(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 
 /// The 3-D frame Ctl3D draws around edits and list boxes: grey outside top/left, white outside bottom/right, a black border and a
 /// white interior.
-fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32) {
+fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: Rgb) {
     fb.fill(x, y, w, h, BLACK);
-    fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
+    fb.fill(x + 1, y + 1, w - 2, h - 2, interior);
     fb.fill(x - 1, y - 1, w, 1, GRAY);
     fb.fill(x - 1, y - 1, 1, h, GRAY);
     fb.fill(x - 1, y + h, w + 1, 1, WHITE);
@@ -496,7 +547,7 @@ fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32) {
 
 fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    sunken_box(fb, x, y, w, h);
+    sunken_box(fb, x, y, w, h, WHITE);
     if let Some(font) = cx.font(f) {
         let s = caption_or(cx, n, "Text");
         let old = fb.clip;
@@ -541,11 +592,33 @@ fn roster(
         let pos = c.first().copied().unwrap_or("");
         let first_of_group = i > 0 && pos != last;
         if first_of_group {
-            fb.fill(x + 1, top, w - 2, 1, BLACK);
+            fb.fill(x + 1, top, w - 2, 1, color);
             top += 4;
         }
         last = pos.to_string();
         let ty = top;
+        let selected = cx
+            .texts
+            .get(&format!("{}.sel", n.name))
+            .and_then(|v| v.parse::<usize>().ok())
+            == Some(i);
+        let (color, back) = if selected {
+            (cx.color_of(n, "bg").unwrap_or(WHITE), Some(color))
+        } else {
+            (color, None)
+        };
+        if let Some(b) = back {
+            fb.fill(x + 1, ty, w - 2, 16, b);
+        }
+        match c.get(5).copied().unwrap_or("") {
+            "+" => {
+                for (dy, (a, b)) in [(0, (5, 8)), (1, (4, 9)), (2, (4, 9)), (3, (5, 8))] {
+                    fb.fill(x + a, ty + 5 + dy, b - a, 1, color);
+                }
+            }
+            "-" => fb.fill(x + 4, ty + 6, 6, 1, color),
+            _ => {}
+        }
         text(fb, font, x + 23, ty, pos, color, false);
         text(
             fb,
@@ -585,7 +658,7 @@ fn roster(
 }
 
 /// The two-row score table of the main screen's first notebook page: `name|w|d|l|gf|ga|pts|r,g,b` per row, 16 pixels high.
-fn classification(fb: &mut Fb, font: &Font, x: i32, y: i32, rows: &[String]) {
+fn classification(fb: &mut Fb, font: &Font, x: i32, y: i32, w: i32, rows: &[String]) {
     // glyph start of each number relative to the list's left edge: wins, draws, losses, goals for, colon, goals against, points
     const COLS: [i32; 7] = [137, 157, 177, 207, 220, 232, 262];
     for (i, row) in rows.iter().enumerate() {
@@ -600,6 +673,17 @@ fn classification(fb: &mut Fb, font: &Font, x: i32, y: i32, rows: &[String]) {
             .filter(|v| v.len() == 3)
             .map_or(WHITE, |v| Rgb(v[0], v[1], v[2]));
         let ty = y + 1 + i as i32 * 16;
+        if let Some(b) = c
+            .get(8)
+            .map(|t| {
+                t.split(',')
+                    .filter_map(|v| v.parse::<u8>().ok())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|v| v.len() == 3)
+        {
+            fb.fill(x, ty, w, 16, Rgb(b[0], b[1], b[2]));
+        }
         text(
             fb,
             font,
@@ -630,20 +714,57 @@ fn classification(fb: &mut Fb, font: &Font, x: i32, y: i32, rows: &[String]) {
     }
 }
 
+/// The balance list of the finances page: rows `label|value|b` (`b` for a bold row), 16 pixels high, values right-aligned.
+fn balance_list(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32, rows: &[String]) {
+    let (Some(reg), Some(bold)) = (
+        cx.font(f),
+        cx.font(&FontSpec {
+            bold: true,
+            ..f.clone()
+        }),
+    ) else {
+        return;
+    };
+    let _ = n;
+    for (i, row) in rows.iter().enumerate() {
+        let c: Vec<&str> = row.split('|').collect();
+        let font = if c.get(2) == Some(&"b") { bold } else { reg };
+        let ty = y + i as i32 * 16;
+        text(
+            fb,
+            font,
+            x + 2,
+            ty,
+            c.first().copied().unwrap_or(""),
+            f.color,
+            false,
+        );
+        let v = c.get(1).copied().unwrap_or("");
+        text(fb, font, x + 212 - font.width(v), ty, v, f.color, false);
+    }
+}
+
 fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    let flat = !n.flag("Ctl3D", true) && n.flag("ParentColor", false);
+    let flat = (!n.flag("Ctl3D", true) && n.flag("ParentColor", false))
+        || n.ident("BorderStyle") == Some("bsNone");
     if flat {
         fb.fill(x, y, w, h, cx.bg);
     } else {
-        sunken_box(fb, x, y, w, h);
+        sunken_box(fb, x, y, w, h, cx.color_of(n, "bg").unwrap_or(WHITE));
     }
     let Some(font) = cx.font(f) else {
         return;
     };
+    if n.name == "ListBoxBalance" {
+        if let Some(rows) = cx.lists.get(&n.name) {
+            balance_list(fb, cx, n, f, x, y, rows);
+        }
+        return;
+    }
     if n.name == "ListBoxClassification" {
         if let Some(rows) = cx.lists.get(&n.name) {
-            classification(fb, font, x, y, rows);
+            classification(fb, font, x, y, w, rows);
         }
         return;
     }
@@ -779,6 +900,15 @@ fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     // text positions: the selected tab is padded on both sides by its slanted edges
     let mut pen = x + 9;
     for (i, t) in tabs.iter().enumerate() {
+        cx.hits.borrow_mut().push(Hit {
+            name: format!("{}#{i}", n.name),
+            class: "TabSetTab".into(),
+            x: pen - 6,
+            y,
+            w: widths[i] + 12,
+            h: n.int("Height", 25),
+            enabled: true,
+        });
         text(fb, font, pen, y + 2, t, f.color, false);
         if i == sel {
             let left = pen - 5;

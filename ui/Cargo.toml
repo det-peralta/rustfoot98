@@ -20,3 +20,7 @@ required-features = ["sdl"]
 [[bin]]
 name = "win31shot"
 path = "src/bin/win31shot.rs"
+
+[[bin]]
+name = "classic_shot"
+path = "src/bin/classic_shot.rs"

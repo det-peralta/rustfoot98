@@ -1,0 +1,63 @@
+//! Number and money formatting of the original (Portuguese, space as the thousands separator).
+
+/// `1216448` -> `"1 216 448"`, negative numbers keep their sign.
+pub fn int(v: i64) -> String {
+    let s = v.abs().to_string();
+    let mut out = String::new();
+    for (i, ch) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
+            out.push(' ');
+        }
+        out.push(ch);
+    }
+    if v < 0 {
+        format!("-{out}")
+    } else {
+        out
+    }
+}
+
+/// An amount in words as the game writes it: `1 milhão e 216 mil reais`, `975 mil reais`, `850 reais`.
+pub fn money_words(v: i64, unit: &str) -> String {
+    let v = v.max(0);
+    let (m, k, r) = (v / 1_000_000, v % 1_000_000 / 1000, v % 1000);
+    let mut parts = Vec::new();
+    if m > 0 {
+        parts.push(format!("{m} {}", if m == 1 { "milhão" } else { "milhões" }));
+    }
+    if k > 0 {
+        parts.push(format!("{k} mil"));
+    }
+    if m == 0 && k == 0 {
+        return format!("{r} {unit}");
+    }
+    let body = parts.join(" e ");
+    format!("{body} {unit}")
+}
+
+/// The behaviour word of a player by his aggression (`0..=5`).
+pub fn behaviour(aggression: u8) -> &'static str {
+    match aggression {
+        0 | 1 => "Cavalheiro",
+        2 | 3 => "Caneleiro",
+        _ => "Sarrafeiro",
+    }
+}
+
+pub const POSITIONS: [&str; 4] = ["Guarda-redes", "Defesa", "Médio", "Avançado"];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn numbers_and_words() {
+        assert_eq!(int(1216448), "1 216 448");
+        assert_eq!(int(-81000), "-81 000");
+        assert_eq!(int(0), "0");
+        assert_eq!(money_words(1_216_448, "reais"), "1 milhão e 216 mil reais");
+        assert_eq!(money_words(2_000_000, "reais"), "2 milhões reais");
+        assert_eq!(money_words(975_500, "reais"), "975 mil reais");
+        assert_eq!(money_words(850, "reais"), "850 reais");
+    }
+}

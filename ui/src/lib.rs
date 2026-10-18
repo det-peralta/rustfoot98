@@ -5,6 +5,7 @@
 //! user releases the mouse over it. No retained widget tree, no callbacks: a screen is one function from state to pixels, which keeps
 //! the front ends (SDL2, web canvas) trivial to maintain.
 pub mod canvas;
+pub mod classic;
 mod dialogs;
 mod screens;
 pub mod win31;

@@ -55,6 +55,11 @@ pub struct Club {
     /// The coach's score (`coach+0x0e`): +2 for a home win, +3 for an away win, +1 / +2 for a home / away draw. It
     /// travels with the coach when two clubs swap coaches and ranks the candidates for a vacancy (lowest first).
     pub coach_score: i64,
+    /// The club's colours (background, foreground) from its `.EFT` team; the original paints the user's windows with them.
+    pub colors: ([u8; 3], [u8; 3]),
+    /// The `.EFT` team's long name (`FIGUEIRENSE F.C.`) and its coach's name, shown in the windows.
+    pub full_name: String,
+    pub coach_name: String,
     pub fin: Finance,
     /// The club's country code (`team+4` object `+0x4a`); compared with the players' nationalities.
     pub country: [u8; 3],
@@ -105,6 +110,9 @@ impl Club {
             goals_against: 0,
             coach_games: 0,
             coach_score: 0,
+            colors: ([0, 0, 0], [255, 255, 255]),
+            full_name: name.to_string(),
+            coach_name: String::new(),
             fin: Finance::default(),
             country: *b"???",
             master: 0,

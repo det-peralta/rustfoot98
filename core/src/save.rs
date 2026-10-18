@@ -94,7 +94,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -121,7 +121,16 @@ impl World {
                 c.fin.fill,
                 c.fin.works,
                 c.fin.prizes,
-                c.coach_score
+                c.coach_score,
+                c.colors
+                    .0
+                    .iter()
+                    .chain(c.colors.1.iter())
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
+                clean(&c.full_name),
+                clean(&c.coach_name)
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -314,6 +323,18 @@ impl World {
                         has_market = true;
                     }
                     c.coach_score = f.get(27).and_then(|x| x.parse().ok()).unwrap_or(0);
+                    if let Some(v) = f.get(29) {
+                        c.full_name = v.to_string();
+                    }
+                    if let Some(v) = f.get(30) {
+                        c.coach_name = v.to_string();
+                    }
+                    if let Some(v) = f.get(28) {
+                        let n: Vec<u8> = v.split(',').filter_map(|t| t.parse().ok()).collect();
+                        if n.len() == 6 {
+                            c.colors = ([n[0], n[1], n[2]], [n[3], n[4], n[5]]);
+                        }
+                    }
                     c.names.clear();
                     current = Some((num(n, &f, 1)? as usize, c));
                 }
