@@ -12,6 +12,7 @@ thread_local! {
     static OUT: RefCell<String> = const { RefCell::new(String::new()) };
     static BUF: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static SAVE: RefCell<String> = const { RefCell::new(String::new()) };
+    static OFFERS: RefCell<Vec<elifoot_core::world::Offer>> = const { RefCell::new(Vec::new()) };
     static MSG: RefCell<String> = const { RefCell::new(String::new()) };
     static TEAMS: RefCell<Vec<EftTeam>> = const { RefCell::new(Vec::new()) };
 }
@@ -354,12 +355,31 @@ fn world_json(w: &World) -> String {
             )
         })
         .collect();
+    let offers: Vec<String> = OFFERS.with(|o| {
+        o.borrow()
+            .iter()
+            .enumerate()
+            .map(|(i, f)| {
+                format!(
+                    "{{\"i\":{},\"club\":{},\"player\":{},\"pos\":{},\"str\":{},\"nat\":{},\"price\":{}}}",
+                    i,
+                    esc(&f.club),
+                    esc(&f.player),
+                    f.position,
+                    f.strength,
+                    esc(&String::from_utf8_lossy(&f.nationality)),
+                    f.price
+                )
+            })
+            .collect()
+    });
     let msg = MSG.with(|m| std::mem::take(&mut *m.borrow_mut()));
     let _ = write!(
         out,
-        "],\"transfers\":[{}],\"board\":[{}],\"msg\":{}",
+        "],\"transfers\":[{}],\"board\":[{}],\"offers\":[{}],\"msg\":{}",
         transfers.join(","),
         board.join(","),
+        offers.join(","),
         esc(&msg)
     );
     let _ = write!(
@@ -559,6 +579,64 @@ pub extern "C" fn market_sell(slot: u32, ask: f64) -> i32 {
         r.unwrap_or(Err("sem jogo".into()))
             .map(|fee| format!("Vendido por {fee}.")),
     )
+}
+
+/// Player search (`Procurar jogadores`): the name filter is in the buffer (`name_len` bytes), `nat` is a three-letter code packed
+/// as `a<<16|b<<8|c` (0 = any), `position` -1 = any, `max_price` 0 = any. The results come back as `offers` in the JSON.
+#[no_mangle]
+pub extern "C" fn buy_search(
+    name_len: usize,
+    nat: u32,
+    min_strength: u32,
+    position: i32,
+    max_price: f64,
+    hide_mine: i32,
+) {
+    let name = BUF.with(|b| {
+        String::from_utf8_lossy(&b.borrow()[..name_len.min(b.borrow().len())]).to_string()
+    });
+    let q = elifoot_core::world::Search {
+        name,
+        nationality: (nat != 0).then_some([(nat >> 16) as u8, (nat >> 8) as u8, nat as u8]),
+        min_strength: min_strength as u16,
+        position: (position >= 0).then_some(position as u8),
+        max_price: (max_price > 0.0).then_some(max_price as i64),
+        hide_mine: hide_mine != 0,
+    };
+    let found = WORLD.with(|w| {
+        w.borrow()
+            .as_ref()
+            .map(|w| w.search_offers(&q))
+            .unwrap_or_default()
+    });
+    OFFERS.with(|o| *o.borrow_mut() = found);
+    publish();
+}
+
+/// Buys offer number `i` of the last search at its asking price; returns 1 on success, 0 with the reason in `msg`.
+#[no_mangle]
+pub extern "C" fn buy_player(i: u32) -> i32 {
+    let offer = OFFERS.with(|o| o.borrow().get(i as usize).cloned());
+    let r = match offer {
+        None => Err("pesquisa desactualizada".to_string()),
+        Some(f) => WORLD
+            .with(|w| {
+                w.borrow_mut()
+                    .as_mut()
+                    .map(|w| w.human_buy(&f.club, f.index, &f.player))
+            })
+            .unwrap_or(Err("sem jogo".into()))
+            .map(|p| format!("{} comprado por {}; chega no fim da jornada.", f.player, p)),
+    };
+    if r.is_ok() {
+        OFFERS.with(|o| {
+            let mut o = o.borrow_mut();
+            if (i as usize) < o.len() {
+                o.remove(i as usize);
+            }
+        });
+    }
+    finish_market(r)
 }
 
 /// Loan step taken / repaid and stadium works, with the answer in `msg`.

@@ -116,6 +116,20 @@
     <p class="note">Os leilões fecham no início da jornada seguinte; se não licitares, ganha a melhor oferta dos clubes do computador. Vender: usa o botão na tabela do plantel.</p>
   </section>
 
+  <section class="card wide" id="search-card" hidden aria-labelledby="sr-title">
+    <h2 id="sr-title">Procurar jogadores</h2>
+    <form id="search-form" class="searchform">
+      <label>Nome <input id="sr-name" type="text" size="12"></label>
+      <label>País <input id="sr-nat" type="text" size="4" maxlength="3" placeholder="BRA"></label>
+      <label>Força mínima <input id="sr-str" type="number" min="0" max="50" value="0"></label>
+      <label>Posição <select id="sr-pos"><option value="-1">Todas</option><option value="0">Guarda-redes</option><option value="1">Defesa</option><option value="2">Médio</option><option value="3">Avançado</option></select></label>
+      <label>Preço máximo <input id="sr-price" type="number" min="0" step="1000" value="0"></label>
+      <button type="submit">Procurar</button>
+    </form>
+    <table id="offers"><thead><tr><th class="l">Jogador</th><th class="l">Clube</th><th class="l">Pos</th><th>F</th><th class="l">País</th><th>Preço</th><th></th></tr></thead><tbody></tbody></table>
+    <p class="note">Só aparecem (até 50) os jogadores que o clube aceita vender, ao preço que pede. O pagamento é imediato e o jogador chega no fim da jornada.</p>
+  </section>
+
   <section class="card wide" id="transfers-card" hidden aria-labelledby="tr-title">
     <h2 id="tr-title">Transferências</h2>
     <ul id="transfers" class="transfers"></ul>

@@ -101,3 +101,6 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 
 .kicks { margin: .25rem 0 .5rem 1.25rem; padding: 0; }
 .kicks li.away { color: var(--muted, #888); }
+
+.searchform { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: end; margin-bottom: .75rem; }
+.searchform label { display: flex; flex-direction: column; font-size: .85rem; }

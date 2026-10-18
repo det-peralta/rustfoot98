@@ -10,7 +10,7 @@ use crate::market::{code, country_class};
 use crate::rng::DelphiRng;
 use crate::season::{Club, Plan, PlannedSub};
 use crate::sector::{Slot, Status};
-use crate::world::{Human, Listing, World};
+use crate::world::{Human, Listing, Pending, World};
 
 const MAGIC: &str = "ELIFOOT98-RS 1";
 
@@ -66,6 +66,13 @@ impl World {
         for name in &self.cup {
             out.push_str(&format!("cup|{}\n", clean(name)));
         }
+        for p in &self.pending {
+            out.push_str(&format!(
+                "pending|{}|{}\n",
+                clean(&p.seller),
+                clean(&p.player)
+            ));
+        }
         for l in &self.board {
             let (b, fee) = l
                 .best
@@ -87,7 +94,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -112,7 +119,8 @@ impl World {
                 c.bought,
                 c.bought_foreign,
                 c.fin.fill,
-                c.fin.works
+                c.fin.works,
+                c.fin.prizes
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -158,6 +166,7 @@ impl World {
         let mut has_cup = false;
         let mut has_finance = false;
         let mut board: Vec<Listing> = Vec::new();
+        let mut pending: Vec<Pending> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
         let mut cash_ref = [0i64; 4];
@@ -203,6 +212,10 @@ impl World {
                         .ok_or(format!("line {}: bad economy", n + 1))?
                 }
                 "round" => round = num(n, &f, 1)? as usize,
+                "pending" => pending.push(Pending {
+                    seller: f.get(1).ok_or("pending without seller")?.to_string(),
+                    player: f.get(2).ok_or("pending without player")?.to_string(),
+                }),
                 "listing" => {
                     let best = match (f.get(5), f.get(6).and_then(|x| x.parse::<i64>().ok())) {
                         (Some(b), Some(fee)) if !b.is_empty() => Some((b.to_string(), fee)),
@@ -288,6 +301,7 @@ impl World {
                             wages: int(18),
                             interest: int(19),
                             works: f.get(25).and_then(|x| x.parse().ok()).unwrap_or(0),
+                            prizes: f.get(26).and_then(|x| x.parse().ok()).unwrap_or(0),
                         };
                         has_finance = true;
                     }
@@ -359,6 +373,7 @@ impl World {
             cup_champion,
             transfers: Vec::new(),
             board,
+            pending,
         };
         if !has_cup {
             w.reset_cup();

@@ -48,6 +48,8 @@ try {
   const mmsg = await p.textContent('#market-msg');
   check('selling gives an answer', /Vendido|nenhum clube|jogadores/.test(mmsg), mmsg);
   await p.click('#loan-up');
+  await p.click('#search-form button[type=submit]');
+  check('player search lists offers', (await p.locator('#offers tbody tr').count()) > 0, String(await p.locator('#offers tbody tr').count()));
   check('loan granted', (await p.textContent('#market-msg')).includes('Empréstimo'), await p.textContent('#market-msg'));
   check('loan shown', (await p.textContent('#finance')).includes('limite'));
   check('my match highlighted in the results', (await p.locator('#results li.mine').count()) === 1);

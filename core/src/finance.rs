@@ -15,6 +15,8 @@ pub enum Category {
     Interest,
     /// Stadium works (category `0x17`).
     Works,
+    /// Season-end prizes (category 3).
+    Prizes,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -34,6 +36,7 @@ pub struct Finance {
     pub wages: i64,
     pub interest: i64,
     pub works: i64,
+    pub prizes: i64,
 }
 
 impl Default for Finance {
@@ -50,6 +53,7 @@ impl Default for Finance {
             wages: 0,
             interest: 0,
             works: 0,
+            prizes: 0,
         }
     }
 }
@@ -82,6 +86,7 @@ impl Finance {
             Category::Wages => self.wages += amount,
             Category::Interest => self.interest += amount,
             Category::Works => self.works += amount,
+            Category::Prizes => self.prizes += amount,
         }
     }
 }
@@ -140,6 +145,12 @@ pub fn expansion_cost(f: &Finance, e: f64, g: i64) -> i64 {
 pub fn expand(f: &mut Finance) {
     f.stadium += 1;
     f.fill = 0.6;
+}
+
+/// The season-end prizes of the sample save's currency record (`10c8:2d8f..2d97`): 20 000 000 for the first division's
+/// champion, 6 000 000 for the cup winner and 3 000 000 for the club of each top scorer, with `G = 5`; scaled with `G`.
+pub fn season_prizes(g: i64) -> [i64; 3] {
+    [4_000_000 * g, 1_200_000 * g, 600_000 * g]
 }
 
 /// `1040:3865`: interest per game, 5 % of the loan.

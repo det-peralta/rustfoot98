@@ -191,6 +191,39 @@ pub struct World {
     pub transfers: Vec<Transfer>,
     /// Auctions of computer-managed clubs' players that the user can still outbid before the next round.
     pub board: Vec<Listing>,
+    /// Direct purchases of the user waiting for the end of the round.
+    pub pending: Vec<Pending>,
+}
+
+/// A player the user could buy straight away (`Procurar jogadores`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Offer {
+    pub club: String,
+    /// Index of the player in the club's squad.
+    pub index: usize,
+    pub player: String,
+    pub position: u8,
+    pub strength: u16,
+    pub nationality: [u8; 3],
+    pub price: i64,
+}
+
+/// Search criteria of the player search dialog.
+#[derive(Clone, Debug, Default)]
+pub struct Search {
+    pub name: String,
+    pub nationality: Option<[u8; 3]>,
+    pub min_strength: u16,
+    pub position: Option<u8>,
+    pub max_price: Option<i64>,
+    pub hide_mine: bool,
+}
+
+/// A purchase the user has paid that arrives with the end of the round (`1020:0aae`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Pending {
+    pub seller: String,
+    pub player: String,
 }
 
 /// A player on offer in an open auction.
@@ -370,6 +403,7 @@ impl World {
             cup_champion: None,
             transfers: Vec::new(),
             board: Vec::new(),
+            pending: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -402,6 +436,7 @@ impl World {
             cup_champion: None,
             transfers: Vec::new(),
             board: Vec::new(),
+            pending: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -444,6 +479,7 @@ impl World {
             cup_champion: None,
             transfers: Vec::new(),
             board: Vec::new(),
+            pending: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -736,6 +772,173 @@ impl World {
                 self.settle(seller, idx, buyer, fee, l.round);
             }
         }
+    }
+
+    /// `Procurar jogadores` (`1048:29f0`): up to 50 players of other clubs that are for sale, with the price each club asks.
+    pub fn search_offers(&self, q: &Search) -> Vec<Offer> {
+        let Some(human) = self.human_location() else {
+            return Vec::new();
+        };
+        let me = self.club_ref(human);
+        let needle = q.name.to_lowercase();
+        let mut out = Vec::new();
+        for loc in self.all_clubs_by_master() {
+            if out.len() >= 50 {
+                break;
+            }
+            let c = self.club_ref(loc);
+            if loc == human && q.hide_mine {
+                continue;
+            }
+            if loc == human {
+                continue; // the user cannot buy from himself
+            }
+            for (i, s) in c.slots.iter().enumerate() {
+                if out.len() >= 50 {
+                    break;
+                }
+                if (!needle.is_empty() && !c.names[i].to_lowercase().contains(&needle))
+                    || q.nationality.is_some_and(|n| n != s.nat)
+                    || s.strength < q.min_strength
+                    || q.position.is_some_and(|p| p != s.position)
+                {
+                    continue;
+                }
+                let price = crate::market::direct_price(c, i, Some(me), self.economy, self.scale);
+                if price == 0 || q.max_price.is_some_and(|m| price > m) {
+                    continue;
+                }
+                out.push(Offer {
+                    club: c.name.clone(),
+                    index: i,
+                    player: c.names[i].clone(),
+                    position: s.position,
+                    strength: s.strength,
+                    nationality: s.nat,
+                    price,
+                });
+            }
+        }
+        out
+    }
+
+    /// The user buys a listed player at the asking price: the club is paid at once and the player arrives with the end of the
+    /// round (`1048:1d66`, `1020:0aae`).
+    pub fn human_buy(&mut self, club: &str, index: usize, player: &str) -> Result<i64, String> {
+        let human = self.human_location().ok_or("sem clube")?;
+        let seller = self
+            .all_clubs_by_master()
+            .into_iter()
+            .find(|&loc| self.club_ref(loc).name == club)
+            .ok_or("clube inexistente")?;
+        let idx = index;
+        if self.club_ref(seller).names.get(idx).map(String::as_str) != Some(player) {
+            return Err("o jogador já não está nesse clube".into());
+        }
+        if self
+            .pending
+            .iter()
+            .any(|p| p.seller == club && p.player == player)
+        {
+            return Err("esse jogador já está comprado".into());
+        }
+        let price = crate::market::direct_price(
+            self.club_ref(seller),
+            idx,
+            Some(self.club_ref(human)),
+            self.economy,
+            self.scale,
+        );
+        if price == 0 {
+            return Err("o clube não quer vender esse jogador".into());
+        }
+        let slot = self.club_ref(seller).slots[idx];
+        let me = self.club_ref(human);
+        if me.fin.cash < price {
+            return Err(format!("sem dinheiro: o preço é {price}"));
+        }
+        if !crate::market::may_bid(me, &slot) {
+            return Err("o plantel está cheio ou já tens estrangeiros a mais".into());
+        }
+        let year = self.year;
+        let round = self.round;
+        let to = me.name.clone();
+        let foreign = country_class(me.country, slot.nat) == 2;
+        self.club_mut(seller)
+            .fin
+            .book(price, finance::Category::Sales);
+        let c = self.club_mut(human);
+        c.fin.book(-price, finance::Category::Purchases);
+        c.bought += 1;
+        c.bought_foreign += foreign as u16;
+        self.pending.push(Pending {
+            seller: club.to_string(),
+            player: player.to_string(),
+        });
+        self.transfers.push(Transfer {
+            round,
+            year,
+            player: player.to_string(),
+            position: slot.position,
+            strength: slot.strength,
+            from: club.to_string(),
+            to,
+            fee: price,
+        });
+        Ok(price)
+    }
+
+    /// `1020:0aae`: the user's purchases join the club (wage from the player's value in the new club's economy).
+    fn deliver_purchases(&mut self) {
+        let pending = std::mem::take(&mut self.pending);
+        let Some(human) = self.human_location() else {
+            return;
+        };
+        for p in pending {
+            let Some(seller) = self
+                .all_clubs_by_master()
+                .into_iter()
+                .find(|&loc| self.club_ref(loc).name == p.seller)
+            else {
+                continue;
+            };
+            let Some(idx) = self
+                .club_ref(seller)
+                .names
+                .iter()
+                .position(|n| *n == p.player)
+            else {
+                continue;
+            };
+            let value = {
+                let sl = &self.club_ref(seller).slots[idx];
+                player_value(
+                    sl.strength,
+                    self.club_ref(human).fin.f,
+                    self.economy,
+                    self.scale,
+                )
+            };
+            let name = self.club_mut(seller).names.remove(idx);
+            let mut slot = self.club_mut(seller).slots.remove(idx);
+            let country = self.club_ref(human).country;
+            slot.foreign = country_class(country, slot.nat);
+            slot.same_country = slot.foreign == 0;
+            slot.wage = value;
+            slot.fresh = true;
+            slot.status = Status::Out;
+            let c = self.club_mut(human);
+            c.slots.push(slot);
+            c.names.push(name);
+            c.bought = c.bought.saturating_sub(1);
+            if slot.foreign == 2 {
+                c.bought_foreign = c.bought_foreign.saturating_sub(1);
+            }
+            if self.is_human(seller) {
+                self.remap_plan_after_removal(idx);
+            }
+        }
+        self.refresh_plan();
     }
 
     /// The user takes one loan step (`1010:665e`), within the bank's limit (`1040:3899`).
@@ -1277,6 +1480,7 @@ impl World {
         // order of `1020:0c41`: games, economic factors (`6e48`), clubs sell and renegotiate (`3e9c`), then the evolution
         self.update_factors();
         self.market_round(round);
+        self.deliver_purchases();
         for (d, base) in DIVISION_BASE.iter().enumerate() {
             end_of_round(&mut self.rng, &mut self.divisions[d], *base);
         }
@@ -1292,6 +1496,51 @@ impl World {
         self.refresh_plan();
         if round == ROUNDS {
             self.finish_season();
+        }
+    }
+
+    /// `1020:2ae6`: the champion of the first division, the cup winner and the club of every top scorer get their prizes
+    /// (category 3); the scorers' tallies then start again.
+    fn pay_prizes(&mut self, cup_winner: Option<&str>) {
+        let [p1, p2, p3] = finance::season_prizes(self.scale);
+        if let Some(&i) = standings(&self.divisions[0]).first() {
+            self.divisions[0][i].fin.book(p1, finance::Category::Prizes);
+        }
+        if let Some(name) = cup_winner {
+            if let Some(loc) = self.locate(name) {
+                self.club_at(loc).fin.book(p2, finance::Category::Prizes);
+            }
+        }
+        let top = self
+            .divisions
+            .iter()
+            .flatten()
+            .chain(self.pool.iter())
+            .flat_map(|c| c.slots.iter().map(|s| s.goals))
+            .max()
+            .unwrap_or(0);
+        if top > 0 {
+            for c in self
+                .divisions
+                .iter_mut()
+                .flatten()
+                .chain(self.pool.iter_mut())
+            {
+                let scorers = c.slots.iter().filter(|s| s.goals == top).count() as i64;
+                if scorers > 0 {
+                    c.fin.book(p3 * scorers, finance::Category::Prizes);
+                }
+            }
+        }
+        for c in self
+            .divisions
+            .iter_mut()
+            .flatten()
+            .chain(self.pool.iter_mut())
+        {
+            for s in c.slots.iter_mut() {
+                s.goals = 0;
+            }
         }
     }
 
@@ -1327,6 +1576,7 @@ impl World {
             .chain(self.pool.iter().map(|c| (c.name.clone(), 4)))
             .collect();
         let cup_winner = self.cup_champion.clone();
+        self.pay_prizes(cup_winner.as_deref());
         end_of_season(
             &mut self.rng,
             &mut self.divisions,
@@ -2010,5 +2260,82 @@ mod tests {
             }
         }
         assert!(shootouts > 0, "some final in 60 seasons goes to penalties");
+    }
+
+    #[test]
+    fn season_prizes_go_to_the_champion_the_cup_winner_and_the_top_scorer_clubs() {
+        let mut w = World::synthetic(21);
+        for _ in 0..14 {
+            w.play_round();
+        }
+        let s = w.last_season.as_ref().unwrap();
+        let champion = s.tables[0][0].name.clone();
+        let cup = s.cup_winner.clone().unwrap();
+        let [p1, p2, p3] = finance::season_prizes(w.scale);
+        let find = |n: &str| {
+            w.divisions
+                .iter()
+                .flatten()
+                .chain(w.pool.iter())
+                .find(|c| c.name == n)
+                .unwrap()
+        };
+        assert!(find(&champion).fin.prizes >= p1);
+        assert!(find(&cup).fin.prizes >= p2);
+        let total: i64 = w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .map(|c| c.fin.prizes)
+            .sum();
+        assert!(total >= p1 + p2 + p3, "{total}");
+        // a new season starts with fresh scoring tallies
+        assert!(w
+            .divisions
+            .iter()
+            .flatten()
+            .all(|c| c.slots.iter().all(|s| s.goals == 0)));
+    }
+
+    #[test]
+    fn the_user_can_search_and_buy_players_that_arrive_after_the_round() {
+        let mut w = World::synthetic(13);
+        set_human_cash(&mut w, 900_000_000);
+        let offers = w.search_offers(&Search::default());
+        assert!(!offers.is_empty() && offers.len() <= 50);
+        assert!(offers.iter().all(|o| o.price > 0 && o.price % 1000 == 0));
+        let (d, i) = w.human_location().unwrap();
+        let (before, cash) = (w.divisions[d][i].slots.len(), w.divisions[d][i].fin.cash);
+        let o = offers[0].clone();
+        let paid = w.human_buy(&o.club, o.index, &o.player).unwrap();
+        assert_eq!(paid, o.price);
+        assert_eq!(w.divisions[d][i].fin.cash, cash - paid);
+        assert_eq!(
+            w.divisions[d][i].slots.len(),
+            before,
+            "the player arrives with the end of the round"
+        );
+        assert!(
+            w.human_buy(&o.club, o.index, &o.player).is_err(),
+            "cannot buy him twice"
+        );
+        w.play_round();
+        let (d, i) = w.human_location().unwrap();
+        let club = &w.divisions[d][i];
+        assert_eq!(club.slots.len(), before + 1);
+        assert!(club.names.contains(&o.player));
+        assert_eq!(club.bought, 0);
+        // filters work
+        let gk = w.search_offers(&Search {
+            position: Some(0),
+            ..Search::default()
+        });
+        assert!(gk.iter().all(|o| o.position == 0));
+        let cheap = w.search_offers(&Search {
+            max_price: Some(5000),
+            ..Search::default()
+        });
+        assert!(cheap.iter().all(|o| o.price <= 5000));
     }
 }

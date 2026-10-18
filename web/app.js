@@ -387,6 +387,30 @@ function renderMarket() {
 }
 let lastMarketMsg = "";
 
+function renderOffers() {
+  const card = $("search-card");
+  card.hidden = !state.human;
+  const body = $("offers").querySelector("tbody");
+  body.innerHTML = "";
+  (state.offers || []).forEach((o) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="l">${esc(o.player)}</td><td class="l">${esc(o.club)}</td><td class="l">${POS[o.pos]}</td><td>${o.str}</td><td class="l">${esc(o.nat)}</td><td>${money(o.price)}</td><td><button>Comprar</button></td>`;
+    tr.querySelector("button").onclick = () => { wasm.buy_player(o.i); lastMarketMsg = ""; read(); };
+    body.appendChild(tr);
+  });
+}
+
+function doSearch(ev) {
+  ev.preventDefault();
+  const enc = new TextEncoder().encode($("sr-name").value);
+  const ptr = wasm.buf_resize(Math.max(1, enc.length));
+  new Uint8Array(wasm.memory.buffer, ptr, enc.length).set(enc);
+  const nat = $("sr-nat").value.toUpperCase().padEnd(3, " ").slice(0, 3);
+  const packed = $("sr-nat").value.trim() ? (nat.charCodeAt(0) << 16) | (nat.charCodeAt(1) << 8) | nat.charCodeAt(2) : 0;
+  wasm.buy_search(enc.length, packed, Number($("sr-str").value) | 0, Number($("sr-pos").value) | 0, Number($("sr-price").value) || 0, 1);
+  read();
+}
+
 function renderTransfers() {
   const card = $("transfers-card"), list = state.transfers || [];
   if (!list.length) { card.hidden = true; return; }
@@ -419,6 +443,7 @@ function render() {
   renderClub();
   renderCup();
   renderMarket();
+  renderOffers();
   renderTransfers();
   renderSeason();
 }
@@ -466,6 +491,7 @@ $("export").onclick = () => {
 };
 $("import").onchange = async (e) => { const f = e.target.files[0]; if (f) loadText(await f.text()); e.target.value = ""; };
 $("import-e98").onchange = async (e) => { const f = e.target.files[0]; if (f) importE98(new Uint8Array(await f.arrayBuffer())); e.target.value = ""; };
+$("search-form").onsubmit = doSearch;
 $("play-round").onclick = () => play("world_play_round");
 $("play-season").onclick = () => play("world_play_season");
 $("new-world").onclick = newWorld;

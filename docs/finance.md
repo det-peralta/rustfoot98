@@ -149,3 +149,16 @@ port keeps the same rules but makes it asynchronous, because every game runs in 
   (`c081`) and `cost` (category `0x17`) is `max(50000, 50000 * round(sqrt(bracket) * E * 35000 * G / 50000))` with bracket 1 / 2 / 3 for level
   < 6 / < 14 / >= 14. The user does the same from the finance card.
 
+## Direct purchases, prizes (decoded in the second pass)
+- **Buying from a computer club** (`1010:63fa`, the *Procurar jogadores* dialog `1048:29f0`): a club sells a player only when it is sellable
+  (`5a6a`), its coach is not human and the player's sale score is at most 1.95 (a surplus player). Price: `market value * 3.5 * score`;
+  for a buyer of the same country `(p + 30000) * 1.6`, of the same group `(p + 15000) * 1.3`; rounded down to 100 000 (>= 2 M),
+  50 000 (>= 1 M), 25 000 (> 500 000), 10 000 (> 100 000) or 1000. The user pays at once (seller `+`, buyer category `0x15`), the
+  player joins with the end of the round (`1020:0aae`) with the wage `7ff4` of the buyer's economy, `fresh` set; `team+0xc7/0xc9` count
+  the pending arrivals against the 24-player and 5-foreigner limits.
+- **Season-end prizes** (`1020:2ae6`; the amounts live in the currency record at `DS:2d8f..2d97`, loaded from the save header — in the sample
+  `20 000 000`, `6 000 000`, `3 000 000` with `G = 5`): the first division's champion, the cup winner and the club of every top scorer
+  (all players tied on the most goals; the tally `slot+0x14`, which also ranks the line-up, starts again each season in the port).
+  Header record (offsets of the `.e98`): `0x7b` loan step 500 000, `0x7f` 4, `0x83` `G`, `0x87` 1, `0x8b` the three prizes, `0x32` the ticket
+  rounding unit (extended 1.0), `0x28` economy index.
+

@@ -205,6 +205,42 @@ fn ratio_term(over: f64, w: i64) -> f64 {
     ((over / w as f64 - 9.0).ln() / 10.0) + 1.0
 }
 
+/// `1010:63fa`: the price a computer-managed club asks when the user wants to buy `slot` directly (0 = not for sale).
+/// Only players the club could do without (sale score at most 1.95) are for sale; the price is
+/// `market value * 3.5 * score`, raised for a buyer of the same country (`(p + 30000) * 1.6`) or country group
+/// (`(p + 15000) * 1.3`), then rounded down to 100 000 from 2 M, 50 000 from 1 M, 25 000 above 500 000, 10 000 above 100 000
+/// and 1000 below.
+pub fn direct_price(seller: &Club, idx: usize, buyer: Option<&Club>, e: f64, g: i64) -> i64 {
+    if sale_blocker(seller, idx) != 0 {
+        return 0;
+    }
+    let slot = &seller.slots[idx];
+    let score = sale_score(seller, slot);
+    if score > 1.95 {
+        return 0;
+    }
+    let mut price = (market_value(slot, e, g) as f64 * 3.5 * score).round_ties_even() as i64;
+    if let Some(b) = buyer {
+        match country_class(b.country, slot.nat) {
+            0 => price = ((price + 30_000) as f64 * 1.6).round_ties_even() as i64,
+            1 => price = ((price + 15_000) as f64 * 1.3).round_ties_even() as i64,
+            _ => {}
+        }
+    }
+    let unit = if price >= 2_000_000 {
+        100_000
+    } else if price >= 1_000_000 {
+        50_000
+    } else if price > 500_000 {
+        25_000
+    } else if price > 100_000 {
+        10_000
+    } else {
+        1000
+    };
+    price / unit * unit
+}
+
 /// Rounds a price down to a multiple of 1000 (`1882` then `1845`).
 pub fn floor_1000(v: i64) -> i64 {
     v.div_euclid(1000) * 1000
