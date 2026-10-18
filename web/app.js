@@ -330,7 +330,9 @@ function renderClub() {
   if (!mine) { box.className = "empty"; box.textContent = "Ainda não jogaste."; return; }
   box.className = "";
   const evs = timeline(mine).map((e) => `<li>${e.m}' ${e.html}</li>`).join("");
-  box.innerHTML = `<p><b>${esc(mine.home)} ${mine.hg} – ${mine.ag} ${esc(mine.away)}</b></p><ul class="mm">${evs || "<li class=\"empty\">Sem acontecimentos.</li>"}</ul>`;
+  const swaps = (state.coachChanges || []).map(([a, b]) => `<li>${esc(a)} trocou de treinador com ${esc(b)}.</li>`).join("");
+  const moved = state.humanMoved ? `<p class="note" role="status"><b>${esc(state.humanMoved[0])} → ${esc(state.humanMoved[1])}:</b> o teu treinador mudou de clube.</p>` : "";
+  box.innerHTML = `<p><b>${esc(mine.home)} ${mine.hg} – ${mine.ag} ${esc(mine.away)}</b></p><ul class="mm">${evs || "<li class=\"empty\">Sem acontecimentos.</li>"}</ul>${moved}${swaps ? `<p class="note">Treinadores:</p><ul class="mm">${swaps}</ul>` : ""}`;
 }
 
 let selectedCup = null;

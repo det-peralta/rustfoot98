@@ -52,6 +52,9 @@ pub struct Club {
     pub goals_against: i32,
     /// Games played by the current coach (`coach+0x0c`, saturating at `i16::MAX`); reset when the coach is sacked.
     pub coach_games: u16,
+    /// The coach's score (`coach+0x0e`): +2 for a home win, +3 for an away win, +1 / +2 for a home / away draw. It
+    /// travels with the coach when two clubs swap coaches and ranks the candidates for a vacancy (lowest first).
+    pub coach_score: i64,
     pub fin: Finance,
     /// The club's country code (`team+4` object `+0x4a`); compared with the players' nationalities.
     pub country: [u8; 3],
@@ -71,13 +74,19 @@ impl Club {
     /// `1010:8b5d` + `4f40`: replaces the coach when the results were bad for long enough. The new coach starts with
     /// `K = 1.0` and zero games. (The original may swap the coach with another club's; that side effect is not modelled.)
     pub fn maybe_sack_coach(&mut self) -> bool {
-        if self.coach_games >= SACK_MIN_GAMES && self.k <= SACK_MORALE {
+        if self.sack_due() {
             self.k = 1.0;
             self.coach_games = 0;
+            self.coach_score = 0;
             true
         } else {
             false
         }
+    }
+
+    /// `1010:8b5d` for a league game: the coach has coached enough games and the morale has sunk.
+    pub fn sack_due(&self) -> bool {
+        self.coach_games >= SACK_MIN_GAMES && self.k <= SACK_MORALE
     }
 
     pub fn new(name: &str, slots: Vec<Slot>) -> Self {
@@ -95,6 +104,7 @@ impl Club {
             goals_for: 0,
             goals_against: 0,
             coach_games: 0,
+            coach_score: 0,
             fin: Finance::default(),
             country: *b"???",
             master: 0,
@@ -395,7 +405,17 @@ pub fn play_game(
     }
 }
 
-/// Plays one league round; updates ratings, injuries, bans, goals, points (3-1-0), W/D/L and morale.
+/// Coach scores after a league game (`1010:9396`): `(home, away)`.
+pub fn coach_points(x: i32, y: i32) -> (i64, i64) {
+    match x.cmp(&y) {
+        std::cmp::Ordering::Greater => (2, 0),
+        std::cmp::Ordering::Less => (0, 3),
+        std::cmp::Ordering::Equal => (1, 2),
+    }
+}
+
+/// Plays one league round with the local fallback for sackings (the coach is replaced by a fresh one); see
+/// [`play_round_with`] for the original's coach swap between clubs.
 pub fn play_round(
     rng: &mut DelphiRng,
     clubs: &mut [Club],
@@ -403,6 +423,24 @@ pub fn play_round(
     names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
     plans: &HashMap<usize, Plan>,
     money: Option<MoneyCtx>,
+) -> Vec<MatchRecord> {
+    play_round_with(rng, clubs, round, names, plans, money, &mut |clubs, i| {
+        clubs[i].maybe_sack_coach();
+    })
+}
+
+/// Plays one league round; updates ratings, injuries, bans, goals, points (3-1-0), W/D/L and morale. After each game
+/// the sack check of `1010:8b5d` runs for the loser (both clubs after a draw), before the morale update, and
+/// `on_sack(clubs, i)` is called for every club whose coach is due to go (`1010:4f40`).
+#[allow(clippy::too_many_arguments)]
+pub fn play_round_with(
+    rng: &mut DelphiRng,
+    clubs: &mut [Club],
+    round: usize,
+    names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+    plans: &HashMap<usize, Plan>,
+    money: Option<MoneyCtx>,
+    on_sack: &mut dyn FnMut(&mut [Club], usize),
 ) -> Vec<MatchRecord> {
     let mut records = Vec::new();
     for (i, c) in clubs.iter_mut().enumerate() {
@@ -465,9 +503,21 @@ pub fn play_round(
             }
             finance::update_fill(&mut hc.fin, attendance);
         }
+        let (ph, pa) = coach_points(x, y);
+        hc.coach_score += ph;
+        ac.coach_score += pa;
+        let checks: &[usize] = match x.cmp(&y) {
+            std::cmp::Ordering::Greater => &[a],
+            std::cmp::Ordering::Less => &[h],
+            std::cmp::Ordering::Equal => &[h, a],
+        };
+        for &i in checks {
+            if clubs[i].sack_due() {
+                on_sack(clubs, i);
+            }
+        }
         let (rh, ra) = morale_results(x, y);
-        hc.maybe_sack_coach();
-        ac.maybe_sack_coach();
+        let (hc, ac) = two_mut(clubs, h, a);
         hc.k = update_morale(hc.k, rh);
         ac.k = update_morale(ac.k, ra);
         hc.coach_games = hc.coach_games.saturating_add(1).min(i16::MAX as u16);

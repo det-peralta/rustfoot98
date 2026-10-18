@@ -376,7 +376,16 @@ fn world_json(w: &World) -> String {
     let msg = MSG.with(|m| std::mem::take(&mut *m.borrow_mut()));
     let _ = write!(
         out,
-        "],\"transfers\":[{}],\"board\":[{}],\"offers\":[{}],\"msg\":{}",
+        "],\"coachChanges\":[{}],\"humanMoved\":{},\"transfers\":[{}],\"board\":[{}],\"offers\":[{}],\"msg\":{}",
+        w.coach_changes
+            .iter()
+            .map(|(a, b)| format!("[{},{}]", esc(a), esc(b)))
+            .collect::<Vec<_>>()
+            .join(","),
+        match &w.human_moved {
+            Some((a, b)) => format!("[{},{}]", esc(a), esc(b)),
+            None => "null".into(),
+        },
         transfers.join(","),
         board.join(","),
         offers.join(","),
@@ -749,6 +758,16 @@ pub extern "C" fn human_plan(len: usize) -> i32 {
     });
     publish();
     1
+}
+
+/// Whether the user accepts being invited to take over a club whose coach was sacked (`1` yes, `0` no).
+#[no_mangle]
+pub extern "C" fn world_set_accept_invitations(on: i32) {
+    WORLD.with(|w| {
+        if let Some(w) = w.borrow_mut().as_mut() {
+            w.accept_invitations = on != 0;
+        }
+    });
 }
 
 #[no_mangle]

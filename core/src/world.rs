@@ -14,10 +14,10 @@ use crate::finance::{self, Finance};
 use crate::market::{code, country_class};
 use crate::matchsim::{Event, SubEvent};
 use crate::rng::DelphiRng;
-use crate::season::{apply_plan, auto_lineup, fixtures, play_game};
+use crate::season::{apply_plan, auto_lineup, fixtures, play_game, play_round_with};
 use crate::season::{
-    best_formation, end_of_round, end_of_season, plan_for_formation, play_round, standings, Club,
-    MatchRecord, MoneyCtx, Plan, FORMATIONS,
+    best_formation, end_of_round, end_of_season, plan_for_formation, standings, Club, MatchRecord,
+    MoneyCtx, Plan, FORMATIONS,
 };
 use crate::sector::{Slot, Status};
 use std::collections::HashMap;
@@ -193,6 +193,13 @@ pub struct World {
     pub board: Vec<Listing>,
     /// Direct purchases of the user waiting for the end of the round.
     pub pending: Vec<Pending>,
+    /// Whether the user accepts an invitation to take over a club whose coach was sacked (the original asks in a dialog).
+    pub accept_invitations: bool,
+    /// Coach changes of the last round played, as `(sacked club, club that gave its coach)`; the second is the club the
+    /// coach came from. The user's own moves are in `human_moved`.
+    pub coach_changes: Vec<(String, String)>,
+    /// Set when the user's coach was moved to another club by a swap (`(from, to)`).
+    pub human_moved: Option<(String, String)>,
 }
 
 /// A player the user could buy straight away (`Procurar jogadores`).
@@ -404,6 +411,9 @@ impl World {
             transfers: Vec::new(),
             board: Vec::new(),
             pending: Vec::new(),
+            accept_invitations: false,
+            coach_changes: Vec::new(),
+            human_moved: None,
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -437,6 +447,9 @@ impl World {
             transfers: Vec::new(),
             board: Vec::new(),
             pending: Vec::new(),
+            accept_invitations: false,
+            coach_changes: Vec::new(),
+            human_moved: None,
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -480,6 +493,9 @@ impl World {
             transfers: Vec::new(),
             board: Vec::new(),
             pending: Vec::new(),
+            accept_invitations: false,
+            coach_changes: Vec::new(),
+            human_moved: None,
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -1224,6 +1240,110 @@ impl World {
         self.cup_champion = None;
     }
 
+    /// `1010:8b5d` -> `1010:4f40`: the coach of club `i` of `cur` (division `d`, taken out of `self`) is sacked. A new one is
+    /// picked among the coaches (`5343`): those of clubs whose morale `K` is at least 1.25 and whose rating (`4ec3`) is 11..19
+    /// below this club's (`5661`), the lowest coach score first (`1050:1d59`); the user's coach only when invitations are
+    /// accepted. Without a candidate nothing happens (the check repeats after every lost game). The two clubs swap
+    /// coaches, both coaches' game counters and both clubs' morale reset; the user's coach takes the club it moved to.
+    fn replace_coach(&mut self, d: usize, cur: &mut [Club], i: usize, round: usize) {
+        let get = |this: &World, cur: &[Club], loc: (usize, usize)| -> Club {
+            if loc.0 == d {
+                cur[loc.1].clone()
+            } else {
+                this.club_ref(loc).clone()
+            }
+        };
+        let mut locs: Vec<(usize, usize)> = self
+            .divisions
+            .iter()
+            .enumerate()
+            .flat_map(|(dd, v)| {
+                (0..if dd == d { cur.len() } else { v.len() }).map(move |k| (dd, k))
+            })
+            .chain((0..self.pool.len()).map(|k| (4, k)))
+            .collect();
+        locs.sort_by_key(|&l| get(self, cur, l).master);
+        let me = (d, i);
+        let t = cur[i].clone();
+        let rating_t = crate::cup::team_rating(&t.slots) as i32;
+        let human_name = self.human.as_ref().map(|h| h.club.clone());
+        let is_human = |c: &Club| human_name.as_deref() == Some(c.name.as_str());
+        let exclude_humans = round == 14;
+        // coach list order: computer coaches by club order, the user's coach last
+        let mut cands: Vec<((usize, usize), Club)> = Vec::new();
+        for l in locs {
+            if l == me {
+                continue;
+            }
+            let c = get(self, cur, l);
+            let diff = rating_t - crate::cup::team_rating(&c.slots) as i32;
+            if c.k >= 1.25 && (11..20).contains(&diff) && !(exclude_humans && is_human(&c)) {
+                cands.push((l, c));
+            }
+        }
+        cands.sort_by_key(|(_, c)| is_human(c)); // stable: users last
+                                                 // `1050:1e3b` (free coaches wanted, rating < 15) puts computer coaches first, `1d59` only ranks by score; both
+                                                 // are the stable bubble sort `1068:0e0d` keeping a pair that is already in ascending order
+        let mut v: Vec<usize> = (0..cands.len()).collect();
+        for a in 1..v.len() {
+            for j in (a..v.len()).rev() {
+                let (p, q) = (&cands[v[j - 1]].1, &cands[v[j]].1);
+                let in_order = if rating_t < 15 {
+                    match (is_human(q), is_human(p)) {
+                        (false, true) => true,
+                        (true, false) => false,
+                        _ => p.coach_score <= q.coach_score,
+                    }
+                } else {
+                    p.coach_score <= q.coach_score
+                };
+                if !in_order {
+                    v.swap(j - 1, j);
+                }
+            }
+        }
+        let Some(&pick) = v
+            .iter()
+            .find(|&&k| !is_human(&cands[k].1) || self.accept_invitations)
+        else {
+            return;
+        };
+        let (ploc, p) = cands[pick].clone();
+        let t_human = is_human(&t);
+        let p_human = is_human(&p);
+        let (t_score, t_games) = (t.coach_score, 0u16);
+        let (p_score, p_games) = (p.coach_score, 0u16);
+        cur[i].k = 1.0;
+        cur[i].coach_score = p_score;
+        cur[i].coach_games = p_games;
+        {
+            let pc = if ploc.0 == d {
+                &mut cur[ploc.1]
+            } else {
+                self.club_mut(ploc)
+            };
+            pc.k = 1.0;
+            pc.coach_score = t_score;
+            pc.coach_games = t_games;
+        }
+        self.coach_changes.push((t.name.clone(), p.name.clone()));
+        if t_human {
+            self.human_moved = Some((t.name.clone(), p.name.clone()));
+        } else if p_human {
+            self.human_moved = Some((p.name.clone(), t.name.clone()));
+        }
+        if t_human && !p_human {
+            // `1010:6a08`: the club the user leaves gets wages no higher than the players' values and no overdraft
+            let (e, g) = (self.economy, self.scale);
+            let c = &mut cur[i];
+            let f = c.fin.f;
+            for s in c.slots.iter_mut() {
+                s.wage = s.wage.min(player_value(s.strength, f, e, g));
+            }
+            c.fin.cash = c.fin.cash.max(0);
+        }
+    }
+
     fn locate(&self, name: &str) -> Option<(usize, usize)> {
         self.divisions
             .iter()
@@ -1458,6 +1578,8 @@ impl World {
     pub fn play_round(&mut self) {
         self.close_board();
         self.last_round.clear();
+        self.coach_changes.clear();
+        self.human_moved = None;
         let round = self.round + 1;
         #[allow(clippy::needless_range_loop)]
         for d in 0..4 {
@@ -1480,14 +1602,28 @@ impl World {
                 }
             }
             let money = self.money_ctx(d);
-            let records = play_round(
-                &mut self.rng,
-                &mut self.divisions[d],
+            // the division is taken out so that a sacking can reach the other divisions (the coach swap of `4f40`)
+            let mut cur = std::mem::take(&mut self.divisions[d]);
+            let mut rng = std::mem::replace(&mut self.rng, DelphiRng::new(0));
+            let records = play_round_with(
+                &mut rng,
+                &mut cur,
                 round,
                 &mut names,
                 &plans,
                 Some(money),
+                &mut |cur, i| self.replace_coach(d, cur, i, round),
             );
+            self.rng = rng;
+            self.divisions[d] = cur;
+            if let Some((_, to)) = self.human_moved.clone() {
+                if let Some((hd, hi)) = self.locate(&to).filter(|l| l.0 < 4) {
+                    let keep = self.human.as_ref().map(|h| h.club == to).unwrap_or(false);
+                    if !keep {
+                        self.set_human(hd, hi);
+                    }
+                }
+            }
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
         }
         // order of `1020:0c41`: games, economic factors (`6e48`), clubs sell and renegotiate (`3e9c`), then the evolution
@@ -1643,6 +1779,56 @@ impl World {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A sacked coach swaps with the coach of a weaker club in good form (`5661`), keeping scores and resetting the games.
+    #[test]
+    fn a_sacked_coach_swaps_with_a_weaker_club_in_form() {
+        let mut w = World::synthetic(1);
+        w.human = None;
+        let rt = crate::cup::team_rating(&w.divisions[0][0].slots);
+        for s in w.divisions[2][0].slots.iter_mut() {
+            s.strength = rt - 15;
+        }
+        for s in w.divisions[3][0].slots.iter_mut() {
+            s.strength = rt - 15;
+        }
+        {
+            let t = &mut w.divisions[0][0];
+            t.k = 0.5;
+            t.coach_games = 12;
+            t.coach_score = 7;
+        }
+        w.divisions[2][0].k = 1.3;
+        w.divisions[2][0].coach_score = 9;
+        w.divisions[3][0].k = 1.4;
+        w.divisions[3][0].coach_score = 4; // the lowest score is chosen
+        w.divisions[3][0].coach_games = 20;
+        let mut cur = std::mem::take(&mut w.divisions[0]);
+        w.replace_coach(0, &mut cur, 0, 3);
+        w.divisions[0] = cur;
+        let t = &w.divisions[0][0];
+        assert_eq!((t.k, t.coach_games, t.coach_score), (1.0, 0, 4));
+        let p = &w.divisions[3][0];
+        assert_eq!((p.k, p.coach_games, p.coach_score), (1.0, 0, 7));
+        assert_eq!(w.divisions[2][0].coach_score, 9);
+        assert_eq!(w.coach_changes.len(), 1);
+    }
+
+    #[test]
+    fn nobody_is_sacked_without_a_suitable_partner() {
+        let mut w = World::synthetic(1);
+        w.human = None;
+        {
+            let t = &mut w.divisions[0][0];
+            t.k = 0.5;
+            t.coach_games = 12;
+        }
+        let mut cur = std::mem::take(&mut w.divisions[0]);
+        w.replace_coach(0, &mut cur, 0, 3);
+        w.divisions[0] = cur;
+        assert_eq!(w.divisions[0][0].k, 0.5);
+        assert!(w.coach_changes.is_empty());
+    }
 
     #[test]
     fn a_world_has_four_divisions_of_eight_and_a_pool() {

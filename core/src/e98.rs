@@ -53,6 +53,11 @@ pub struct E98Team {
     /// Season totals of the ledger: gate, sales, purchases, wages.
     pub ledger: [i64; 4],
     pub players: Vec<E98Player>,
+    /// The team's coach (`coach+0x0c` games coached, `+0x0e` score, `+0x07` set for the user's coaches).
+    pub coach: u16,
+    pub coach_games: u16,
+    pub coach_score: i64,
+    pub coach_human: bool,
     /// Team ids of the opponents in the fixture list (each twice); empty for clubs outside the league.
     pub opponents: Vec<u16>,
 }
@@ -186,7 +191,8 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
     c.raw(14)?;
     let k = real48(c.raw(6)?);
     let k = if (0.3..=11.0).contains(&k) { k } else { 1.0 };
-    c.raw(2 + 28 + 28)?; // coach id and two blocks of 28 bytes
+    let coach = c.u16()?;
+    c.raw(28 + 28)?; // two blocks of 28 bytes
     let money = c.raw(4 + 4 + 4 + 10)?; // loan, cash, start-of-season cash, F
     let factor = extended(&money[12..22]);
     let factor = if (0.1..=10.0).contains(&factor) {
@@ -228,6 +234,10 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         factor,
         ledger,
         players,
+        coach,
+        coach_games: 0,
+        coach_score: 0,
+        coach_human: false,
         opponents,
     })
 }
@@ -243,12 +253,16 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     let mut c = Cur { d, o: 0 };
     let n = c.u8()? as usize;
     c.raw(n + 2 + 2 + 1 + 2 + 4 + 10 + 10 + 101)?;
-    c.list(|c| {
-        c.raw(2)?;
+    let coaches = c.list(|c| {
+        let id = c.u16()?;
         c.pstr()?;
-        c.raw(1 + 1 + 2 + 4 + 4 + 5)?;
+        let human = c.u8()? != 0;
+        c.u8()?;
+        let games = c.u16()?;
+        let rest = c.raw(4 + 4 + 5)?;
+        let score = long(rest, 0);
         c.list(|c| c.raw(7).map(|_| ()))?;
-        Ok(())
+        Ok((id, human, games, score))
     })?;
     c.list(|c| {
         c.raw(3)?;
@@ -256,7 +270,14 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         c.pstr()?;
         Ok(())
     })?;
-    let teams = c.list(team)?;
+    let mut teams = c.list(team)?;
+    for t in &mut teams {
+        if let Some(&(_, human, games, score)) = coaches.iter().find(|k| k.0 == t.coach) {
+            t.coach_human = human;
+            t.coach_games = games;
+            t.coach_score = score;
+        }
+    }
     let cup = c.list(|c| c.u16())?;
     let divisions = c.list(|c| {
         c.raw(4 + 2)?;
@@ -355,6 +376,8 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c.losses = t.losses;
     c.goals_for = t.goals_for as i32;
     c.goals_against = t.goals_against as i32;
+    c.coach_games = t.coach_games;
+    c.coach_score = t.coach_score;
     c.fin = Finance::new_game(base, DEFAULT_SCALE); // stadium level: the save's stadium object was not located
     c.fin.cash = t.cash;
     c.fin.loan = t.loan;
@@ -462,6 +485,12 @@ mod tests {
             assert_eq!(save.teams.len(), 52);
             assert_eq!(save.cup.len(), 52);
             assert_eq!(save.divisions.len(), 5);
+            if name == "snap2.e98" {
+                let t = save.teams.iter().find(|t| t.coach_human).unwrap();
+                assert_eq!(t.coach_games, 2, "two rounds played");
+                assert!(t.coach_score <= 6);
+                assert_eq!(save.teams.iter().filter(|t| t.coach_human).count(), 2);
+            }
             let divs = save.divisions().unwrap();
             assert!(divs.iter().all(|g| g.len() == 8));
             let w = World::from_e98(1, &save).unwrap();

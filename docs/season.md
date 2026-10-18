@@ -92,13 +92,23 @@ is most likely intended; the user counters it by buying players at auction.
 - The browser shows the last cup round in a "Taça" card and the winner in the season-end summary. Saves keep the cup state
   (`cup|name`, `cupchampion|name` records); older saves start a fresh cup.
 
-## Coach sacking (`1010:8b5d` -> `4f40`, implemented in `Club::maybe_sack_coach`)
-Checked for both teams after every league game, **before** that game's morale update: an AI coach (`coach+0x07 == 0`) with
-`coach+0x0c >= 10` games (incremented at the end of every league game by `9396`, saturating at 0x7FFF, kept across seasons)
-whose team has `K <= 0.65` (extended constant at `1010:8b53`) is replaced. `4f40` then sets the team's `K` back to 1.0
-(Real48 `81 00 00 00 00 00`) and the new coach's game counter to 0, and records news. The replacement is picked by `5343`:
-free coaches and, for teams rated below 15, coaches of clubs whose rating is 11..19 higher (`5661`); in that second case the two
-clubs swap coaches (the partner's `K` is also reset to 1.0). **Not modelled:** the choice of the replacement and therefore the
-partner swap; the human-coach branch (`+0x07 != 0`, `576f`). A sacked weak team recovers morale, so the rule dampens the
-slide of weak clubs.
-
+## Coach sacking and swaps (`1010:8b5d` -> `5343` -> `4f40`, `World::replace_coach`)
+Coaches are objects (`coach+0x07` user flag, `+0x0c` games coached, `+0x0e` score) that belong to a team and **move between
+teams**; the 54 entries of the save's first list are the 52 clubs' coaches plus the two users' coaches.
+* **Scores** (`9396`, league games): home win +2 for the home coach; away win +3 for the away coach; draw +1 home / +2 away; the
+  loser gets nothing. Cup ties: the winner's coach +3.
+* **Sack check** (`8b5d`) runs right after the game, before the morale update, **only for the loser** (both clubs after a draw;
+  the loser of a cup tie with flag `0x400`): the coach has coached at least 10 games and the team's `K <= 0.65`. (A user's coach on a
+  club of the outside pool is dismissed at once; the pool never plays here.)
+* **Replacement** (`4f40` -> `5343`): candidates are the coaches of clubs with `K >= 1.25` (constant at `1010:565d`, a
+  32-bit float) whose rating (`4ec3`) is **11..19 below** the sacked club's (`5661`). Teams rated below 15 also accept unemployed
+  coaches (none exist here) and rank computer coaches before the user's (`1050:1e3b`); otherwise the comparator `1050:1d59` ranks
+  by `+0x16`, `+0x18` (both 0 in every save seen) and then **by score, lowest first**; the sort is the stable bubble sort `1068:0e0d`.
+  The head of the list is taken; the user's coach would first be asked in a dialog (`3bf9`), and is never a candidate in round 14
+  or for cup sackings (`0x400`). **Without a candidate nothing happens** and the check repeats after every lost game.
+* **Effect**: the two clubs **swap coaches** (score travels, both coaches' game counters reset to 0) and both clubs' `K` resets to
+  1.0. A user whose coach is swapped *takes over the other club* (so a sacked user is moved to a weaker club in form; an accepted
+  invitation takes them to the sacked club). When the user leaves a club for a computer coach, `6a08` caps that club's wages at
+  the players' values and lifts a negative cash balance to 0.
+In the port `World::accept_invitations` (default off; `world_set_accept_invitations` in the wasm ABI) decides about invitations;
+`coach_changes` / `human_moved` report what happened in the last round. About 3.5 swaps per season occur in a synthetic world.

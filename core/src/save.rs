@@ -94,7 +94,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -120,7 +120,8 @@ impl World {
                 c.bought_foreign,
                 c.fin.fill,
                 c.fin.works,
-                c.fin.prizes
+                c.fin.prizes,
+                c.coach_score
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -312,6 +313,7 @@ impl World {
                         c.bought_foreign = f.get(23).and_then(|x| x.parse().ok()).unwrap_or(0);
                         has_market = true;
                     }
+                    c.coach_score = f.get(27).and_then(|x| x.parse().ok()).unwrap_or(0);
                     c.names.clear();
                     current = Some((num(n, &f, 1)? as usize, c));
                 }
@@ -374,6 +376,9 @@ impl World {
             transfers: Vec::new(),
             board,
             pending,
+            accept_invitations: false,
+            coach_changes: Vec::new(),
+            human_moved: None,
         };
         if !has_cup {
             w.reset_cup();
