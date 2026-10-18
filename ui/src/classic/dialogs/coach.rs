@@ -336,6 +336,24 @@ mod tests {
     }
 
     #[test]
+    fn the_profile_dialog_holds_a_working_copy_of_the_options() {
+        let mut d = Dialog::new(Kind::CoachProfile, "TCOACHOPTIONSDLG");
+        d.text("CheckBoxNationalPlayersSalary.checked", "1");
+        d.text("CheckBoxBosmanPlayersSalary.checked", "0");
+        d.text("CheckBoxForeignerPlayersSalary.checked", "1");
+        d.text("CheckBoxEncryptOffers.checked", "1");
+        d.text("RadioGroupBuyInAuction.index", "2");
+        assert_eq!(
+            profile_options(&d),
+            CoachOptions {
+                salary: [true, false, true],
+                auction: 2,
+                encrypt: true
+            }
+        );
+    }
+
+    #[test]
     fn coach_history_rows_per_event_kind() {
         let mut w = World::synthetic(8);
         let (d, i) = w.human_location().unwrap();
