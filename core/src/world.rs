@@ -11,6 +11,7 @@ use crate::cup;
 use crate::economy::{player_value, walk_index, DEFAULT_SCALE, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
 use crate::finance::{self, Finance};
+use crate::history::History;
 use crate::market::{code, country_class};
 use crate::matchsim::{Event, SubEvent};
 use crate::rng::DelphiRng;
@@ -200,6 +201,8 @@ pub struct World {
     pub coach_changes: Vec<(String, String)>,
     /// Set when the user's coach was moved to another club by a swap (`(from, to)`).
     pub human_moved: Option<(String, String)>,
+    /// Calendars, champions, club and coach histories, the user's coach profile (`history.rs`, `docs/season.md`).
+    pub history: History,
 }
 
 /// A player the user could buy straight away (`Procurar jogadores`).
@@ -417,6 +420,7 @@ impl World {
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
+            history: History::default(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -453,6 +457,7 @@ impl World {
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
+            history: History::default(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -499,6 +504,7 @@ impl World {
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
+            history: History::default(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -679,6 +685,7 @@ impl World {
         };
         let c = self.club_ref(h);
         h != seller
+            && self.history.options.auction != 2 // the coach profile: no buying in auctions
             && c.fin.cash >= ask
             && crate::market::may_bid(c, &self.club_ref(seller).slots[slot_idx])
     }
@@ -1084,14 +1091,15 @@ impl World {
 
     /// `3e9c`: the most overpaid (stored wage / value above 1.2) and the most underpaid (below 0.8) player not yet marked
     /// `fresh` are repriced to their current value and marked.
-    fn renegotiate_wages(&mut self, loc: (usize, usize)) {
+    fn renegotiate_wages(&mut self, loc: (usize, usize), classes: [bool; 3]) {
         let (e, g) = (self.economy, self.scale);
         let club = self.club_mut(loc);
         let f = club.fin.f;
         let (mut cut, mut raise) = (None, None);
         let (mut cut_best, mut raise_best) = (1.2f64, 0.8f64);
         for (i, s) in club.slots.iter().enumerate() {
-            if s.fresh {
+            // the coach profile (`TCoachOptionsDlg`): only the classes the computer manages are renegotiated
+            if s.fresh || !classes[s.foreign.min(2) as usize] {
                 continue;
             }
             let v = player_value(s.strength, f, e, g);
@@ -1118,9 +1126,10 @@ impl World {
         let human = self.is_human(loc);
         let (e, g) = (self.economy, self.scale);
         if human {
-            // the user's wages are renegotiated by the computer (the coach options of the original ask whether to do so)
+            // the user's wages are renegotiated by the computer for the player classes of the coach profile (the original asks
+            // the user in a dialog for the others)
             if round >= 2 && self.club_ref(loc).coach_games > 1 {
-                self.renegotiate_wages(loc);
+                self.renegotiate_wages(loc, self.history.options.salary);
             }
             return;
         }
@@ -1140,7 +1149,7 @@ impl World {
         }
         // wages follow the player's value: the most overpaid and the most underpaid player (outside 0.8..1.2) are repriced
         if self.club_ref(loc).coach_games > 1 {
-            self.renegotiate_wages(loc);
+            self.renegotiate_wages(loc, [true; 3]);
             let club = self.club_mut(loc);
             // a club that is broke sells its lowest-scoring player at any price
             if club.fin.cash < 0 {
@@ -1319,6 +1328,7 @@ impl World {
         cur[i].k = 1.0;
         cur[i].coach_score = p_score;
         cur[i].coach_games = p_games;
+        cur[i].coach_name = p.coach_name.clone();
         {
             let pc = if ploc.0 == d {
                 &mut cur[ploc.1]
@@ -1328,7 +1338,9 @@ impl World {
             pc.k = 1.0;
             pc.coach_score = t_score;
             pc.coach_games = t_games;
+            pc.coach_name = t.coach_name.clone();
         }
+        self.log_coach_swap(&t, &p);
         self.coach_changes.push((t.name.clone(), p.name.clone()));
         if t_human {
             self.human_moved = Some((t.name.clone(), p.name.clone()));
@@ -1642,7 +1654,7 @@ impl World {
             };
             let mut plans = HashMap::new();
             if let (Some((hd, hi)), Some(h)) = (self.human_location(), self.human.as_ref()) {
-                if hd == d {
+                if hd == d && !self.history.holiday {
                     plans.insert(hi, h.plan.clone());
                 }
             }
@@ -1664,6 +1676,7 @@ impl World {
             self.apply_human_move();
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
         }
+        self.record_league_fixtures(round);
         // order of `1020:0c41`: games, economic factors (`6e48`), clubs sell and renegotiate (`3e9c`), then the evolution
         self.update_factors();
         self.market_round(round);
@@ -1676,6 +1689,7 @@ impl World {
         self.last_cup = None;
         if round.is_multiple_of(2) {
             self.play_cup_round(round);
+            self.record_cup_fixtures(round);
             self.apply_human_move();
         }
         if let Some(h) = self.human.as_mut() {
@@ -1765,6 +1779,7 @@ impl World {
             .collect();
         let cup_winner = self.cup_champion.clone();
         self.pay_prizes(cup_winner.as_deref());
+        self.record_season_history();
         end_of_season(
             &mut self.rng,
             &mut self.divisions,
@@ -1801,6 +1816,7 @@ impl World {
         });
         self.year += 1;
         self.round = 0;
+        self.history.calendars.clear(); // the new season's calendars are generated from the new divisions
         self.reset_cup();
         self.refresh_cash_ref();
     }

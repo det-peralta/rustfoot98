@@ -7,11 +7,12 @@
 use crate::cipher::read_pstr_n;
 use crate::economy::DEFAULT_SCALE;
 use crate::finance::Finance;
+use crate::history::{CoachOptions, Fixture, History, Winner};
 use crate::market::{code, country_class};
 use crate::season::Club;
 use crate::sector::{Slot, Status};
 use crate::world::base_strength;
-use crate::world::World;
+use crate::world::{Transfer, World};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
@@ -37,6 +38,73 @@ pub struct E98Player {
     pub g: u16,
     /// Career history (`+0x17..0x26`): games, goals, red cards, injuries.
     pub history: [u32; 4],
+}
+
+/// A history record of a club or a coach (7 bytes: `u8 kind`, `i32 year`, `u16` coach id for a club, team id for a coach).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct E98Event {
+    pub kind: u8,
+    pub year: u32,
+    pub other: u16,
+}
+
+/// A coach record (`1010:8612`).
+#[derive(Clone, Debug)]
+pub struct E98Coach {
+    pub id: u16,
+    pub name: String,
+    pub human: bool,
+    /// `+6`: a user's coach on holiday (the computer plays for him).
+    pub holiday: bool,
+    /// Titles won as coach (`+0x16` league, `+0x18` cup): the ranking sorts by them first.
+    pub titles: (u16, u16),
+    /// The five profile options (`+0x1a`): computer manages the wages of domestic, Bosman and other foreign players, auction
+    /// offers mode (0 all, 1 not the weakest, 2 none), encrypt offers.
+    pub options: [u8; 5],
+    pub events: Vec<E98Event>,
+}
+
+/// One line of the champions list (`1010:ca77`, 10 bytes): year and the ids of champion, its coach, cup winner, its coach.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct E98Winner {
+    pub year: u16,
+    pub champion: u16,
+    pub champion_coach: u16,
+    pub cup_winner: u16,
+    pub cup_coach: u16,
+}
+
+/// One line of the last transfers list (`1010:cf1f`, 12 bytes).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct E98Transfer {
+    /// `+4`: involves a user's club (shown in blue).
+    pub human: bool,
+    pub player: u16,
+    pub strength: u16,
+    pub fee: i64,
+    /// Team id shown in the last column (`+0xa`).
+    pub club: u16,
+}
+
+/// One entry of a club's fixture list (`1010:2031`, the original's `TCalendarEntry`, 16 bytes in the save: `u16 +8, u16 +0xe,
+/// u16 +0xa, u16 +0xc, u32 +0x10, u8 +7, u8 +6, u16 +4`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct E98Fixture {
+    /// Team id of the opponent (`+8`).
+    pub opponent: u16,
+    /// Venue (`+0xe`; letters `C`, `F`, `N` of the calendar list): 0 home, 1 away, 2 neutral ground.
+    pub venue: u16,
+    /// The two scores (`+0xa`, `+0xc`): the club's own goals first; -1 while the game is unplayed.
+    pub goals_a: i16,
+    pub goals_b: i16,
+    /// Attendance (`+0x10`).
+    pub gate: i64,
+    /// `+7`: a cup tie (the list shows cup rows in red, league rows in blue).
+    pub cup: bool,
+    /// `+6`: 0 normal time, 1 extra time, 2 won on penalties, 3 lost on penalties.
+    pub result: u8,
+    /// Round number (`+4`; below 1 shows blank).
+    pub round: u16,
 }
 
 #[derive(Clone, Debug)]
@@ -69,6 +137,10 @@ pub struct E98Team {
     pub coach_name: String,
     /// Team ids of the opponents in the fixture list (each twice); empty for clubs outside the league.
     pub opponents: Vec<u16>,
+    /// Titles and places of the club (`TTeamEvent`).
+    pub events: Vec<E98Event>,
+    /// The whole fixture list with results.
+    pub calendar: Vec<E98Fixture>,
 }
 
 #[derive(Clone, Debug)]
@@ -83,6 +155,9 @@ pub struct E98 {
     pub cup: Vec<u16>,
     /// Division lists as saved: name and club ids (the fifth is the pool of unemployed-coach clubs).
     pub divisions: Vec<(String, Vec<u16>)>,
+    pub coaches: Vec<E98Coach>,
+    pub winners: Vec<E98Winner>,
+    pub transfers: Vec<E98Transfer>,
 }
 
 fn u16_at(d: &[u8], o: usize) -> Option<u16> {
@@ -167,6 +242,15 @@ fn long(b: &[u8], at: usize) -> i64 {
     i32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]) as i64
 }
 
+fn event(c: &mut Cur) -> Result<E98Event, String> {
+    let e = c.raw(7)?;
+    Ok(E98Event {
+        kind: e[0],
+        year: long(e, 1) as u32,
+        other: u16::from_le_bytes([e[5], e[6]]),
+    })
+}
+
 fn player(c: &mut Cur) -> Result<E98Player, String> {
     let id = c.u16()?;
     let nat = c.pstr()?;
@@ -223,12 +307,23 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         long(block, 0x41 - 0x16),
     ];
     let players = c.list(player)?;
-    c.list(|c| c.raw(7).map(|_| ()))?;
+    let events = c.list(event)?;
     c.list(|c| c.raw(8).map(|_| ()))?;
-    let opponents = c.list(|c| {
+    let calendar = c.list(|c| {
         let e = c.raw(16)?;
-        Ok(u16::from_le_bytes([e[0], e[1]]))
+        let w = |k: usize| u16::from_le_bytes([e[k], e[k + 1]]);
+        Ok(E98Fixture {
+            opponent: w(0),
+            venue: w(2),
+            goals_a: w(4) as i16,
+            goals_b: w(6) as i16,
+            gate: long(e, 8),
+            cup: e[12] != 0,
+            result: e[13],
+            round: w(14),
+        })
     })?;
+    let opponents = calendar.iter().map(|f| f.opponent).collect();
     c.raw(1 + 6)?; // stadium level and fill
     Ok(E98Team {
         id,
@@ -255,6 +350,8 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         coach_human: false,
         coach_name: String::new(),
         opponents,
+        events,
+        calendar,
     })
 }
 
@@ -269,17 +366,36 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     let mut c = Cur { d, o: 0 };
     let n = c.u8()? as usize;
     c.raw(n + 2 + 2 + 1 + 2 + 4 + 10 + 10 + 101)?;
-    let coaches = c.list(|c| {
+    let coach_records = c.list(|c| {
         let id = c.u16()?;
         let name = c.pstr()?;
         let human = c.u8()? != 0;
-        c.u8()?;
+        let holiday = c.u8()? != 0;
         let games = c.u16()?;
         let rest = c.raw(4 + 4 + 5)?;
         let score = long(rest, 0);
-        c.list(|c| c.raw(7).map(|_| ()))?;
-        Ok((id, human, games, score, name))
+        let events = c.list(event)?;
+        Ok((
+            E98Coach {
+                id,
+                name,
+                human,
+                holiday,
+                titles: (
+                    u16::from_le_bytes([rest[4], rest[5]]),
+                    u16::from_le_bytes([rest[6], rest[7]]),
+                ),
+                options: [rest[8], rest[9], rest[10], rest[11], rest[12]],
+                events,
+            },
+            games,
+            score,
+        ))
     })?;
+    let coaches: Vec<(u16, bool, u16, i64, String)> = coach_records
+        .iter()
+        .map(|(k, g, s)| (k.id, k.human, *g, *s, k.name.clone()))
+        .collect();
     c.list(|c| {
         c.raw(3)?;
         c.pstr()?;
@@ -309,8 +425,29 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     while c.u16()? != 0 {
         c.list(|c| c.u16())?;
     }
-    c.list(|c| c.raw(10).map(|_| ()))?;
-    c.list(|c| c.raw(12).map(|_| ()))?;
+    let winners = c.list(|c| {
+        let e = c.raw(10)?;
+        let w = |k: usize| u16::from_le_bytes([e[k], e[k + 1]]);
+        Ok(E98Winner {
+            year: w(0),
+            champion: w(2),
+            champion_coach: w(4),
+            cup_winner: w(6),
+            cup_coach: w(8),
+        })
+    })?;
+    let transfers = c.list(|c| {
+        // read order of `1010:cf1f`: +6 player, +0xa club, +0xc fee, +8 strength, +5, +4 flag
+        let e = c.raw(12)?;
+        let w = |k: usize| u16::from_le_bytes([e[k], e[k + 1]]);
+        Ok(E98Transfer {
+            player: w(0),
+            club: w(2),
+            fee: long(e, 4),
+            strength: w(8),
+            human: e[11] != 0,
+        })
+    })?;
     if c.o != d.len() {
         return Err(format!("{} unread bytes after the save", d.len() - c.o));
     }
@@ -331,6 +468,9 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         teams,
         cup,
         divisions,
+        coaches: coach_records.into_iter().map(|(k, _, _)| k).collect(),
+        winners,
+        transfers,
     })
 }
 
@@ -415,6 +555,96 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c
 }
 
+/// The records of `history.rs` from a save: calendars, champions, club and coach histories, titles and the user's coach profile.
+fn history_of(save: &E98, club: &HashMap<u16, String>) -> History {
+    let team = |id: u16| club.get(&id).cloned().unwrap_or_default();
+    let coach = |id: u16| {
+        save.coaches
+            .iter()
+            .find(|k| k.id == id)
+            .map(|k| k.name.clone())
+            .unwrap_or_default()
+    };
+    let mut h = History::default();
+    for w in &save.winners {
+        h.winners.push(Winner {
+            year: w.year,
+            champion: team(w.champion),
+            champion_coach: coach(w.champion_coach),
+            cup_winner: team(w.cup_winner),
+            cup_coach: coach(w.cup_coach),
+        });
+    }
+    for t in &save.teams {
+        let name = team(t.id);
+        if !t.calendar.is_empty() {
+            h.calendars.insert(
+                name.clone(),
+                t.calendar
+                    .iter()
+                    .map(|f| Fixture {
+                        opponent: team(f.opponent),
+                        venue: f.venue.min(2) as u8,
+                        goals: (f.goals_a, f.goals_b),
+                        gate: f.gate,
+                        cup: f.cup,
+                        result: f.result,
+                        round: f.round,
+                    })
+                    .collect(),
+            );
+        }
+        for e in &t.events {
+            h.add_club_event(&name, e.kind, e.year, &coach(e.other));
+        }
+    }
+    for k in &save.coaches {
+        for e in &k.events {
+            h.add_coach_event(&k.name, e.kind, e.year, &team(e.other));
+        }
+        if k.titles != (0, 0) {
+            h.coach_titles.insert(k.name.clone(), k.titles);
+        }
+    }
+    if let Some(k) = save
+        .coaches
+        .iter()
+        .find(|k| k.human && save.teams.iter().any(|t| t.id == save.human_id && t.coach == k.id))
+    {
+        h.options = CoachOptions {
+            salary: [k.options[0] != 0, k.options[1] != 0, k.options[2] != 0],
+            auction: k.options[3].min(2),
+            encrypt: k.options[4] != 0,
+        };
+        h.holiday = k.holiday;
+    }
+    h
+}
+
+/// The last transfers of the save: the player is looked up by id among the squads, the club is the buyer.
+fn transfers_of(save: &E98, club: &HashMap<u16, String>) -> Vec<Transfer> {
+    save.transfers
+        .iter()
+        .map(|t| {
+            let p = save
+                .teams
+                .iter()
+                .flat_map(|tm| tm.players.iter())
+                .find(|p| p.id == t.player);
+            Transfer {
+                round: 0,
+                year: save.year,
+                player: p.map(|p| p.name.clone()).unwrap_or_default(),
+                position: p.map_or(0, |p| p.position),
+                strength: t.strength,
+                from: String::new(),
+                to: club.get(&t.club).cloned().unwrap_or_default(),
+                fee: t.fee,
+            }
+        })
+        .collect()
+}
+
 impl World {
     /// Builds a world from an original save. `seed` drives the random number generator from here on (the original's seed is
     /// not stored in a place we have decoded). The user's club is the first human club of the save.
@@ -436,10 +666,13 @@ impl World {
         let base_of = |i: usize| by_id.iter().position(|&x| x == i).unwrap_or(0);
         let mut in_league = std::collections::HashSet::new();
         let mut divisions: [Vec<Club>; 4] = Default::default();
+        let mut club_names: HashMap<u16, String> = HashMap::new();
         for (d, idx) in divs.iter().enumerate() {
             for &i in idx {
                 in_league.insert(i);
-                divisions[d].push(club_of(&save.teams[i], name_of(&save.teams[i]), base_of(i)));
+                let name = name_of(&save.teams[i]);
+                club_names.insert(save.teams[i].id, name.clone());
+                divisions[d].push(club_of(&save.teams[i], name, base_of(i)));
             }
         }
         let mut rest: Vec<usize> = (0..save.teams.len())
@@ -448,7 +681,11 @@ impl World {
         rest.sort_by_key(|&i| std::cmp::Reverse(save.teams[i].level));
         let pool: Vec<Club> = rest
             .iter()
-            .map(|&i| club_of(&save.teams[i], name_of(&save.teams[i]), base_of(i)))
+            .map(|&i| {
+                let name = name_of(&save.teams[i]);
+                club_names.insert(save.teams[i].id, name.clone());
+                club_of(&save.teams[i], name, base_of(i))
+            })
             .collect();
         let round = divs
             .iter()
@@ -461,6 +698,8 @@ impl World {
             .unwrap_or(0);
         let mut w = World::empty(seed, divisions, pool, save.year, round.min(13));
         w.economy = save.economy;
+        w.history = history_of(save, &club_names);
+        w.transfers = transfers_of(save, &club_names);
         w.refresh_cash_ref();
         let human = divs.iter().enumerate().find_map(|(d, idx)| {
             idx.iter()
