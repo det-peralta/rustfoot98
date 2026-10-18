@@ -1,6 +1,8 @@
 //! The game with the original's own user interface: the Delphi forms rendered pixel for pixel by [`crate::win31`] and bound to the
 //! rules of `elifoot-core`. Needs the skin pack (`tools/ui/skin.py`); see `docs/pixel-exact-ui.md`.
 pub mod main_win;
+pub mod menu;
+pub mod round_view;
 pub mod text;
 
 use crate::win31::draw::Hit;
@@ -112,5 +114,12 @@ impl Classic {
     pub fn draw(&mut self) {
         self.hits.clear();
         main_win::draw(self);
+        if let (Some((open, hl)), Some((d, i))) = (self.main.menu, self.world.human_location()) {
+            let club = self.world.divisions[d][i].clone();
+            let tops = menu::model(self, &club);
+            if open < tops.len() {
+                menu::draw_open(self, &tops, open, hl);
+            }
+        }
     }
 }

@@ -24,3 +24,7 @@ path = "src/bin/win31shot.rs"
 [[bin]]
 name = "classic_shot"
 path = "src/bin/classic_shot.rs"
+
+[[bin]]
+name = "round_shot"
+path = "src/bin/round_shot.rs"

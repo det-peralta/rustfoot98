@@ -272,6 +272,8 @@ pub struct MatchRecord {
     /// Attendance and gate receipts of the home club (0 when finances are not simulated).
     pub attendance: i64,
     pub gate: i64,
+    /// The players' names of both squads as they were in the game (events index into them).
+    pub names: [Vec<String>; 2],
 }
 
 /// What a round needs to book the money: the division's ticket price, the economy index and the currency scale.
@@ -545,6 +547,7 @@ pub fn play_round_with(
             subs: g.subs,
             attendance,
             gate,
+            names: [clubs[h].names.clone(), clubs[a].names.clone()],
         });
     }
     records

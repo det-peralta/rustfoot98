@@ -50,6 +50,12 @@ fn main() -> Result<(), String> {
             "plan" => {
                 app.world.set_formation(v.parse().map_err(|_| "bad plan")?);
             }
+            "menu" => app.main.menu = Some((v.parse().map_err(|_| "bad menu")?, Some(0))),
+            "hl" => {
+                if let Some((m, _)) = app.main.menu {
+                    app.main.menu = Some((m, v.parse().ok()));
+                }
+            }
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }

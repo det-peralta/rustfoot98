@@ -14,6 +14,8 @@ pub struct MainState {
     pub page: Option<Page>,
     /// Index into the roster order of the selected player.
     pub selected: Option<usize>,
+    /// The open menu: top-level index and the highlighted entry.
+    pub menu: Option<(usize, Option<usize>)>,
 }
 
 /// The squad in the order of the list: goalkeepers, defenders, midfielders, attackers, each group by name.
