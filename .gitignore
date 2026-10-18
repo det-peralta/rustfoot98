@@ -25,3 +25,14 @@ target/
 # build output of the web demo
 web/elifoot_wasm.wasm
 web/elifoot_ui.wasm
+
+# captures of the original game and the driver's scratch files (copyrighted images, never commit)
+analysis/shots/[0-9]*.png
+analysis/shots/guest*.png
+analysis/shots/native*.png
+analysis/shots/p[0-9]*.png
+analysis/shots/orig_*
+analysis/cmd.jsonl
+analysis/cmd.out
+__pycache__/
+*.pyc

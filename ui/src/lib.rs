@@ -7,6 +7,7 @@
 pub mod canvas;
 mod dialogs;
 mod screens;
+pub mod win31;
 
 use canvas::{Canvas, Rect, Rgb};
 use elifoot_core::world::{Offer, Search, World};

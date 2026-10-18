@@ -20,7 +20,7 @@ def value(r):
     if t == 7: return {'ident': r.ps()}
     if t == 8: return False
     if t == 9: return True
-    if t == 10: n = r.i('<I', 4); b = r.d[r.o:r.o+n]; r.o += n; return {'binary': len(b), 'hex': b[:64].hex()}
+    if t == 10: n = r.i('<I', 4); b = r.d[r.o:r.o+n]; r.o += n; return {'binary': len(b), 'hex': b.hex()}
     if t == 11:
         out = []
         while True:

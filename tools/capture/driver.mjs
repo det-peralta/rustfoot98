@@ -19,6 +19,10 @@ while (true) {
     const c = JSON.parse(lines[done++]);
     try {
       if (c.op === 'shot') { await p.screenshot({ path: c.path }); out('shot ' + c.path); }
+      else if (c.op === 'canvas') { const u = await p.evaluate(() => new Promise(r => requestAnimationFrame(() => r(document.querySelector('canvas.emulator-canvas').toDataURL('image/png'))))); fs.writeFileSync(c.path, Buffer.from(u.split(',')[1], 'base64')); out('canvas ' + c.path + ' ' + u.length); }
+      else if (c.op === 'viewport') { await p.setViewportSize({ width: c.w, height: c.h }); await p.waitForTimeout(800); out('viewport'); }
+      else if (c.op === 'cshot') { const r = await p.evaluate(() => { const b = document.querySelector('canvas.emulator-canvas').getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; }); await p.screenshot({ path: c.path, clip: { x: r[0], y: r[1], width: r[2], height: r[3] } }); out('cshot ' + JSON.stringify(r)); }
+      else if (c.op === 'guest') { const u = await p.evaluate(async () => { const ci = await window.dosInstance.ciPromise; const im = await ci.screenshot(); const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; cv.getContext('2d').putImageData(im, 0, 0); return cv.toDataURL('image/png'); }); fs.writeFileSync(c.path, Buffer.from(u.split(',')[1], 'base64')); out('guest ' + c.path); }
       else if (c.op === 'click') { await p.mouse.click(c.x, c.y, { clickCount: c.n || 1 }); out('click'); }
       else if (c.op === 'move') { await p.mouse.move(c.x, c.y); out('move'); }
       else if (c.op === 'key') { await p.keyboard.press(c.key, { delay: 150 }); await p.waitForTimeout(700); out('key ' + c.key); }

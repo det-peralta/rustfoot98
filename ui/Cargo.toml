@@ -16,3 +16,7 @@ sdl = ["dep:sdl2"]
 name = "elifoot-sdl"
 path = "src/bin/elifoot_sdl.rs"
 required-features = ["sdl"]
+
+[[bin]]
+name = "win31shot"
+path = "src/bin/win31shot.rs"
