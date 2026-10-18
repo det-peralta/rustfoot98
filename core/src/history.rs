@@ -86,6 +86,18 @@ impl Default for CoachOptions {
     }
 }
 
+/// A line of the coach ranking.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CoachRank {
+    pub coach: String,
+    pub club: String,
+    /// The user's coach.
+    pub human: bool,
+    /// League and cup titles.
+    pub titles: (u16, u16),
+    pub score: i64,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct History {
     pub winners: Vec<Winner>,
@@ -156,7 +168,10 @@ impl History {
             cup_winner: cup_winner.clone(),
             cup_coach: cup_coach.clone(),
         });
-        self.coach_titles.entry(champion_coach.clone()).or_default().0 += 1;
+        self.coach_titles
+            .entry(champion_coach.clone())
+            .or_default()
+            .0 += 1;
         if cup.is_some() {
             self.coach_titles.entry(cup_coach.clone()).or_default().1 += 1;
         }
@@ -177,7 +192,6 @@ impl History {
         }
     }
 }
-
 
 impl World {
     fn find_club(&self, name: &str) -> Option<&Club> {
@@ -340,45 +354,33 @@ impl World {
             .add_coach_event(&picked.coach_name, 7, year, &sacked.name);
     }
 
-    /// Every coach of the world with the club he works for, the user's coach flagged, as the ranking lists them.
-    pub fn coaches(&self) -> Vec<(String, String, bool)> {
-        let human = self.human.as_ref().map(|h| h.club.as_str());
-        self.divisions
-            .iter()
-            .flatten()
-            .chain(self.pool.iter())
-            .map(|c| (c.coach_name.clone(), c.name.clone(), human == Some(c.name.as_str())))
-            .collect()
-    }
-
     /// `1050:1d59` applied with the bubble sort `1068:0e0d` (stable): the coaches by league titles, cup titles and score,
-    /// best first. Entries are `(coach, club, human, (league titles, cup titles), score)`.
-    pub fn coach_ranking(&self) -> Vec<(String, String, bool, (u16, u16), i64)> {
-        let mut v: Vec<(String, String, bool, (u16, u16), i64)> = self
+    /// best first.
+    pub fn coach_ranking(&self) -> Vec<CoachRank> {
+        let mut v: Vec<CoachRank> = self
             .divisions
             .iter()
             .flatten()
             .chain(self.pool.iter())
-            .map(|c| {
-                let human = self.human.as_ref().is_some_and(|h| h.club == c.name);
-                (
-                    c.coach_name.clone(),
-                    c.name.clone(),
-                    human,
-                    self.history
-                        .coach_titles
-                        .get(&c.coach_name)
-                        .copied()
-                        .unwrap_or_default(),
-                    c.coach_score,
-                )
+            .map(|c| CoachRank {
+                coach: c.coach_name.clone(),
+                club: c.name.clone(),
+                human: self.human.as_ref().is_some_and(|h| h.club == c.name),
+                titles: self
+                    .history
+                    .coach_titles
+                    .get(&c.coach_name)
+                    .copied()
+                    .unwrap_or_default(),
+                score: c.coach_score,
             })
             .collect();
         v.sort_by(|a, b| {
-            b.3 .0
-                .cmp(&a.3 .0)
-                .then(b.3 .1.cmp(&a.3 .1))
-                .then(b.4.cmp(&a.4))
+            b.titles
+                .0
+                .cmp(&a.titles.0)
+                .then(b.titles.1.cmp(&a.titles.1))
+                .then(b.score.cmp(&a.score))
         });
         v
     }
@@ -430,7 +432,11 @@ mod tests {
         let cal = w.calendar(&club);
         assert!(cal[0].played() && cal[1].played() && !cal[2].played());
         let mine = &w.divisions[w.human_location().unwrap().0][w.human_location().unwrap().1];
-        let gf: i32 = cal.iter().filter(|f| f.played() && !f.cup).map(|f| f.goals.0 as i32).sum();
+        let gf: i32 = cal
+            .iter()
+            .filter(|f| f.played() && !f.cup)
+            .map(|f| f.goals.0 as i32)
+            .sum();
         assert_eq!(gf, mine.goals_for, "the calendar agrees with the standings");
         // a saved game keeps the history
         let back = World::load(&w.save()).unwrap();
@@ -442,10 +448,78 @@ mod tests {
         let champion = &w.last_season.as_ref().unwrap().tables[0][0].name;
         assert_eq!(&w.history.winners[0].champion, champion);
         assert!(w.history.club_events.contains_key(champion));
-        assert!(w.history.calendars.is_empty(), "a new season starts with fresh calendars");
+        assert!(
+            w.history.calendars.is_empty(),
+            "a new season starts with fresh calendars"
+        );
         assert_eq!(w.coach_ranking().len(), 38);
         let first = &w.coach_ranking()[0];
-        assert!(first.3 .0 + first.3 .1 > 0, "the coach with titles heads the ranking");
+        assert!(
+            first.titles.0 + first.titles.1 > 0,
+            "the coach with titles heads the ranking"
+        );
+    }
+
+    fn rich_world(seed: u32) -> World {
+        let mut w = World::synthetic(seed);
+        let (d, i) = w.human_location().unwrap();
+        w.divisions[d][i].fin.cash = 900_000_000;
+        w
+    }
+
+    #[test]
+    fn the_coach_profile_decides_which_wages_the_computer_renegotiates() {
+        let fresh_after = |salary: [bool; 3]| {
+            let mut w = rich_world(12);
+            w.history.options.salary = salary;
+            let (d, i) = w.human_location().unwrap();
+            for s in w.divisions[d][i].slots.iter_mut() {
+                s.wage *= 10; // everybody overpaid
+                s.foreign = 0;
+            }
+            for _ in 0..4 {
+                w.play_round();
+            }
+            let (d, i) = w.human_location().unwrap();
+            w.divisions[d][i].slots.iter().filter(|s| s.fresh).count()
+        };
+        assert!(fresh_after([true, true, true]) > 0);
+        assert_eq!(
+            fresh_after([false, true, true]),
+            0,
+            "domestic players are left alone"
+        );
+        assert!(fresh_after([false, false, false]) == 0);
+    }
+
+    #[test]
+    fn not_buying_in_auctions_leaves_the_user_no_listing() {
+        let listings = |mode: u8| {
+            let mut w = rich_world(9);
+            w.history.options.auction = mode;
+            (0..14)
+                .map(|_| {
+                    w.play_round();
+                    w.board.len()
+                })
+                .sum::<usize>()
+        };
+        assert!(
+            listings(1) > 0,
+            "the default profile gets auctions to bid in"
+        );
+        assert_eq!(listings(2), 0);
+    }
+
+    #[test]
+    fn a_coach_on_holiday_lets_the_computer_play() {
+        let mut w = rich_world(13);
+        w.history.holiday = true;
+        w.play_round(); // plays with the automatic line-up, nothing to break
+        assert_eq!(w.round, 1);
+        let back = World::load(&w.save()).unwrap();
+        assert!(back.history.holiday);
+        assert_eq!(back.history.options, w.history.options);
     }
 
     #[test]

@@ -26,9 +26,14 @@ pub fn notebook(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
     let page = page_of(cx, n);
     let tab_px = -n.int("TabFont.Height", -11);
-    let font = [tab_px, 11, 13]
-        .iter()
-        .find_map(|&px| cx.skin.font(n.str("TabFont.Name").unwrap_or("MS Sans Serif"), px, false, false));
+    let font = [tab_px, 11, 13].iter().find_map(|&px| {
+        cx.skin.font(
+            n.str("TabFont.Name").unwrap_or("MS Sans Serif"),
+            px,
+            false,
+            false,
+        )
+    });
     // the framed page
     let top = y + TABS - 1;
     fb.fill(x, top, w, 1, WHITE);

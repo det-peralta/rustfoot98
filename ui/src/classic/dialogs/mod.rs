@@ -37,9 +37,7 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::Winners
         | Kind::AllTimeScorers
         | Kind::Transactions
-        | Kind::Acquisitions => {
-            tables::bind(c, d)
-        }
+        | Kind::Acquisitions => tables::bind(c, d),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
@@ -76,9 +74,7 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::Winners
         | Kind::AllTimeScorers
         | Kind::Transactions
-        | Kind::Acquisitions => {
-            tables::click(c, d, name)
-        }
+        | Kind::Acquisitions => tables::click(c, d, name),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
@@ -109,9 +105,7 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         | Kind::Winners
         | Kind::AllTimeScorers
         | Kind::Transactions
-        | Kind::Acquisitions => {
-            tables::key(c, d, key)
-        }
+        | Kind::Acquisitions => tables::key(c, d, key),
         Kind::Sell
         | Kind::Contract
         | Kind::Search

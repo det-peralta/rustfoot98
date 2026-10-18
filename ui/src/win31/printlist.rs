@@ -170,7 +170,8 @@ pub fn vscroll(
         ((track as i64 * visible.min(count) as i64) / count as i64).max(BAR as i64) as i32
     };
     let range = count.saturating_sub(visible).max(1);
-    let thumb_y = y + BAR + ((track - thumb_h) as i64 * top.min(range) as i64 / range as i64) as i32;
+    let thumb_y =
+        y + BAR + ((track - thumb_h) as i64 * top.min(range) as i64 / range as i64) as i32;
     button(fb, x, thumb_y);
     if thumb_h > BAR {
         fb.fill(x, thumb_y + BAR, BAR, thumb_h - BAR, BLACK);

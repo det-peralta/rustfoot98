@@ -115,7 +115,9 @@ pub fn ranking(w: &World) -> Spec {
         .coach_ranking()
         .into_iter()
         .enumerate()
-        .map(|(k, (coach, club, human, (l, c), score))| {
+        .map(|(k, r)| {
+            let ((l, c), human, score) = (r.titles, r.human, r.score);
+            let (coach, club) = (r.coach, r.club);
             let mut r = String::new();
             if human {
                 r.push('\u{2}');
@@ -318,6 +320,8 @@ mod tests {
     #[test]
     fn team_history_lists_titles_and_places() {
         let mut w = World::synthetic(8);
+        let (d, i) = w.human_location().unwrap();
+        w.divisions[d][i].coach_name = "Silva".into();
         let club = w.human.as_ref().unwrap().club.clone();
         let coach = human_coach(&w);
         w.history.add_club_event(&club, 1, 1999, &coach);
@@ -334,6 +338,8 @@ mod tests {
     #[test]
     fn coach_history_rows_per_event_kind() {
         let mut w = World::synthetic(8);
+        let (d, i) = w.human_location().unwrap();
+        w.divisions[d][i].coach_name = "Silva".into();
         let me = human_coach(&w);
         w.history.add_coach_event(&me, 5, 2026, "Santos");
         w.history.add_coach_event(&me, 3, 2027, "Santos");

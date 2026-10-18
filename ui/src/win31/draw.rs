@@ -328,7 +328,8 @@ pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
             let mut m = n.clone();
             if v.len() == 2 {
                 m.props.insert("Width".into(), super::json::Json::Num(v[0]));
-                m.props.insert("Height".into(), super::json::Json::Num(v[1]));
+                m.props
+                    .insert("Height".into(), super::json::Json::Num(v[1]));
             }
             resized = m;
             &resized

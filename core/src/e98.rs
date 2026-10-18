@@ -606,11 +606,13 @@ fn history_of(save: &E98, club: &HashMap<u16, String>) -> History {
             h.coach_titles.insert(k.name.clone(), k.titles);
         }
     }
-    if let Some(k) = save
-        .coaches
-        .iter()
-        .find(|k| k.human && save.teams.iter().any(|t| t.id == save.human_id && t.coach == k.id))
-    {
+    if let Some(k) = save.coaches.iter().find(|k| {
+        k.human
+            && save
+                .teams
+                .iter()
+                .any(|t| t.id == save.human_id && t.coach == k.id)
+    }) {
         h.options = CoachOptions {
             salary: [k.options[0] != 0, k.options[1] != 0, k.options[2] != 0],
             auction: k.options[3].min(2),
@@ -757,6 +759,34 @@ mod tests {
             let divs = save.divisions().unwrap();
             assert!(divs.iter().all(|g| g.len() == 8));
             let w = World::from_e98(1, &save).unwrap();
+            if name == "snap2.e98" {
+                // the lists of the information dialogs: the three trades, the coaches' first events, the calendars of two rounds
+                assert_eq!(save.transfers.len(), 3);
+                assert_eq!(w.transfers.len(), 3);
+                assert_eq!(w.transfers[0].fee, 5_171_000);
+                assert!(save.winners.is_empty());
+                assert_eq!(
+                    w.history
+                        .coach_events
+                        .values()
+                        .filter(|v| v[0].kind == 5)
+                        .count(),
+                    54
+                );
+                let me = &w.human.as_ref().unwrap().club;
+                let cal = w.calendar(me);
+                assert_eq!(cal.len(), 14);
+                assert_eq!(cal.iter().filter(|f| f.played()).count(), 2);
+                assert_eq!(
+                    (cal[0].goals, cal[0].gate, cal[0].venue),
+                    ((1, 2), 10730, 1)
+                );
+                assert_eq!(w.history.options.auction, 1);
+                assert!(
+                    !w.history.options.salary[0],
+                    "the original's new-game profile"
+                );
+            }
             assert_eq!(w.pool.len(), 20);
             // the standings are internally consistent
             for c in w.divisions.iter().flatten() {

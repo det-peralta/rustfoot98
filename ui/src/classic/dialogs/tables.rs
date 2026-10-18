@@ -145,7 +145,11 @@ pub fn calendar_row(f: &Fixture) -> String {
         field("\u{6}", 0x14, &f.round.to_string())
     };
     r += &field("", 0x78, &f.opponent);
-    r += &field("", 0x0f, &char::from(b"CFN"[f.venue.min(2) as usize]).to_string());
+    r += &field(
+        "",
+        0x0f,
+        &char::from(b"CFN"[f.venue.min(2) as usize]).to_string(),
+    );
     if f.played() {
         r += &field("\u{7}", 0x0f, &f.goals.0.to_string());
         r += &field("\u{7}", 0x0a, ":");
@@ -477,6 +481,15 @@ pub fn key_list(d: &mut Dialog, key: Key) -> Option<Outcome> {
 
 /// Timers: the standings close after ten seconds when shown by the game flow, a list when it was asked to (`Timer1Timer`).
 pub fn tick(_c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
+    if timer_closes(d, ms) {
+        Outcome::Close
+    } else {
+        Outcome::Keep
+    }
+}
+
+/// Advances the one-second timer of the form; true when it closes the dialog.
+pub fn timer_closes(d: &mut Dialog, ms: u32) -> bool {
     let mut acc = d.num("ms") + ms as i64;
     let mut seconds = d.num("seconds");
     while acc >= 1000 {
@@ -487,12 +500,12 @@ pub fn tick(_c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
             _ => d.num("flags") as u32 & AUTOCLOSE != 0 && seconds > d.num("count") + 3,
         };
         if close {
-            return Outcome::Close;
+            return true;
         }
     }
     d.set_num("ms", acc);
     d.set_num("seconds", seconds);
-    Outcome::Keep
+    false
 }
 
 // ---- TClassificationDlg -------------------------------------------------------------------------------------------------
@@ -573,7 +586,8 @@ mod tests {
             venue: 0,
             ..f
         };
-        let (fg, bg, fields) = crate::win31::printlist::split_colors(&calendar_row(&g));
+        let row = calendar_row(&g);
+        let (fg, bg, fields) = crate::win31::printlist::split_colors(&row);
         assert_eq!((fg, bg), (Some(Rgb(255, 255, 255)), Some(Rgb(255, 0, 0))));
         assert_eq!(fields, "\u{6}\u{14} \t\u{78}Santos\t\u{0f}C\t");
     }
@@ -631,6 +645,69 @@ mod tests {
         assert_eq!(l.list, (545, 225 + 278));
         assert_eq!(l.ok.0, 252);
         assert_eq!(layout(14, 0).list.1, 226);
+    }
+
+    #[test]
+    fn a_list_dialog_selects_the_last_row_scrolls_and_closes() {
+        let rows: Vec<String> = (0..40).map(|i| field("", 0x28, &i.to_string())).collect();
+        let mut d = Dialog::new(Kind::Transactions, "TPRINTLISTDLG");
+        bind_list(
+            &mut d,
+            Spec {
+                caption: "x".into(),
+                rows,
+                flags: SELECT_LAST,
+            },
+        );
+        // 40 rows: the list takes the 278 pixels the screen leaves (17 rows) and ends on the last row
+        assert_eq!(d.texts["listOfItems.sel"], "39");
+        assert_eq!(d.texts["listOfItems.top"], (40 - 501 / 16).to_string());
+        assert_eq!(d.texts["listOfItems.size"], "345,503");
+        assert_eq!(d.texts["@client"], "374x575");
+        assert!(matches!(
+            click_list(&mut d, "listOfItems.pgup"),
+            Outcome::Keep
+        ));
+        let t: usize = d.texts["listOfItems.top"].parse().unwrap();
+        assert!(t < 40 - 501 / 16);
+        // a click selects, the arrow keys scroll without going past either end
+        click_list(&mut d, "listOfItems#3");
+        assert_eq!(d.texts["listOfItems.sel"], "3");
+        for _ in 0..100 {
+            key_list(&mut d, Key::Up);
+        }
+        assert_eq!(d.texts["listOfItems.top"], "0");
+        for _ in 0..100 {
+            key_list(&mut d, Key::Down);
+        }
+        assert_eq!(d.texts["listOfItems.top"], (40 - 501 / 16).to_string());
+        assert!(matches!(click_list(&mut d, "OKBtn"), Outcome::Close));
+    }
+
+    #[test]
+    fn the_standings_close_after_ten_seconds_only_when_started_by_the_game() {
+        let mut manual = standings_dialog(false);
+        let mut auto = standings_dialog(true);
+        let mut closed_at = None;
+        for k in 0..60 {
+            assert!(!timer_closes(&mut manual, 500));
+            if timer_closes(&mut auto, 500) && closed_at.is_none() {
+                closed_at = Some(k);
+            }
+        }
+        assert_eq!(closed_at, Some(19), "after ten seconds");
+        // a list with the auto-close flag closes after its rows plus three seconds
+        let mut l = Dialog::new(Kind::Scorers, "TPRINTLISTDLG");
+        bind_list(
+            &mut l,
+            Spec {
+                caption: String::new(),
+                rows: vec![field("", 5, "a"); 2],
+                flags: AUTOCLOSE,
+            },
+        );
+        let n = (0..100).find(|_| timer_closes(&mut l, 1000)).unwrap();
+        assert_eq!(n, 5, "the sixth tick is the first beyond rows + 3");
     }
 
     #[test]
