@@ -749,7 +749,7 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     pen += text(fb, font, pen, ty, &pre, ink, false);
     if !mid.is_empty() {
         let mw = font.width(&mid);
-        fb.fill(pen, y + 2, mw, h - 4, NAVY);
+        fb.fill(pen + 1, ty, mw, font.height(), NAVY);
         text(fb, font, pen, ty, &mid, WHITE, false);
         pen += mw;
     }
