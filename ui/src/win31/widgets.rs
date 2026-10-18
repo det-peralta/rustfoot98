@@ -171,26 +171,54 @@ fn button_text(
     }
 }
 
+/// A control of the button class with a mark (check box or radio button): the 13-pixel mark at the left, the caption 18 pixels
+/// right of it, the focus rectangle around the caption clipped to the control. `(x, y, w, h)` is the control's rectangle.
+#[allow(clippy::too_many_arguments)]
+fn marked_button(
+    fb: &mut Fb,
+    cx: &Ctx,
+    f: &FontSpec,
+    (x, y, w, h): (i32, i32, i32, i32),
+    cap: &str,
+    mark: impl FnOnce(&mut Fb, i32, i32),
+    enabled: bool,
+    focused: bool,
+) {
+    mark(fb, x, y + (h - 13) / 2);
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let cap = cap.replace('&', "");
+    let ty = y + (h - font.ascent) / 2;
+    let tw = button_text(fb, font, x + 18, ty, &cap, f, enabled);
+    if focused {
+        // the rectangle around the text is cut to the control's client area
+        let (rx, ry, rw, rh) = (x + 16, ty - 1, tw + 4, font.height() + 3);
+        let (x1, y1) = ((rx + rw).min(x + w), (ry + rh).min(y + h));
+        let (rx, ry) = (rx.max(x), ry.max(y));
+        focus_rect(fb, rx, ry, x1 - rx, y1 - ry, x, y);
+    }
+}
+
 /// `TCheckBox`: a 13-pixel square (cross when `<name>.checked=1` or the form's `Checked`), 6 pixels of space, the caption; the focus
 /// rectangle surrounds the caption.
 pub(super) fn checkbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
-    let h = n.int("Height", 17);
     let enabled = is_enabled(cx, n);
     let checked = match get(cx, n, "checked") {
         Some(v) => v != "0",
         None => n.flag("Checked", false),
     };
     let ink = if enabled { BLACK } else { GRAY };
-    check_square(fb, x, y + (h - 13) / 2, checked, ink);
-    let Some(font) = cx.font(f) else {
-        return;
-    };
-    let cap = caption(cx, n).replace('&', "");
-    let ty = y + (h - font.ascent) / 2;
-    let tw = button_text(fb, font, x + 18, ty, &cap, f, enabled);
-    if cx.focus == n.name {
-        focus_rect(fb, x + 16, y + 1, tw + 6, h - 1, x, y);
-    }
+    marked_button(
+        fb,
+        cx,
+        f,
+        (x, y, n.int("Width", 100), n.int("Height", 17)),
+        caption(cx, n),
+        |fb, mx, my| check_square(fb, mx, my, checked, ink),
+        enabled,
+        cx.focus == n.name,
+    );
 }
 
 /// The ring of a radio button, with the dot inside when selected.
@@ -221,22 +249,20 @@ pub(super) fn radio_ring(fb: &mut Fb, x: i32, y: i32, selected: bool, color: Rgb
 
 /// `TRadioButton`: the ring (and dot when `<name>.checked=1`), the caption 18 pixels right of it.
 pub(super) fn radio(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
-    let h = n.int("Height", 17);
-    let enabled = is_enabled(cx, n);
     let checked = match get(cx, n, "checked") {
         Some(v) => v != "0",
         None => n.flag("Checked", false),
     };
-    radio_ring(fb, x, y + (h - 13) / 2, checked, f.color);
-    let Some(font) = cx.font(f) else {
-        return;
-    };
-    let cap = caption(cx, n).replace('&', "");
-    let ty = y + (h - font.ascent) / 2;
-    let tw = button_text(fb, font, x + 18, ty, &cap, f, enabled);
-    if cx.focus == n.name {
-        focus_rect(fb, x + 15, y + 1, tw + 6, h - 1, x, y);
-    }
+    marked_button(
+        fb,
+        cx,
+        f,
+        (x, y, n.int("Width", 100), n.int("Height", 17)),
+        caption(cx, n),
+        |fb, mx, my| radio_ring(fb, mx, my, checked, f.color),
+        is_enabled(cx, n),
+        cx.focus == n.name,
+    );
 }
 
 /// `TRadioGroup`: a group box whose items (`Items.Strings`) are radio buttons spread over its height; `<name>.index` selects one.
@@ -269,14 +295,17 @@ pub(super) fn radiogroup(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, 
     let bh = (h - font.tm_height - 5) / items.len() as i32;
     let enabled = is_enabled(cx, n);
     for (i, it) in items.iter().enumerate() {
-        let by = y + font.tm_height + 1 + i as i32 * bh;
-        let ring_y = by + (bh - 13 + 1) / 2;
-        radio_ring(fb, x + 8, ring_y, index == i as i32, f.color);
-        let ty = by + (bh - font.ascent) / 2;
-        let tw = button_text(fb, font, x + 26, ty, &it.replace('&', ""), f, enabled);
-        if cx.focus == n.name && index == i as i32 {
-            focus_rect(fb, x + 23, by + 1, tw + 6, bh - 1, x + 8, by);
-        }
+        let by = y + font.tm_height + 2 + i as i32 * bh;
+        marked_button(
+            fb,
+            cx,
+            f,
+            (x + 8, by, w - 16, bh),
+            it,
+            |fb, mx, my| radio_ring(fb, mx, my, index == i as i32, f.color),
+            enabled,
+            cx.focus == n.name && index == i as i32,
+        );
         push_hit(
             cx,
             format!("{}#{i}", n.name),
