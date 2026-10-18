@@ -1,9 +1,7 @@
 //! Modal dialogs: one of the original's forms drawn over the screen with texts, lists and states supplied by the program, and a
 //! behaviour (`dialogs/`) that answers clicks and keys. See `docs/classic-dialogs.md` for the conventions.
 use super::{dialogs, Classic, Key};
-use crate::win31::draw::{
-    controls, dialog_frame, dialog_frame_thick, Ctx, Hit,
-};
+use crate::win31::draw::{controls, dialog_frame, dialog_frame_thick, Ctx, Hit};
 use crate::win31::fb::{Rgb, SILVER};
 use crate::win31::Node;
 use std::cell::RefCell;
@@ -129,10 +127,7 @@ impl Dialog {
         } else {
             dialog_frame(fb, skin, caption, cw, ch, bg)
         };
-        let (ox, oy) = (
-            ox + self.num_text("@dx"),
-            oy + self.num_text("@dy"),
-        );
+        let (ox, oy) = (ox + self.num_text("@dx"), oy + self.num_text("@dy"));
         let hits = RefCell::new(Vec::new());
         let cx = Ctx {
             skin,
@@ -227,7 +222,14 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
         h.enabled
             && matches!(
                 h.class.as_str(),
-                "TBitBtn" | "TButton" | "TEdit" | "TRadioButton" | "TCheckBox" | "TListBox" | "TComboBox" | "TSpinEdit"
+                "TBitBtn"
+                    | "TButton"
+                    | "TEdit"
+                    | "TRadioButton"
+                    | "TCheckBox"
+                    | "TListBox"
+                    | "TComboBox"
+                    | "TSpinEdit"
             )
     };
     let is_edit = d

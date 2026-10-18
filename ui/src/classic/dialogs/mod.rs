@@ -98,9 +98,12 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
             tables::key(c, d, key)
         }
-        Kind::Sell | Kind::Contract | Kind::Search | Kind::Observed | Kind::Auction | Kind::Plantel => {
-            market::key(c, d, key)
-        }
+        Kind::Sell
+        | Kind::Contract
+        | Kind::Search
+        | Kind::Observed
+        | Kind::Auction
+        | Kind::Plantel => market::key(c, d, key),
         Kind::SelectGame | Kind::CoachName => newgame::key(c, d, key),
         _ => None,
     }

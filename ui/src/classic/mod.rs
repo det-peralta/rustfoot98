@@ -20,6 +20,8 @@ pub struct Data {
     pub countries: HashMap<String, String>,
     /// Referees as `(country code, name)` from `REFEREE.TXE`.
     pub referees: Vec<(String, String)>,
+    /// Names of the games the player has saved (the host keeps their text).
+    pub saves: Vec<String>,
 }
 
 impl Data {
@@ -39,6 +41,7 @@ impl Data {
                 .skip(1)
                 .filter_map(split)
                 .collect(),
+            saves: Vec::new(),
         }
     }
 }

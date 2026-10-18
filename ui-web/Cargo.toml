@@ -9,3 +9,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 elifoot-ui = { path = "../ui" }
+elifoot-core = { path = "../core" }

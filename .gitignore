@@ -37,3 +37,6 @@ analysis/cmd.out
 __pycache__/
 *.pyc
 analysis/jsdos/
+
+# the skin pack for the browser (the game's own data)
+web/skin/

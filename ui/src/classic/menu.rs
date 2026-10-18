@@ -101,8 +101,18 @@ pub fn dropdown_rect(c: &Classic, tops: &[Top], open: usize) -> (i32, i32, i32, 
         return (x, y, 0, 0);
     };
     let t = &tops[open];
-    let label_w = t.entries.iter().map(|e| f.width(&e.label)).max().unwrap_or(0);
-    let short_w = t.entries.iter().map(|e| f.width(&e.shortcut)).max().unwrap_or(0);
+    let label_w = t
+        .entries
+        .iter()
+        .map(|e| f.width(&e.label))
+        .max()
+        .unwrap_or(0);
+    let short_w = t
+        .entries
+        .iter()
+        .map(|e| f.width(&e.shortcut))
+        .max()
+        .unwrap_or(0);
     let w = if short_w > 0 {
         16 + label_w + 8 + short_w + 15
     } else {
@@ -141,14 +151,29 @@ pub fn draw_open(c: &mut Classic, tops: &[Top], open: usize, hl: Option<usize>) 
     let bar = bar_items(c, tops);
     if let Some(&(l, r)) = bar.get(open) {
         c.fb.fill(l, FRAME.1 + 20, r - l, 18, NAVY);
-        text(&mut c.fb, f, l + 8, FRAME.1 + 20, &tops[open].label, WHITE, false);
+        text(
+            &mut c.fb,
+            f,
+            l + 8,
+            FRAME.1 + 20,
+            &tops[open].label,
+            WHITE,
+            false,
+        );
     }
     let (x, y, w, h) = dropdown_rect(c, tops, open);
     c.fb.fill(x + 1, y + 1, w, h, SILVER); // the shadow
     c.fb.fill(x, y, w, h, BLACK);
     c.fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
     let t = &tops[open];
-    let sc_x = x + 16 + t.entries.iter().map(|e| f.width(&e.label)).max().unwrap_or(0) + 8;
+    let sc_x = x
+        + 16
+        + t.entries
+            .iter()
+            .map(|e| f.width(&e.label))
+            .max()
+            .unwrap_or(0)
+        + 8;
     let mut top = y + 1;
     for (i, e) in t.entries.iter().enumerate() {
         if e.separator {

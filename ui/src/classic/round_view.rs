@@ -47,8 +47,7 @@ impl Game {
     pub fn latest(&self, minute: u16) -> Option<&Ev> {
         self.events
             .iter()
-            .filter(|e| e.minute <= minute && e.kind != EventKind::Annulled)
-            .last()
+            .rfind(|e| e.minute <= minute && e.kind != EventKind::Annulled)
     }
 }
 
@@ -168,7 +167,14 @@ pub fn draw(fb: &mut Fb, skin: &Skin, v: &RoundView) {
         fb.fill(65, top, tw, 1, GREEN);
         text(fb, bold, 65, top - 8, &title, YELLOW, false);
         for (r, g) in v.divisions[d].iter().enumerate() {
-            row(fb, reg, bold, 92 + 110 * d as i32 + 22 * r as i32, g, v.minute);
+            row(
+                fb,
+                reg,
+                bold,
+                92 + 110 * d as i32 + 22 * r as i32,
+                g,
+                v.minute,
+            );
         }
     }
     clock(fb, v.minute);
@@ -217,16 +223,65 @@ fn row(
             }
             _ => {}
         }
-        text(fb, reg, x, y + 1, &format!("{} {}'", e.player, e.minute), YELLOW, false);
+        text(
+            fb,
+            reg,
+            x,
+            y + 1,
+            &format!("{} {}'", e.player, e.minute),
+            YELLOW,
+            false,
+        );
     }
 }
 
 /// The disc of the pie clock: `(first, last)` x offsets of every row of the 45x45 circle.
 const DISC: [(i32, i32); 45] = [
-    (18, 26), (15, 29), (12, 32), (11, 33), (9, 35), (8, 36), (7, 37), (6, 38), (5, 39), (4, 40), (4, 40), (3, 41), (2, 42),
-    (2, 42), (2, 42), (1, 43), (1, 43), (1, 43), (0, 44), (0, 44), (0, 44), (0, 44), (0, 44), (0, 44), (0, 44), (0, 44),
-    (0, 44), (1, 43), (1, 43), (1, 43), (2, 42), (2, 42), (2, 42), (3, 41), (4, 40), (4, 40), (5, 39), (6, 38), (7, 37),
-    (8, 36), (9, 35), (11, 33), (12, 32), (15, 29), (18, 26),
+    (18, 26),
+    (15, 29),
+    (12, 32),
+    (11, 33),
+    (9, 35),
+    (8, 36),
+    (7, 37),
+    (6, 38),
+    (5, 39),
+    (4, 40),
+    (4, 40),
+    (3, 41),
+    (2, 42),
+    (2, 42),
+    (2, 42),
+    (1, 43),
+    (1, 43),
+    (1, 43),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (0, 44),
+    (1, 43),
+    (1, 43),
+    (1, 43),
+    (2, 42),
+    (2, 42),
+    (2, 42),
+    (3, 41),
+    (4, 40),
+    (4, 40),
+    (5, 39),
+    (6, 38),
+    (7, 37),
+    (8, 36),
+    (9, 35),
+    (11, 33),
+    (12, 32),
+    (15, 29),
+    (18, 26),
 ];
 
 fn clock(fb: &mut Fb, minute: u16) {

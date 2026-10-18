@@ -95,7 +95,10 @@ impl Classic {
         };
         let out = match ev {
             Ev::Move(..) | Ev::Up(..) => Outcome::Keep,
-            Ev::Down(x, y) => match d.hit_at(x, y).map(|h| (h.name.clone(), h.class.clone(), h.enabled)) {
+            Ev::Down(x, y) => match d
+                .hit_at(x, y)
+                .map(|h| (h.name.clone(), h.class.clone(), h.enabled))
+            {
                 Some((name, class, true)) => {
                     if class != "ListRow" && class != "TabSetTab" {
                         d.focus = name.clone();
@@ -259,9 +262,10 @@ impl Classic {
             Key::Char('a') | Key::Char('A') => self.command("Automtico1"),
             Key::Char('m') | Key::Char('M') => self.command("Melhores1"),
             Key::Up | Key::Down => {
-                let n = self.world.human_location().map_or(0, |(d, i)| {
-                    self.world.divisions[d][i].slots.len()
-                });
+                let n = self
+                    .world
+                    .human_location()
+                    .map_or(0, |(d, i)| self.world.divisions[d][i].slots.len());
                 if n > 0 {
                     let cur = self.main.selected;
                     self.main.selected = Some(match (cur, k) {
@@ -271,11 +275,7 @@ impl Classic {
                     });
                 }
             }
-            Key::Enter => {
-                if self.play_enabled() {
-                    self.play_round();
-                }
-            }
+            Key::Enter if self.play_enabled() => self.play_round(),
             _ => {}
         }
     }
@@ -307,7 +307,9 @@ impl Classic {
         match name {
             "Melhores1" | "Automtico1" => {
                 if let Some((d, i)) = self.world.human_location() {
-                    if let Some(k) = elifoot_core::season::best_formation(&self.world.divisions[d][i].slots) {
+                    if let Some(k) =
+                        elifoot_core::season::best_formation(&self.world.divisions[d][i].slots)
+                    {
                         self.world.set_formation(k);
                     }
                 }

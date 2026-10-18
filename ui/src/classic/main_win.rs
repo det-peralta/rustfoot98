@@ -172,17 +172,17 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     lists.insert("ListBoxOfPlayers".to_string(), rows);
     t("ListBoxOfPlayers.color", col(fg));
     t("ListBoxOfPlayers.bg", col(bg));
-    t("ListBoxOfPlayers.focus", c.main.selected.unwrap_or(0).to_string());
+    t(
+        "ListBoxOfPlayers.focus",
+        c.main.selected.unwrap_or(0).to_string(),
+    );
     if let Some(s) = c.main.selected {
         t("ListBoxOfPlayers.sel", s.to_string());
     }
     t("Notebook.page", page.notebook_index().to_string());
     let tabs = "Jogo|Jogador|Finanças|Selecção|Adversário";
     t("TabSet.tabs", tabs.into());
-    t(
-        "TabSet.index",
-        page.tab_index().to_string(),
-    );
+    t("TabSet.index", page.tab_index().to_string());
     t("TabSet.color", col(bg));
     // the next opponent
     let opp = next_opponent(c).map(|(d, j, home)| (&c.world.divisions[d][j], home));
@@ -247,7 +247,10 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     );
     t("gaugeMoral.barcolor", "248,252,0".into());
     {
-        let sel = c.main.selected.and_then(|r| roster_order(club).get(r).copied());
+        let sel = c
+            .main
+            .selected
+            .and_then(|r| roster_order(club).get(r).copied());
         let hide = [
             "textSelectedPlayerName",
             "bitmapPlayerCountry",
@@ -301,7 +304,10 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
             .iter()
             .filter(|s| s.starter() && s.position == 0)
             .count();
-        t("OKBtn.enabled", ((starters == 11 && keepers == 1) as u8).to_string());
+        t(
+            "OKBtn.enabled",
+            ((starters == 11 && keepers == 1) as u8).to_string(),
+        );
     }
     if let Some((o, _)) = opp {
         t("textOpponentName", o.name.clone());

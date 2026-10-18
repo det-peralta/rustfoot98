@@ -597,6 +597,7 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 
 /// The owner-drawn squad list of the main screen: rows `pos|name|strength|wage|mark`, 16 pixels high, grouped by position with a black
 /// rule and 4 extra pixels above the first row of every group but the first.
+#[allow(clippy::too_many_arguments)]
 fn roster(
     fb: &mut Fb,
     cx: &Ctx,
@@ -869,6 +870,7 @@ const DITHER_PARITY: i32 = 0;
 
 /// A bevel of `bs` pixels inside the inclusive rectangle `(x1, y1)..(x2, y2)` with 45-degree joints: `tl` on the top and left,
 /// `br` on the bottom and right.
+#[allow(clippy::too_many_arguments)]
 fn bevel_miter(fb: &mut Fb, x1: i32, y1: i32, x2: i32, y2: i32, bs: i32, tl: Rgb, br: Rgb) {
     for k in 0..bs {
         fb.fill(x1 + k, y1 + k, x2 - x1 - 2 * k + 1, 1, tl);
@@ -965,7 +967,11 @@ fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     };
     let fwd = |fb: &mut Fb, bx: i32, row0: i32, off: i32| {
         for row in row0..=15 {
-            fb.set(bx + off + (row - row0) / 3 * (row0 != 2) as i32 + (row / 3) * (row0 == 2) as i32, y + row, BLACK);
+            fb.set(
+                bx + off + (row - row0) / 3 * (row0 != 2) as i32 + (row / 3) * (row0 == 2) as i32,
+                y + row,
+                BLACK,
+            );
         }
     };
     for (i, t) in tabs.iter().enumerate() {
@@ -1026,16 +1032,15 @@ fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             // right edge: `/` from the boundary to the next tab
             let next_sel = i + 1 == sel;
             let br = pen + widths[i] + if next_sel { 3 } else { 7 };
-            let xr;
-            if next_sel {
+            let xr = if next_sel {
                 for row in 9..=15 {
                     fb.set(br + 1 - (row - 9) / 3, y + row, BLACK);
                 }
-                xr = br - 1;
+                br - 1
             } else {
                 back(fb, br, 2);
-                xr = br - 5;
-            }
+                br - 5
+            };
             seg(fb, xl, xr + 1, 16, BLACK);
         }
     }

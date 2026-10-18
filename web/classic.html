@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elifoot 98</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #008000; overflow: hidden; }
+  body { display: grid; place-items: center; font: 14px system-ui, sans-serif; color: #fff; }
+  canvas { image-rendering: pixelated; touch-action: none; outline: none; background: #008000; display: none; }
+  #msg { max-width: 34rem; padding: 1.5rem; line-height: 1.5; }
+  #msg code { background: #0006; padding: 0 .3em; border-radius: 3px; }
+  #msg button, #msg label.btn { font: inherit; padding: .5rem 1rem; margin-top: .75rem; cursor: pointer; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="600" tabindex="0" aria-label="Elifoot 98"></canvas>
+<div id="msg">A carregar…</div>
+<script src="classic.js" type="module"></script>
+</body>
+</html>

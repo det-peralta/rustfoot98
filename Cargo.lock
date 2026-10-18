@@ -30,6 +30,7 @@ dependencies = [
 name = "elifoot-ui-web"
 version = "0.1.0"
 dependencies = [
+ "elifoot-core",
  "elifoot-ui",
 ]
 
