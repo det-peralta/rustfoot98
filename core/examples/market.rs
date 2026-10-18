@@ -49,6 +49,10 @@ fn main() {
                 )
             })
             .collect();
+        let st: Vec<u32> = (0..4)
+            .map(|d| w.divisions[d].iter().map(|c| c.fin.stadium as u32).sum())
+            .collect();
+        println!("stadium levels {st:?}");
         println!("season {season:>2} ({}): transfers {n:>3} fees {fee:>11} fresh {fresh}/{total} per-round {per_round:?} mean str {mean:?} avg cash(k) {cash:?}", w.year);
         w.transfers.clear();
     }

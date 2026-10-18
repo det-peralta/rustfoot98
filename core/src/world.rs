@@ -711,6 +711,58 @@ impl World {
         }
     }
 
+    /// The user takes one loan step (`1010:665e`), within the bank's limit (`1040:3899`).
+    pub fn human_borrow(&mut self) -> Result<i64, String> {
+        let loc = self.human_location().ok_or("sem clube")?;
+        let (e, g) = (self.economy, self.scale);
+        let c = self.club_mut(loc);
+        let step = finance::loan_step(g);
+        let max = finance::max_loan(finance::rating(&c.slots), c.k, e, g);
+        if c.fin.loan + step > max {
+            return Err(format!("o banco não empresta mais: limite {max}"));
+        }
+        c.fin.cash += step;
+        c.fin.loan += step;
+        Ok(step)
+    }
+
+    /// The user repays one loan step (`1010:668d`).
+    pub fn human_repay(&mut self) -> Result<i64, String> {
+        let loc = self.human_location().ok_or("sem clube")?;
+        let step = finance::loan_step(self.scale);
+        let c = self.club_mut(loc);
+        if c.fin.loan <= 0 {
+            return Err("não tens empréstimos".into());
+        }
+        let pay = step.min(c.fin.loan);
+        if c.fin.cash < pay {
+            return Err("sem dinheiro para amortizar".into());
+        }
+        c.fin.cash -= pay;
+        c.fin.loan -= pay;
+        Ok(pay)
+    }
+
+    /// The user builds the next 5000 seats (`1010:c081`, cost `c172`) once the stadium is at least 80 % full.
+    pub fn human_expand(&mut self) -> Result<i64, String> {
+        let loc = self.human_location().ok_or("sem clube")?;
+        let (e, g) = (self.economy, self.scale);
+        let c = self.club_mut(loc);
+        if c.fin.stadium >= finance::MAX_STADIUM_LEVEL {
+            return Err("o estádio já tem a capacidade máxima".into());
+        }
+        if !finance::wants_expansion(&c.fin) {
+            return Err("o estádio ainda não está cheio o suficiente (80 %)".into());
+        }
+        let cost = finance::expansion_cost(&c.fin, e, g);
+        if c.fin.cash < cost {
+            return Err(format!("as obras custam {cost}"));
+        }
+        finance::expand(&mut c.fin);
+        c.fin.book(-cost, finance::Category::Works);
+        Ok(cost)
+    }
+
     /// The user bids `amount` (a multiple of 1000, above the asking price and the computer's best bid) for a listed player.
     pub fn human_bid(&mut self, listing: usize, amount: i64) -> Result<(), String> {
         let l = self
@@ -784,10 +836,24 @@ impl World {
     /// `1010:3e9c` (and `3aad`) for one computer-managed club after a round: wage renegotiation, forced sale when broke, and
     /// the regular decision to put a player up for sale.
     fn club_after_round(&mut self, loc: (usize, usize), round: usize) {
-        if self.is_human(loc) || round < 2 {
+        if self.is_human(loc) {
             return;
         }
         let (e, g) = (self.economy, self.scale);
+        // `3aad` ends with the stadium: expand when it is full and the club can afford the works plus two wage bills
+        {
+            let club = self.club_mut(loc);
+            if finance::wants_expansion(&club.fin) {
+                let cost = finance::expansion_cost(&club.fin, e, g);
+                if cost + 2 * crate::market::wage_sum(club) < club.fin.cash {
+                    finance::expand(&mut club.fin);
+                    club.fin.book(-cost, finance::Category::Works);
+                }
+            }
+        }
+        if round < 2 {
+            return;
+        }
         // wages follow the player's value: the most overpaid and the most underpaid player (outside 0.8..1.2) are repriced
         if self.club_ref(loc).coach_games > 1 {
             let club = self.club_mut(loc);
@@ -1006,7 +1072,10 @@ impl World {
                 c.fin.book(half, finance::Category::Gate);
                 let wages = finance::wage_bill(&c.slots);
                 c.fin.book(-wages, finance::Category::Wages);
+                let interest = finance::loan_interest(c.fin.loan);
+                c.fin.book(-interest, finance::Category::Interest);
             }
+            finance::update_fill(&mut home.fin, attendance);
             let (mh, ma) = cup::morale_results(!home_out);
             home.k = crate::matchsim::update_morale(home.k, mh);
             away.k = crate::matchsim::update_morale(away.k, ma);
@@ -1741,6 +1810,42 @@ mod tests {
     fn set_human_cash(w: &mut World, cash: i64) {
         let (d, i) = w.human_location().unwrap();
         w.divisions[d][i].fin.cash = cash;
+    }
+
+    #[test]
+    fn loans_accrue_interest_and_can_be_repaid_and_stadiums_grow() {
+        let mut w = World::synthetic(3);
+        let (d, i) = w.human_location().unwrap();
+        let cash = w.divisions[d][i].fin.cash;
+        let step = finance::loan_step(w.scale);
+        assert_eq!(w.human_borrow().unwrap(), step);
+        assert_eq!(w.divisions[d][i].fin.cash, cash + step);
+        w.play_round();
+        let c = &w.divisions[d][i].fin;
+        assert_eq!(c.interest, -finance::loan_interest(step));
+        assert_eq!(w.human_repay().unwrap(), step);
+        assert_eq!(w.divisions[d][i].fin.loan, 0);
+        assert!(w.human_repay().is_err());
+        // the bank has a limit
+        while w.human_borrow().is_ok() {}
+        assert!(w.human_borrow().is_err());
+        // some computer club grows its stadium within a few seasons
+        let before: u32 = w
+            .divisions
+            .iter()
+            .flatten()
+            .map(|c| c.fin.stadium as u32)
+            .sum();
+        for _ in 0..42 {
+            w.play_round();
+        }
+        let after: u32 = w
+            .divisions
+            .iter()
+            .flatten()
+            .map(|c| c.fin.stadium as u32)
+            .sum();
+        assert!(after >= before);
     }
 
     #[test]

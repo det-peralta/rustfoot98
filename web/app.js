@@ -254,8 +254,15 @@ function renderFinance(h) {
     `<div><dt>Salários por jogo</dt><dd>${money(-f.wageBill)}</dd></div>` +
     `<div><dt>Preço do bilhete</dt><dd>${f.price}</dd></div>` +
     `<div><dt>Estádio</dt><dd>${f.capacity.toLocaleString("pt-PT")} lugares (nível ${f.stadium})</dd></div>` +
-    `<div><dt>Empréstimo</dt><dd>${money(f.loan)}</dd></div></dl>` +
-    `<p class="note">Valores em reais (escala ${f.scale}). Receitas de bilheteira, salários, caixa inicial e estádio seguem o original; transferências ainda não existem.</p>`;
+    `<div><dt>Empréstimo</dt><dd>${money(f.loan)} <small>(limite ${money(f.maxLoan)})</small></dd></div>` +
+    `<div><dt>Enchimento do estádio</dt><dd>${Math.round(f.fill * 100)} %</dd></div></dl>` +
+    `<p class="actions"><button id="loan-up">Pedir ${money(f.step)}</button> <button id="loan-down" ${f.loan ? "" : "disabled"}>Amortizar ${money(f.step)}</button> ` +
+    `<button id="expand" ${f.canExpand ? "" : "disabled"}>Ampliar estádio (${money(f.expandCost)})</button> <span id="fin-msg" class="note" role="status"></span></p>` +
+    `<p class="note">Valores em reais (escala ${f.scale}). Bilheteira, salários, caixa inicial, estádio, empréstimos (juro de 5 % por jogo) e transferências seguem o original.</p>`;
+  const act = (id, fn) => { $(id).onclick = () => { fn(); lastMarketMsg = ""; read(); }; };
+  act("loan-up", () => wasm.loan_borrow());
+  act("loan-down", () => wasm.loan_repay());
+  act("expand", () => wasm.stadium_expand());
 }
 
 function renderClub() {

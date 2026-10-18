@@ -87,7 +87,7 @@ impl World {
         }
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -110,7 +110,9 @@ impl World {
                 String::from_utf8_lossy(&c.country),
                 c.master,
                 c.bought,
-                c.bought_foreign
+                c.bought_foreign,
+                c.fin.fill,
+                c.fin.works
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -278,11 +280,13 @@ impl World {
                             loan: int(12),
                             f: f[13].parse().unwrap_or(1.0),
                             stadium: int(14).clamp(1, 24) as u8,
+                            fill: f.get(24).and_then(|x| x.parse().ok()).unwrap_or(0.6),
                             gate: int(15),
                             sales: int(16),
                             purchases: int(17),
                             wages: int(18),
                             interest: int(19),
+                            works: f.get(25).and_then(|x| x.parse().ok()).unwrap_or(0),
                         };
                         has_finance = true;
                     }

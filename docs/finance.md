@@ -137,3 +137,15 @@ port keeps the same rules but makes it asynchronous, because every game runs in 
   more than 10 outfield players, not `fresh`); the best bid >= the price wins.
 - Not done: the original's refusal cooldown (`slot+0x36`), user-side loans, the user's price/salary negotiation.
 
+## Loans and stadium works (decoded; `finance.rs`, `World::human_borrow/repay/expand`)
+- **Interest**: every game each club pays `round(0.05 * loan)` (`5a37` -> `3865`, category `0x18`).
+- **Loan step** `S` (`10c8:2d7f`): the saves' header holds 500 000 next to the currency name; the port uses `100 000 * G`. Borrowing adds `S` to
+  cash and loan (`665e`), repaying subtracts it (`668d`). **Limit** (`3899`): `rating * K * E * G * 20000`, rounded down to a multiple of `S`
+  (at least one step).
+- **Computer clubs never borrow**: the loop in `3aad` only borrows when the cash already covers interest plus wage bill, which the entry
+  test rules out (dead code); they repay while `cash - wages - interest > S`. In the sample every loan is 0.
+- **Stadium**: `stadium+5` is an exponential average of `attendance / (capacity + 1)` with weight 0.6 on the old value (`c0c0`). At >= 0.8
+  and level < 24 (`c030`) a computer club builds 5000 seats when `cost + 2 * wage bill < cash` (`3aad`); the filling resets to 0.6
+  (`c081`) and `cost` (category `0x17`) is `max(50000, 50000 * round(sqrt(bracket) * E * 35000 * G / 50000))` with bracket 1 / 2 / 3 for level
+  < 6 / < 14 / >= 14. The user does the same from the finance card.
+

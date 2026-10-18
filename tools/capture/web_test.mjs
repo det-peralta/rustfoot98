@@ -47,6 +47,9 @@ try {
   await p.click('#squad tbody tr:first-child button.sell');
   const mmsg = await p.textContent('#market-msg');
   check('selling gives an answer', /Vendido|nenhum clube|jogadores/.test(mmsg), mmsg);
+  await p.click('#loan-up');
+  check('loan granted', (await p.textContent('#market-msg')).includes('Empréstimo'), await p.textContent('#market-msg'));
+  check('loan shown', (await p.textContent('#finance')).includes('limite'));
   check('my match highlighted in the results', (await p.locator('#results li.mine').count()) === 1);
   check('planned substitution consumed', (await p.locator('.subrow').count()) === 0);
   await p.locator('#results li button').first().click();

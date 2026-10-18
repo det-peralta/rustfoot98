@@ -507,7 +507,10 @@ pub fn play_round(
             for c in [&mut *hc, &mut *ac] {
                 let wages = finance::wage_bill(&c.slots);
                 c.fin.book(-wages, Category::Wages);
+                let interest = finance::loan_interest(c.fin.loan);
+                c.fin.book(-interest, Category::Interest);
             }
+            finance::update_fill(&mut hc.fin, attendance);
         }
         let (rh, ra) = morale_results(x, y);
         hc.maybe_sack_coach();

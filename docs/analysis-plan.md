@@ -30,4 +30,5 @@
 - [x] Finances: wages, gate, ticket price, cash, stadium (docs/finance.md); transfers/loans/prizes still open
 - [x] Computer-managed transfer market: sale decisions, asking price, auction, bids (docs/finance.md; fees calibrated on one save)
 - [x] The user's market: bidding in open auctions, selling players (async adaptation, docs/finance.md)
+- [x] Loans (limit, interest) and stadium expansion
 - [ ] Market leftovers (buy/sell, tickets, salaries)

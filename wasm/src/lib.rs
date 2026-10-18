@@ -138,7 +138,7 @@ fn human_json(w: &World) -> String {
     let money = w.money_ctx(d);
     let wage = elifoot_core::finance::wage_bill(&club.slots);
     let finance = format!(
-        "{{\"cash\":{},\"loan\":{},\"f\":{:.4},\"stadium\":{},\"capacity\":{},\"gate\":{},\"sales\":{},\"purchases\":{},\"wages\":{},\"interest\":{},\"wageBill\":{},\"price\":{},\"scale\":{}}}",
+        "{{\"cash\":{},\"loan\":{},\"f\":{:.4},\"stadium\":{},\"capacity\":{},\"gate\":{},\"sales\":{},\"purchases\":{},\"wages\":{},\"interest\":{},\"wageBill\":{},\"price\":{},\"scale\":{},\"step\":{},\"maxLoan\":{},\"fill\":{:.3},\"canExpand\":{},\"expandCost\":{}}}",
         fin.cash,
         fin.loan,
         fin.f,
@@ -151,7 +151,12 @@ fn human_json(w: &World) -> String {
         fin.interest,
         wage,
         money.price,
-        w.scale
+        w.scale,
+        elifoot_core::finance::loan_step(w.scale),
+        elifoot_core::finance::max_loan(elifoot_core::finance::rating(&club.slots), club.k, w.economy, w.scale),
+        fin.fill,
+        elifoot_core::finance::wants_expansion(fin),
+        elifoot_core::finance::expansion_cost(fin, w.economy, w.scale)
     );
     format!(
         "{{\"club\":{},\"finance\":{},\"div\":{},\"idx\":{},\"formation\":{},\"formations\":[{}],\"squad\":[{}],\"plan\":{{\"starters\":[{}],\"bench\":[{}],\"subs\":[{}]}},\"subsLeft\":3}}",
@@ -532,6 +537,34 @@ pub extern "C" fn market_sell(slot: u32, ask: f64) -> i32 {
     finish_market(
         r.unwrap_or(Err("sem jogo".into()))
             .map(|fee| format!("Vendido por {fee}.")),
+    )
+}
+
+/// Loan step taken / repaid and stadium works, with the answer in `msg`.
+#[no_mangle]
+pub extern "C" fn loan_borrow() -> i32 {
+    let r = WORLD.with(|w| w.borrow_mut().as_mut().map(|w| w.human_borrow()));
+    finish_market(
+        r.unwrap_or(Err("sem jogo".into()))
+            .map(|v| format!("Empréstimo de {v} concedido.")),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn loan_repay() -> i32 {
+    let r = WORLD.with(|w| w.borrow_mut().as_mut().map(|w| w.human_repay()));
+    finish_market(
+        r.unwrap_or(Err("sem jogo".into()))
+            .map(|v| format!("Amortizaste {v}.")),
+    )
+}
+
+#[no_mangle]
+pub extern "C" fn stadium_expand() -> i32 {
+    let r = WORLD.with(|w| w.borrow_mut().as_mut().map(|w| w.human_expand()));
+    finish_market(
+        r.unwrap_or(Err("sem jogo".into()))
+            .map(|v| format!("Obras concluídas por {v}: mais 5000 lugares.")),
     )
 }
 
