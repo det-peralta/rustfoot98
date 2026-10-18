@@ -31,15 +31,17 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::CupDraw
         | Kind::EndOfSeason
         | Kind::RefereeAid => matchday::bind(c, d),
-        Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
-            tables::bind(c, d)
-        }
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::bind(c, d),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
         | Kind::Observed
-        | Kind::Transactions
-        | Kind::Acquisitions
         | Kind::Auction
         | Kind::Plantel => market::bind(c, d),
         Kind::CoachHistory
@@ -67,15 +69,17 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::CupDraw
         | Kind::EndOfSeason
         | Kind::RefereeAid => matchday::click(c, d, name),
-        Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
-            tables::click(c, d, name)
-        }
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::click(c, d, name),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
         | Kind::Observed
-        | Kind::Transactions
-        | Kind::Acquisitions
         | Kind::Auction
         | Kind::Plantel => market::click(c, d, name),
         Kind::CoachHistory
@@ -97,9 +101,13 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         Kind::Halftime | Kind::Penalty | Kind::Shootout | Kind::CupDraw | Kind::EndOfSeason => {
             matchday::key(c, d, key)
         }
-        Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
-            tables::key(c, d, key)
-        }
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::key(c, d, key),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
@@ -134,7 +142,13 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
         Kind::Halftime | Kind::Penalty | Kind::Shootout | Kind::CupDraw | Kind::EndOfSeason => {
             matchday::tick(c, d, ms)
         }
-        Kind::Standings | Kind::Calendar => tables::tick(c, d, ms),
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::tick(c, d, ms),
         Kind::Auction | Kind::Plantel => market::tick(c, d, ms),
         _ => Outcome::Keep,
     }
@@ -181,5 +195,10 @@ pub fn open_for_button(c: &Classic, name: &str) -> Option<Dialog> {
         _ => return None,
     };
     let _ = c;
-    Some(Dialog::new(kind, form))
+    let mut d = Dialog::new(kind, form);
+    if name == "opponentCalendarBtn" {
+        // the calendar of the next opponent, not of the user's club
+        d.st.insert("opponent".into(), "1".into());
+    }
+    Some(d)
 }

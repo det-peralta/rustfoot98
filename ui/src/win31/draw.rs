@@ -296,7 +296,7 @@ pub fn controls(fb: &mut Fb, cx: &Ctx, root: &Node) {
     }
 }
 
-fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
+pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
     let visible = match cx.texts.get(&format!("{}.visible", n.name)) {
         Some(v) => v != "0",
         None => n.flag("Visible", true),
@@ -320,6 +320,22 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         }
     }
     let (x, y) = (cx.ox + left, cx.oy + top);
+    // the program resized the control at run time (`<name>.size=w,h`)
+    let resized;
+    let n = match cx.texts.get(&format!("{}.size", n.name)) {
+        Some(sz) => {
+            let v: Vec<f64> = sz.split(',').filter_map(|t| t.parse().ok()).collect();
+            let mut m = n.clone();
+            if v.len() == 2 {
+                m.props.insert("Width".into(), super::json::Json::Num(v[0]));
+                m.props
+                    .insert("Height".into(), super::json::Json::Num(v[1]));
+            }
+            resized = m;
+            &resized
+        }
+        None => n,
+    };
     cx.hits.borrow_mut().push(Hit {
         name: n.name.clone(),
         class: n.class.clone(),
@@ -345,6 +361,8 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TNotebook" => notebook(fb, cx, n, &f, x, y),
         "TBiGauge" => bigauge(fb, cx, n, x, y),
         "TTabSet" => tabset(fb, cx, n, &f, x, y),
+        "TTabbedNotebook" => super::tabbed::notebook(fb, cx, n, &f, x, y),
+        "TRadioGroup" => super::tabbed::radio_group(fb, cx, n, &f, x, y),
         _ => {}
     }
 }
@@ -819,6 +837,28 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if n.name == "ListBoxClassification" {
         if let Some(rows) = cx.lists.get(&n.name) {
             classification(fb, font, x, y, w, rows);
+        }
+        return;
+    }
+    if n.ident("Style") == Some("lbOwnerDrawFixed")
+        && matches!(
+            n.name.as_str(),
+            "listOfItems"
+                | "ListBoxDivision1"
+                | "ListBoxDivision2"
+                | "ListBoxDivision3"
+                | "ListBoxDivision4"
+                | "ListBoxOfCoaches"
+        )
+    {
+        // rows in the field encoding of the original's `DrawItem` routines (`printlist.rs`)
+        if let Some(rows) = cx.lists.get(&n.name) {
+            let bg = if flat {
+                cx.bg
+            } else {
+                cx.color_of(n, "bg").unwrap_or(WHITE)
+            };
+            super::printlist::draw_list(fb, cx, n, f, bg, x, y, w, h, rows);
         }
         return;
     }

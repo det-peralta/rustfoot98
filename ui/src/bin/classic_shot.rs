@@ -1,5 +1,5 @@
 //! Renders the classic interface from a saved game into a BMP: `classic_shot game.e98 out.bmp [key=value ...]`
-//! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
+//! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
 use elifoot_ui::classic::{Classic, Data, Ev, Key, Page};
 use elifoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
@@ -126,6 +126,22 @@ fn main() -> Result<(), String> {
             }
             "open" => elifoot_ui::classic::dialogs::market::open_by_name(&mut app, v)?,
             "registered" => app.main.market.registered = v != "0",
+            "dialog" => {
+                // opens a dialog by the control name of its menu entry (`CampeonatoClassificao`, `menuCalendrio`...)
+                if let Some(d) = elifoot_ui::classic::dialogs::open_for_menu(&app, v)
+                    .or_else(|| elifoot_ui::classic::dialogs::open_for_button(&app, v))
+                {
+                    app.open(d);
+                } else {
+                    return Err(format!("no dialog {v}"));
+                }
+            }
+            "play" => {
+                // plays N rounds of the world without showing them (to have histories to look at)
+                for _ in 0..v.parse::<usize>().map_err(|e| e.to_string())? {
+                    app.world.play_round();
+                }
+            }
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }

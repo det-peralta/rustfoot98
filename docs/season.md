@@ -112,3 +112,34 @@ teams**; the 54 entries of the save's first list are the 52 clubs' coaches plus 
   the players' values and lifts a negative cash balance to 0.
 In the port `World::accept_invitations` (default off; `world_set_accept_invitations` in the wasm ABI) decides about invitations;
 `coach_changes` / `human_moved` report what happened in the last round. About 3.5 swaps per season occur in a synthetic world.
+
+## History records of the information dialogs (`core/src/history.rs`, `World::history`)
+The dialogs *Calendário*, *Últimos vencedores*, *Historial*, *História* (coach), *Ranking* and the coach profile read what the original
+keeps in object lists (see `e98-format.md`); the port keeps them by club and coach **name** (two coaches of the same name share a
+record), saved as `winner|`, `fixture|`, `clubevent|`, `coachevent|`, `coachtitles|`, `coachopts|` and `transfer|` lines and imported from an
+original save (`World::from_e98`).
+* **Calendar** (`TCalendarEntry`, 16 bytes in the save: `u16 +8` opponent id, `u16 +0xe` venue, `u16 +0xa`/`+0xc` the club's own goals and
+  the opponent's, `u32 +0x10` attendance, `u8 +7` cup flag, `u8 +6` result kind, `u16 +4` round): the 14 league games exist from the
+  start of the season with goals `-1`; venue 0 home, 1 away, 2 neutral (the letters `C`, `F`, `N` of the list), result kind 0 normal time,
+  1 extra time (`a. p.`), 2 won (`v. pen.`) and 3 lost on penalties (`d. pen.`). Cup ties are added after the cup draw/round. In the port
+  `History::calendars` is filled by `record_league_fixtures` / `record_cup_fixtures` after every round (a cup tie is listed right after the
+  league game of the round it followed, with a blank round number) and cleared at the end of the season; a club without an entry shows the
+  schedule (`World::calendar`).
+* **Champions** (`TLastWinners`, 10 bytes: year, champion club id, its coach id, cup winner id, its coach id): appended at the season end
+  (`1020:038e`, `History::season_end`).
+* **Club history** (`TTeamEvent`, 7 bytes: kind, year, coach id): kind 1 league title, 2 cup, 3 double (instead of 1 and 2 when the
+  champion also won the cup), 4 second and 5 third place of the *first division* only. **Coach history** (`TCoachEvent`): 1 hired by a club,
+  2 sacked, 3 league title, 4 cup, 5 "Ingresso no <club>" (written for every coach at a new game, `1020:0148`), 6 "Despromovido para o
+  <club>" and 7 "Promovido para o <club>" (the two coaches of a swap, `1010:4f40`: the sacked club's coach goes to the other club), 8 double,
+  9 and 10 second and third place. The champion's coach also counts a title (`coach+0x16`, the cup winner's `coach+0x18`).
+* **Coach ranking** (`1050:1d59` with the stable sort `1068:0e0d`): league titles, cup titles, then score, **highest first** (an earlier
+  note in this file read the comparer as "lowest first"). The port's `replace_coach` now also swaps the coaches' *names* with their
+  scores, so histories and titles follow the person.
+* **Coach profile** (`TCoachOptionsDlg`, 5 bytes at `coach+0x1a`): the computer manages the wages of the domestic players, of the
+  foreigners covered by the Bosman rule and of the others (`1010:3e9c` branches on `option[player+0x35]`; the original asks the user in a
+  dialog for the classes it does not manage), the auction mode (0 offers for all players, 1 not for the weaker ones, 2 no buying in
+  auctions) and "do not let the others see my offers". The port applies the three wage switches in `club_after_round` (only the
+  classes switched on are renegotiated for the user) and mode 2 (the user gets no auction listing, `human_may_bid`); mode 1 and the
+  hidden offers are stored only. The original's new-game values are all off, auction 1 (an imported save keeps what it stores); a port
+  world starts with the wages switched on because the port never had the asking dialog.
+* **Holiday** (`coach+6`, `TCoachManagerDlg`): the computer picks the line-up for the user's club (`History::holiday`).

@@ -6,11 +6,12 @@
 //! are not stored.
 use crate::economy::{DEFAULT_SCALE, INITIAL_INDEX};
 use crate::finance::Finance;
+use crate::history::{ClubEvent, CoachEvent, Fixture, History, Winner};
 use crate::market::{code, country_class};
 use crate::rng::DelphiRng;
 use crate::season::{Club, Plan, PlannedSub};
 use crate::sector::{Slot, Status};
-use crate::world::{Human, Listing, Pending, World};
+use crate::world::{Human, Listing, Pending, Transfer, World};
 
 const MAGIC: &str = "ELIFOOT98-RS 1";
 
@@ -98,6 +99,7 @@ impl World {
         if let Some(c) = &self.cup_champion {
             out.push_str(&format!("cupchampion|{}\n", clean(c)));
         }
+        self.save_history(&mut out);
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
                 "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
@@ -186,6 +188,8 @@ impl World {
         let mut pending: Vec<Pending> = Vec::new();
         let mut observed: Vec<(String, String)> = Vec::new();
         let mut sell_tried: Vec<String> = Vec::new();
+        let mut history = History::default();
+        let mut transfers: Vec<Transfer> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
         let mut cash_ref = [0i64; 4];
@@ -255,6 +259,70 @@ impl World {
                         best,
                     });
                 }
+                "winner" => history.winners.push(Winner {
+                    year: num(n, &f, 1)? as u16,
+                    champion: f.get(2).unwrap_or(&"").to_string(),
+                    champion_coach: f.get(3).unwrap_or(&"").to_string(),
+                    cup_winner: f.get(4).unwrap_or(&"").to_string(),
+                    cup_coach: f.get(5).unwrap_or(&"").to_string(),
+                }),
+                "fixture" => history
+                    .calendars
+                    .entry(f.get(1).unwrap_or(&"").to_string())
+                    .or_default()
+                    .push(Fixture {
+                        opponent: f.get(2).unwrap_or(&"").to_string(),
+                        venue: num(n, &f, 3)? as u8,
+                        goals: (num(n, &f, 4)? as i16, num(n, &f, 5)? as i16),
+                        gate: num(n, &f, 6)?,
+                        cup: num(n, &f, 7)? != 0,
+                        result: num(n, &f, 8)? as u8,
+                        round: num(n, &f, 9)? as u16,
+                    }),
+                "clubevent" => history
+                    .club_events
+                    .entry(f.get(1).unwrap_or(&"").to_string())
+                    .or_default()
+                    .push(ClubEvent {
+                        kind: num(n, &f, 2)? as u8,
+                        year: num(n, &f, 3)? as u32,
+                        coach: f.get(4).unwrap_or(&"").to_string(),
+                    }),
+                "coachevent" => history
+                    .coach_events
+                    .entry(f.get(1).unwrap_or(&"").to_string())
+                    .or_default()
+                    .push(CoachEvent {
+                        kind: num(n, &f, 2)? as u8,
+                        year: num(n, &f, 3)? as u32,
+                        club: f.get(4).unwrap_or(&"").to_string(),
+                    }),
+                "coachtitles" => {
+                    history.coach_titles.insert(
+                        f.get(1).unwrap_or(&"").to_string(),
+                        (num(n, &f, 2)? as u16, num(n, &f, 3)? as u16),
+                    );
+                }
+                "coachopts" => {
+                    history.options.salary = [
+                        num(n, &f, 1)? != 0,
+                        num(n, &f, 2)? != 0,
+                        num(n, &f, 3)? != 0,
+                    ];
+                    history.options.auction = num(n, &f, 4)?.clamp(0, 2) as u8;
+                    history.options.encrypt = num(n, &f, 5)? != 0;
+                    history.holiday = num(n, &f, 6)? != 0;
+                }
+                "transfer" => transfers.push(Transfer {
+                    round: num(n, &f, 1)? as usize,
+                    year: num(n, &f, 2)? as u16,
+                    player: f.get(3).unwrap_or(&"").to_string(),
+                    position: num(n, &f, 4)? as u8,
+                    strength: num(n, &f, 5)? as u16,
+                    from: f.get(6).unwrap_or(&"").to_string(),
+                    to: f.get(7).unwrap_or(&"").to_string(),
+                    fee: num(n, &f, 8)?,
+                }),
                 "scale" => scale = num(n, &f, 1)?.max(1),
                 "cashref" => {
                     for (i, r) in cash_ref.iter_mut().enumerate() {
@@ -415,7 +483,7 @@ impl World {
             cup,
             last_cup: None,
             cup_champion,
-            transfers: Vec::new(),
+            transfers,
             board,
             pending,
             observed,
@@ -423,6 +491,7 @@ impl World {
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
+            history,
         };
         if !has_cup {
             w.reset_cup();
@@ -437,6 +506,87 @@ impl World {
             w.pick_human();
         }
         Ok(w)
+    }
+}
+
+impl World {
+    /// The records of `history.rs` and the transfers list.
+    fn save_history(&self, out: &mut String) {
+        let h = &self.history;
+        for w in &h.winners {
+            out.push_str(&format!(
+                "winner|{}|{}|{}|{}|{}\n",
+                w.year,
+                clean(&w.champion),
+                clean(&w.champion_coach),
+                clean(&w.cup_winner),
+                clean(&w.cup_coach)
+            ));
+        }
+        for (club, list) in &h.calendars {
+            for f in list {
+                out.push_str(&format!(
+                    "fixture|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+                    clean(club),
+                    clean(&f.opponent),
+                    f.venue,
+                    f.goals.0,
+                    f.goals.1,
+                    f.gate,
+                    f.cup as u8,
+                    f.result,
+                    f.round
+                ));
+            }
+        }
+        for (club, list) in &h.club_events {
+            for e in list {
+                out.push_str(&format!(
+                    "clubevent|{}|{}|{}|{}\n",
+                    clean(club),
+                    e.kind,
+                    e.year,
+                    clean(&e.coach)
+                ));
+            }
+        }
+        for (coach, list) in &h.coach_events {
+            for e in list {
+                out.push_str(&format!(
+                    "coachevent|{}|{}|{}|{}\n",
+                    clean(coach),
+                    e.kind,
+                    e.year,
+                    clean(&e.club)
+                ));
+            }
+        }
+        for (coach, t) in &h.coach_titles {
+            out.push_str(&format!("coachtitles|{}|{}|{}\n", clean(coach), t.0, t.1));
+        }
+        let o = &h.options;
+        out.push_str(&format!(
+            "coachopts|{}|{}|{}|{}|{}|{}\n",
+            o.salary[0] as u8,
+            o.salary[1] as u8,
+            o.salary[2] as u8,
+            o.auction,
+            o.encrypt as u8,
+            h.holiday as u8
+        ));
+        for t in &self.transfers {
+            out.push_str(&format!(
+                "transfer|{}|{}|{}|{}|{}|{}|{}|{}\n",
+                t.round,
+                t.year,
+                clean(&t.player),
+                t.position,
+                t.strength,
+                clean(&t.from),
+                clean(&t.to),
+                t.fee
+            ));
+        }
     }
 }
 
