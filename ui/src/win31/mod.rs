@@ -10,7 +10,7 @@ pub mod form;
 pub mod json;
 pub mod printlist;
 pub mod skin;
-pub mod tabbed;
+mod widgets;
 
 pub use fb::Fb;
 pub use form::{Form, Forms, Node};

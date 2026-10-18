@@ -183,6 +183,13 @@ impl Skin {
                     .iter()
                     .find(|f| f.face == face && f.px == px && f.bold == bold)
             })
+            .or_else(|| {
+                // a size the face does not come in: GDI takes the closest raster size that is not larger
+                self.fonts
+                    .iter()
+                    .filter(|f| f.face == face && f.bold == bold && f.px <= px)
+                    .max_by_key(|f| f.px)
+            })
     }
 
     pub fn bitmap(&self, form: &str, name: &str) -> Option<&Bitmap> {

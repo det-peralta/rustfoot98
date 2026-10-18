@@ -111,13 +111,19 @@ impl Classic {
                 .map(|h| (h.name.clone(), h.class.clone(), h.enabled))
             {
                 Some((name, class, true)) => {
-                    if class != "ListRow" && class != "TabSetTab" {
-                        d.focus = name.clone();
-                    }
-                    if class == "TEdit" {
-                        Outcome::Keep
-                    } else {
-                        dialogs::click(self, &mut d, &name)
+                    match super::widget_input::mouse(self, &mut d, &name, &class) {
+                        super::widget_input::MouseAct::Click(n) => dialogs::click(self, &mut d, &n),
+                        super::widget_input::MouseAct::Done => Outcome::Keep,
+                        super::widget_input::MouseAct::Default => {
+                            if class != "ListRow" && class != "TabSetTab" {
+                                d.focus = name.clone();
+                            }
+                            if class == "TEdit" {
+                                Outcome::Keep
+                            } else {
+                                dialogs::click(self, &mut d, &name)
+                            }
+                        }
                     }
                 }
                 // the standings close with a click anywhere on the form (`GoOn`)

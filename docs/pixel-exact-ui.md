@@ -44,6 +44,16 @@ hits Cancel). The saved game `ABCDEEEE` (a 2-round Brazil/Belgium league) lets "
 * **Banner** (`TBanner`): the scrolling text clipped to its rectangle, drawn at `x + width - scroll` with the parent's font (scroll position is run-time state).
 * **Not reproduced**: the mouse cursor in captures (126 pixels in the About capture); the exact scroll position of the banner at any moment (state).
 
+## Widgets measured on captures (options, profile, stadium, calendar, scorers, ranking dialogs)
+* **Sunken box** (edit, list, combo): gray line over the top and left (`x-1..x+w`, `y-1..y+h`), black frame, white line under and right of the black frame (starting at `x` / `y`).
+* **Combo box**: the frame is a pixel shorter than the form's `Height` (the closed box is `Height - 1`), a black divider 17 pixels from the right, a 15-pixel arrow button (white top/left, 2 grey lines bottom/right) with a down arrow and bar glyph; focused (`csDropDownList`): navy highlight inset by one pixel, white text, a *solid* inverted rectangle; open: the list continues the frame, rows `ItemHeight` high, the selected row navy.
+* **Scroll bar** (list box, Windows 3.1): 16 wide inside the list's black border, black line left of the bar; the up and down buttons are 15x15 button faces with arrow glyphs, separated from the track by black lines; the thumb is a fixed 17x17 box (black outline, button face) at `first + (len - 2) * top / range` (floor; the end of the range maps to the last position); the track is silver.
+* **Check box**: 13x13 black frame with silver inside, a one-pixel cross when checked, caption at +18; focus rectangle around the caption (text rectangle from `-2` to `+tw+2`, 19 pixels tall from the line above the box), clipped to the control. **Radio button**: ring and a 7-pixel disc; radio group buttons start at `tmHeight + 2` below the group top and are `(Height - tmHeight - 5) / items` high.
+* **Tabbed notebook**: tabs of `(Width - 4) / TabsPerRow` (3 by default) pixels, the page frame black / white-grey miter bevel 3 pixels outside the page; selected tab bold, 1 pixel higher bevel and open to the page; its focus rectangle is XORed with the tab text colour.
+* **Dotted focus rectangle over other colours**: lit pixels invert what is below them (navy -> (248,252,120)).
+* **Buttons**: the caption's odd pixel goes left (MS Sans Serif: right); thin-framed buttons raise captions of regular raster fonts by one pixel; the default button is the `Default`/`bkOK` button unless another button has the focus.
+* **Stadium picture** (`PaintBoxStadiumPaint`, `1030:2cee`): up to three rings of stands (grey, 2-pixel light yellow outline, `Pie` wedges around the top covering `n/6`, `n/8`, `n/10` of the circle for levels 1..6, 7..14, 15..24; a full ring is an `Ellipse`) drawn first, then the pitch ellipse (green, same outline) with white lines. Ring and pitch geometry is fitted to a level-2 capture.
+
 ## Frames captured so far (analysis/shots, local)
 `guest1` About (done), `guest3` new-game dialog (done), `guest11/13` the same with a saved game listed and selected, `guest14` the "A carregar o jogo..."
 gauge dialog (`TProgressDlg`, `TGauge`: filled part black, rest white, percentage text inverted), `guest15` the **main screen** (`TPrepareGameDlg`, 632x434, black

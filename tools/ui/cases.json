@@ -92,5 +92,194 @@
    "TabSet.index=0",
    "TabSet.color=255,255,255"
   ]
+ },
+ {
+  "form": "TOPTIONSDLG",
+  "golden": "analysis/shots/w/opt1.png",
+  "region": [
+   142,
+   144,
+   516,
+   311
+  ],
+  "args": [
+   "@focus=TabbedNotebook1",
+   "TabbedNotebook1.tabcount=2",
+   "ComboViewPsichologicalLashes.sel=1",
+   "comboViewGetTeams.items=Nunca\nQuando houver humanos\nSempre",
+   "comboViewGetTeams.sel=1",
+   "comboSaveGameWhen.sel=1",
+   "ComboSound.sel=0"
+  ],
+  "note": "options, 'Geral' tab with focus; glyph noise only"
+ },
+ {
+  "form": "TOPTIONSDLG",
+  "golden": "analysis/shots/w/opt2.png",
+  "region": [
+   142,
+   144,
+   516,
+   311
+  ],
+  "args": [
+   "@focus=ComboViewPsichologicalLashes",
+   "TabbedNotebook1.tabcount=2",
+   "ComboViewPsichologicalLashes.sel=1",
+   "comboViewGetTeams.items=Nunca\nQuando houver humanos\nSempre",
+   "comboViewGetTeams.sel=1",
+   "comboSaveGameWhen.sel=1",
+   "ComboSound.sel=0"
+  ],
+  "note": "focused combo box: highlighted text, solid focus rectangle"
+ },
+ {
+  "form": "TOPTIONSDLG",
+  "golden": "analysis/shots/w/opt3.png",
+  "region": [
+   142,
+   144,
+   516,
+   311
+  ],
+  "args": [
+   "@focus=ComboViewPsichologicalLashes",
+   "ComboViewPsichologicalLashes.open=1",
+   "TabbedNotebook1.tabcount=2",
+   "ComboViewPsichologicalLashes.sel=1",
+   "comboViewGetTeams.items=Nunca\nQuando houver humanos\nSempre",
+   "comboViewGetTeams.sel=1",
+   "comboSaveGameWhen.sel=1",
+   "ComboSound.sel=0"
+  ],
+  "note": "open drop-down list"
+ },
+ {
+  "form": "TOPTIONSDLG",
+  "golden": "analysis/shots/w/opt4.png",
+  "region": [
+   142,
+   144,
+   516,
+   311
+  ],
+  "args": [
+   "@focus=TabbedNotebook1",
+   "TabbedNotebook1.page=1",
+   "TabbedNotebook1.tabcount=2",
+   "comboGameTimeProfile.items=Curto\nMédio\nLongo",
+   "comboGameTimeProfile.sel=1",
+   "comboHalfTimeSubstitutions.sel=1",
+   "comboViewComputerPenalties.sel=1"
+  ],
+  "note": "second tab selected"
+ },
+ {
+  "form": "TCOACHOPTIONSDLG",
+  "golden": "analysis/shots/w/prof2.png",
+  "region": [
+   178,
+   149,
+   444,
+   302
+  ],
+  "args": [
+   "@caption=Perfil de joga1",
+   "@focus=TabbedNotebook1",
+   "CheckBoxNationalPlayersSalary.checked=1",
+   "CheckBoxForeignerPlayersSalary.checked=1"
+  ],
+  "note": "check boxes; mouse cursor ~125 px at the title and ~120 at the third box"
+ },
+ {
+  "form": "TCOACHOPTIONSDLG",
+  "golden": "analysis/shots/w/prof4.png",
+  "region": [
+   178,
+   149,
+   444,
+   302
+  ],
+  "args": [
+   "@caption=Perfil de joga1",
+   "@focus=CheckBoxEncryptOffers",
+   "TabbedNotebook1.page=1",
+   "RadioGroupBuyInAuction.index=1",
+   "CheckBoxEncryptOffers.checked=1"
+  ],
+  "note": "radio group and focused check box; mouse cursor ~280 px"
+ },
+ {
+  "form": "TCOACHOPTIONSDLG",
+  "golden": "analysis/shots/w/prof5.png",
+  "region": [
+   178,
+   149,
+   444,
+   302
+  ],
+  "args": [
+   "@caption=Perfil de joga1",
+   "@focus=RadioGroupBuyInAuction",
+   "TabbedNotebook1.page=1",
+   "RadioGroupBuyInAuction.index=1",
+   "CheckBoxEncryptOffers.checked=1"
+  ],
+  "note": "focused radio group item; mouse cursor ~280 px"
+ },
+ {
+  "form": "TSELECTGAMEDLG",
+  "golden": "analysis/shots/w/sel_game.png",
+  "region": [
+   160,
+   114,
+   479,
+   372
+  ],
+  "args": [
+   "@caption=Elifoot 98",
+   "RadioContinueGame.checked=1",
+   "RadioContinueGame.color=248,252,0",
+   "OKBtn.enabled=1",
+   "labelGameDescription=joga1 e joga2\n17/10/26 21:57",
+   "ListBoxGames.list=ABCDEFEE",
+   "ListBoxGames.sel=0",
+   "@focus=ListBoxGames",
+   "textGameName.enabled=1"
+  ],
+  "note": "checked radio, selected row with focus rectangle; the capture's list says ABCDEEEE (20 px), cursor ~100 px"
+ },
+ {
+  "form": "TPRINTLISTDLG",
+  "golden": "analysis/shots/w/rank4.png",
+  "region": [
+   655,
+   36,
+   25,
+   510
+  ],
+  "args": [
+   "@client=578x575",
+   "listOfItems.size=545x499",
+   "listOfItems.list=1|x|y|0 +|0 =|0\n2|x|y|0 +|0 =|0\n3|x|y|0 +|0 =|0\n4|x|y|0 +|0 =|0\n5|x|y|0 +|0 =|0\n6|x|y|0 +|0 =|0\n7|x|y|0 +|0 =|0\n8|x|y|0 +|0 =|0\n9|x|y|0 +|0 =|0\n10|x|y|0 +|0 =|0\n11|x|y|0 +|0 =|0\n12|x|y|0 +|0 =|0\n13|x|y|0 +|0 =|0\n14|x|y|0 +|0 =|0\n15|x|y|0 +|0 =|0\n16|x|y|0 +|0 =|0\n17|x|y|0 +|0 =|0\n18|x|y|0 +|0 =|0\n19|x|y|0 +|0 =|0\n20|x|y|0 +|0 =|0\n21|x|y|0 +|0 =|0\n22|x|y|0 +|0 =|0\n23|x|y|0 +|0 =|0\n24|x|y|0 +|0 =|0\n25|x|y|0 +|0 =|0\n26|x|y|0 +|0 =|0\n27|x|y|0 +|0 =|0\n28|x|y|0 +|0 =|0\n29|x|y|0 +|0 =|0\n30|x|y|0 +|0 =|0\n31|x|y|0 +|0 =|0\n32|x|y|0 +|0 =|0\n33|x|y|0 +|0 =|0\n34|x|y|0 +|0 =|0\n35|x|y|0 +|0 =|0\n36|x|y|0 +|0 =|0\n37|x|y|0 +|0 =|0\n38|x|y|0 +|0 =|0\n39|x|y|0 +|0 =|0\n40|x|y|0 +|0 =|0\n41|x|y|0 +|0 =|0\n42|x|y|0 +|0 =|0\n43|x|y|0 +|0 =|0\n44|x|y|0 +|0 =|0\n45|x|y|0 +|0 =|0\n46|x|y|0 +|0 =|0\n47|x|y|0 +|0 =|0\n48|x|y|0 +|0 =|0\n49|x|y|0 +|0 =|0\n50|x|y|0 +|0 =|0\n51|x|y|0 +|0 =|0\n52|x|y|0 +|0 =|0\n53|x|y|0 +|0 =|0\n54|x|y|0 +|0 =|0",
+   "listOfItems.top=10",
+   "listOfItems.cols=23,34,174,380,395,443",
+   "listOfItems.align=rllrlr"
+  ],
+  "note": "scroll bar of a 54-row list scrolled by 10; mouse cursor at the bottom button ~115 px"
+ },
+ {
+  "form": "TSTADIUMDLG",
+  "golden": "analysis/shots/w/stad1.png",
+  "region": [
+   234,
+   171,
+   332,
+   140
+  ],
+  "args": [
+   "PaintBoxStadium.level=2"
+  ],
+  "note": "stadium picture, level 2 (approximate: ~430 px)"
  }
 ]
