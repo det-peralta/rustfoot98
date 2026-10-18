@@ -153,6 +153,14 @@ try {
   await q.focus('#c'); await q.keyboard.press(' '); await q.waitForTimeout(300);
   const after = await lit();
   check('canvas UI reacts to the keyboard', after !== before, `${before} -> ${after}`);
+  const box = await q.locator('#c').boundingBox();
+  const tap = async (x, y) => { await q.mouse.click(box.x + x * box.width / 800, box.y + y * box.height / 600); await q.waitForTimeout(150); };
+  await tap(766, 22); // Opções tab
+  await tap(100, 140); // Gravar jogo
+  const saved = await q.evaluate(() => localStorage.getItem('elifoot98-rea.save'));
+  check('canvas UI saves the game in localStorage', !!saved && saved.length > 1000, String(saved && saved.length));
+  await tap(260, 140); // Carregar jogo
+  check('canvas UI loads it back without errors', qerr.length === 0, qerr.join(' | '));
   await q.screenshot({ path: 'analysis/shots/web_canvas.png' });
   check('canvas UI has no page errors', qerr.length === 0, qerr.join(' | '));
   check('no console errors', errors.length === 0, errors.join(' | '));

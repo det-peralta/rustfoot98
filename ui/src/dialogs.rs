@@ -2,7 +2,7 @@
 //! (auctions, player search, selling) and the options. Same rules as the DOM page: every action goes through `World`.
 use crate::canvas::{Canvas, Rect};
 use crate::screens::{footer, money, panel, POS};
-use crate::{theme, App};
+use crate::{theme, App, Request};
 use elifoot_core::economy::player_value;
 use elifoot_core::season::{Plan, PlannedSub, FORMATIONS};
 
@@ -458,6 +458,19 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
         theme::MUTED,
         13,
     );
+    for (n, (label, w, req)) in [
+        ("Gravar jogo", 150, Request::Save),
+        ("Carregar jogo", 150, Request::Load),
+        ("Importar .e98 original", 190, Request::Import),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let x = r.x + 14 + [0, 160, 320][n];
+        if app.button(c, Rect::new(x, r.y + 70, w, 30), label) {
+            app.request = Some(req);
+        }
+    }
 
     let mut loans: Vec<(&str, i64)> = Vec::new();
     let mut debts: Vec<(&str, i64)> = Vec::new();
@@ -479,29 +492,29 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
     .enumerate()
     {
         let x = r.x + 14 + col as i32 * 380;
-        c.text(x, r.y + 84, title, theme::ACCENT, 14);
+        c.text(x, r.y + 124, title, theme::ACCENT, 14);
         for (n, (name, v)) in list.iter().take(8).enumerate() {
-            c.text(x, r.y + 110 + n as i32 * 22, name, theme::TEXT, 13);
+            c.text(x, r.y + 150 + n as i32 * 22, name, theme::TEXT, 13);
             c.text(
                 x + 230,
-                r.y + 110 + n as i32 * 22,
+                r.y + 150 + n as i32 * 22,
                 &money(*v),
                 theme::MUTED,
                 13,
             );
         }
         if list.is_empty() {
-            c.text(x, r.y + 110, "Nenhuma.", theme::MUTED, 13);
+            c.text(x, r.y + 150, "Nenhuma.", theme::MUTED, 13);
         }
     }
     c.text(
         r.x + 14,
-        r.y + 304,
+        r.y + 340,
         "Treinadores (última jornada)",
         theme::ACCENT,
         14,
     );
-    let mut y = r.y + 330;
+    let mut y = r.y + 366;
     if let Some((from, to)) = &app.world.human_moved {
         c.text(
             r.x + 14,

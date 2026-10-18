@@ -69,6 +69,13 @@ The existing DOM page stays as the accessible, most complete front end until the
 4. Sound/animation hooks (match ticker) behind a `Host` trait so back ends can opt in.
 5. Decide whether the DOM page is retired or kept as the accessible front end (screen readers cannot read a canvas).
 
+## Saving, loading and importing
+The screens never touch files: `Opções` sets `App::request` (`Save`, `Load`, `Import`) and the host serves it (`App::take_request`), then calls
+`App::save_text` / `load_text` / `import_e98`.
+* SDL2: save slot `$ELIFOOT_SAVES/elifoot.sav` (default `~/.local/share/elifoot98-rea/`); drop a `.e98` or a `.sav` on the window to open it;
+  `ELIFOOT_LOAD=file` opens one at start-up (also in headless shots).
+* Web canvas: localStorage key `elifoot98-rea.save`; "Importar .e98" opens a file picker (`.e98` is parsed by `core/src/e98.rs`, anything else is read as our save text).
+
 ## Commands
 ```bash
 cargo test -p elifoot-ui                                   # screens, clicks and keys without a window

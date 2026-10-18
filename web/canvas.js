@@ -22,13 +22,42 @@ function frame() {
   }
 }
 
+// host requests of the shared UI: save / load in localStorage, import an original .e98 through a file picker
+const SLOT = "elifoot98-rea.save";
+const picker = Object.assign(document.createElement("input"), { type: "file", accept: ".e98,.sav,.txt" });
+const put = (bytes) => { const p = w.ui_alloc(bytes.length); new Uint8Array(w.memory.buffer, p, bytes.length).set(bytes); };
+function serve() {
+  switch (w.ui_take_request()) {
+    case 1: {
+      w.ui_save();
+      try { localStorage.setItem(SLOT, dec.decode(new Uint8Array(w.memory.buffer, w.io_ptr(), w.io_len()))); w.ui_notice(1); }
+      catch { w.ui_notice(3); }
+      break;
+    }
+    case 2: {
+      let text = null;
+      try { text = localStorage.getItem(SLOT); } catch {}
+      if (text == null) w.ui_notice(2); else { put(new TextEncoder().encode(text)); w.ui_load(); }
+      break;
+    }
+    case 3: picker.click(); break;
+  }
+}
+picker.onchange = async () => {
+  const f = picker.files[0]; if (!f) return;
+  const bytes = new Uint8Array(await f.arrayBuffer());
+  put(bytes);
+  if (/\.e98$/i.test(f.name)) w.ui_import_e98(Date.now() >>> 0); else w.ui_load();
+  picker.value = ""; frame();
+};
+
 const pos = (e) => {
   const r = canvas.getBoundingClientRect();
   return [Math.round((e.clientX - r.left) * canvas.width / r.width), Math.round((e.clientY - r.top) * canvas.height / r.height)];
 };
 canvas.addEventListener("pointermove", (e) => { const [x, y] = pos(e); w.ui_event(0, x, y); frame(); });
 canvas.addEventListener("pointerdown", (e) => { const [x, y] = pos(e); w.ui_event(1, x, y); frame(); });
-canvas.addEventListener("pointerup", (e) => { const [x, y] = pos(e); w.ui_event(2, x, y); frame(); });
+canvas.addEventListener("pointerup", (e) => { const [x, y] = pos(e); w.ui_event(2, x, y); frame(); serve(); frame(); });
 canvas.addEventListener("wheel", (e) => { e.preventDefault(); w.ui_event(3, Math.sign(-e.deltaY), 0); frame(); }, { passive: false });
 const KEYS = { " ": 0, s: 1, S: 1, Tab: 2, 1: 3, 2: 4, 3: 5, 4: 6, ArrowUp: 7, ArrowDown: 8, Backspace: 9, Enter: 10, Escape: 11 };
 canvas.addEventListener("keydown", (e) => {

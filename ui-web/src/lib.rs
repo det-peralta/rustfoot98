@@ -6,6 +6,7 @@ use std::cell::RefCell;
 
 thread_local! {
     static APP: RefCell<Option<App>> = const { RefCell::new(None) };
+    static IO: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static OUT: RefCell<String> = const { RefCell::new(String::new()) };
 }
 
@@ -114,4 +115,87 @@ pub extern "C" fn frame_len() -> usize {
 #[no_mangle]
 pub extern "C" fn text_width(len: usize, size: i32) -> i32 {
     DrawList::default().text_width(&"x".repeat(len), size)
+}
+
+/// Host request taken after an event: 0 none, 1 save, 2 load, 3 import an `.e98` file.
+#[no_mangle]
+pub extern "C" fn ui_take_request() -> i32 {
+    APP.with(
+        |app| match app.borrow_mut().as_mut().and_then(App::take_request) {
+            None => 0,
+            Some(elifoot_ui::Request::Save) => 1,
+            Some(elifoot_ui::Request::Load) => 2,
+            Some(elifoot_ui::Request::Import) => 3,
+        },
+    )
+}
+
+/// Serialises the game into the I/O buffer (`io_ptr()` / `io_len()`).
+#[no_mangle]
+pub extern "C" fn ui_save() {
+    let text = APP.with(|app| {
+        app.borrow()
+            .as_ref()
+            .map(App::save_text)
+            .unwrap_or_default()
+    });
+    IO.with(|b| *b.borrow_mut() = text.into_bytes());
+}
+
+/// Makes the I/O buffer `len` bytes long and returns its address, for the page to fill with a file.
+#[no_mangle]
+pub extern "C" fn ui_alloc(len: usize) -> *mut u8 {
+    IO.with(|b| {
+        let mut b = b.borrow_mut();
+        b.clear();
+        b.resize(len, 0);
+        b.as_mut_ptr()
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn io_ptr() -> *const u8 {
+    IO.with(|b| b.borrow().as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn io_len() -> usize {
+    IO.with(|b| b.borrow().len())
+}
+
+/// Loads a game saved by `ui_save` from the I/O buffer; 1 on success.
+#[no_mangle]
+pub extern "C" fn ui_load() -> i32 {
+    let text = IO.with(|b| String::from_utf8_lossy(&b.borrow()).to_string());
+    APP.with(|app| {
+        app.borrow_mut()
+            .as_mut()
+            .is_some_and(|a| a.load_text(&text).is_ok()) as i32
+    })
+}
+
+/// Imports an original `.e98` file from the I/O buffer; 1 on success.
+#[no_mangle]
+pub extern "C" fn ui_import_e98(seed: u32) -> i32 {
+    let bytes = IO.with(|b| b.borrow().clone());
+    APP.with(|app| {
+        app.borrow_mut()
+            .as_mut()
+            .is_some_and(|a| a.import_e98(&bytes, seed.max(1)).is_ok()) as i32
+    })
+}
+
+/// Lets the page report the outcome of a request: 1 saved, 2 nothing saved yet, 3 the browser refused to store.
+#[no_mangle]
+pub extern "C" fn ui_notice(code: i32) {
+    APP.with(|app| {
+        if let Some(a) = app.borrow_mut().as_mut() {
+            a.message = match code {
+                1 => "Jogo gravado no navegador.",
+                2 => "Ainda não há nenhum jogo gravado.",
+                _ => "O navegador não permitiu gravar.",
+            }
+            .into();
+        }
+    });
 }

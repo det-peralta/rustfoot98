@@ -76,6 +76,17 @@ pub const SCREENS: [(Screen, &str); 7] = [
     (Screen::Options, "Opções"),
 ];
 
+/// What the screens ask the host (the window, the page) to do: only it can touch files or browser storage.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Request {
+    /// Write `App::save_text()` to the save slot, then report in `App::message`.
+    Save,
+    /// Read the save slot and call `App::load_text`.
+    Load,
+    /// Ask for an original `.e98` file and call `App::import_e98`.
+    Import,
+}
+
 pub struct App {
     pub world: World,
     pub screen: Screen,
@@ -92,6 +103,8 @@ pub struct App {
     /// The market search form and its last result.
     pub query: Search,
     pub offers: Vec<Offer>,
+    /// A pending request for the host; see [`App::take_request`].
+    pub request: Option<Request>,
     field_hit: bool,
     mouse: (i32, i32),
     down: bool,
@@ -114,6 +127,7 @@ impl App {
             selected: None,
             query: Search::default(),
             offers: Vec::new(),
+            request: None,
             field_hit: false,
             mouse: (0, 0),
             down: false,
@@ -167,6 +181,56 @@ impl App {
                     Key::Down => self.scroll += 24,
                     _ => {}
                 }
+            }
+        }
+    }
+
+    /// The pending host request, if any (the host calls this after every batch of events).
+    pub fn take_request(&mut self) -> Option<Request> {
+        self.request.take()
+    }
+
+    /// The game as text, for the host to store.
+    pub fn save_text(&self) -> String {
+        self.world.save()
+    }
+
+    fn after_load(&mut self, what: &str) {
+        self.division = self.world.human_location().map_or(0, |l| l.0);
+        self.scroll = 0;
+        self.scroll2 = 0;
+        self.selected = None;
+        self.focus = None;
+        self.offers.clear();
+        self.message = what.to_string();
+    }
+
+    /// Replaces the game with one saved by [`App::save_text`].
+    pub fn load_text(&mut self, text: &str) -> Result<(), String> {
+        match elifoot_core::world::World::load(text) {
+            Ok(w) => {
+                self.world = w;
+                self.after_load("Jogo carregado.");
+                Ok(())
+            }
+            Err(e) => {
+                self.message = format!("Não foi possível carregar: {e}");
+                Err(e)
+            }
+        }
+    }
+
+    /// Starts from an original `.e98` save (`seed` drives the random numbers from here on).
+    pub fn import_e98(&mut self, bytes: &[u8], seed: u32) -> Result<(), String> {
+        match elifoot_core::e98::parse(bytes).and_then(|s| World::from_e98(seed, &s)) {
+            Ok(w) => {
+                self.world = w;
+                self.after_load("Jogo original importado.");
+                Ok(())
+            }
+            Err(e) => {
+                self.message = format!("Não foi possível importar: {e}");
+                Err(e)
             }
         }
     }
@@ -463,6 +527,31 @@ mod tests {
         assert!(!app.world.accept_invitations);
         click(&mut app, Rect::new(26, 88, 330, 30));
         assert!(app.world.accept_invitations);
+    }
+
+    #[test]
+    fn save_and_load_round_trip_through_the_host_requests() {
+        let mut app = App::new(21);
+        app.screen = Screen::Options;
+        app.play_round();
+        click(&mut app, Rect::new(26, 124, 150, 30)); // Gravar
+        assert_eq!(app.take_request(), Some(Request::Save));
+        let text = app.save_text();
+        let (round, cash) = (app.world.round, app.world.divisions[0][0].fin.cash);
+        app.play_season();
+        assert_ne!(app.world.round, round);
+        app.load_text(&text).unwrap();
+        assert_eq!(
+            (app.world.round, app.world.divisions[0][0].fin.cash),
+            (round, cash)
+        );
+        assert!(app.load_text("not a save").is_err());
+        assert!(app.message.contains("carregar"));
+        click(&mut app, Rect::new(186, 124, 150, 30)); // Carregar
+        assert_eq!(app.take_request(), Some(Request::Load));
+        click(&mut app, Rect::new(346, 124, 190, 30)); // Importar
+        assert_eq!(app.take_request(), Some(Request::Import));
+        assert!(app.import_e98(&[0; 10], 1).is_err());
     }
 
     #[test]
