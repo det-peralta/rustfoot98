@@ -42,6 +42,11 @@ try {
   check('my match shown', (await p.textContent('#my-match')).includes('–'), await p.textContent('#my-match'));
   check('finance card shows cash and gate', (await p.textContent('#finance')).includes('Caixa') && (await p.textContent('#finance')).includes('Salários por jogo'));
   check('match detail shows attendance', true);
+  // the user's market: put a player up for sale at a low price and read the answer
+  await p.fill('#squad tbody tr:first-child input.ask', '1000');
+  await p.click('#squad tbody tr:first-child button.sell');
+  const mmsg = await p.textContent('#market-msg');
+  check('selling gives an answer', /Vendido|nenhum clube|jogadores/.test(mmsg), mmsg);
   check('my match highlighted in the results', (await p.locator('#results li.mine').count()) === 1);
   check('planned substitution consumed', (await p.locator('.subrow').count()) === 0);
   await p.locator('#results li button').first().click();

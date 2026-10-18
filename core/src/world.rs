@@ -187,6 +187,19 @@ pub struct World {
     pub cup_champion: Option<String>,
     /// Transfers made between computer-managed clubs, newest last (kept for the current season).
     pub transfers: Vec<Transfer>,
+    /// Auctions of computer-managed clubs' players that the user can still outbid before the next round.
+    pub board: Vec<Listing>,
+}
+
+/// A player on offer in an open auction.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Listing {
+    pub seller: String,
+    pub player: String,
+    pub ask: i64,
+    /// The computer's best bid: club and fee.
+    pub best: Option<(String, i64)>,
+    pub round: usize,
 }
 
 /// A completed transfer.
@@ -354,6 +367,7 @@ impl World {
             last_cup: None,
             cup_champion: None,
             transfers: Vec::new(),
+            board: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -385,6 +399,7 @@ impl World {
             last_cup: None,
             cup_champion: None,
             transfers: Vec::new(),
+            board: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -426,6 +441,7 @@ impl World {
             last_cup: None,
             cup_champion: None,
             transfers: Vec::new(),
+            board: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -506,6 +522,45 @@ impl World {
     /// earlier club in the master list on a tie), pays it, and the player moves with a renegotiated wage.
     fn auction(&mut self, seller: (usize, usize), slot_idx: usize, ask: i64, round: usize) -> bool {
         let ask = crate::market::floor_1000(ask);
+        {
+            let c = self.club_ref(seller);
+            if self
+                .board
+                .iter()
+                .any(|l| l.seller == c.name && l.player == c.names[slot_idx])
+            {
+                return false;
+            }
+        }
+        let best = self.best_bid(seller, slot_idx, ask);
+        // the user may still outbid the computer on the player of a computer-managed club
+        if !self.is_human(seller) && self.human_may_bid(seller, slot_idx, ask) {
+            let s = self.club_ref(seller);
+            self.board.push(Listing {
+                seller: s.name.clone(),
+                player: s.names[slot_idx].clone(),
+                ask,
+                best: best.map(|(loc, fee)| (self.club_ref(loc).name.clone(), fee)),
+                round,
+            });
+            return true;
+        }
+        match best {
+            Some((buyer, fee)) => {
+                self.settle(seller, slot_idx, buyer, fee, round);
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// The computer-managed clubs' sealed bids: the winner and the fee, if any club bids at least `ask`.
+    fn best_bid(
+        &self,
+        seller: (usize, usize),
+        slot_idx: usize,
+        ask: i64,
+    ) -> Option<((usize, usize), i64)> {
         let slot = self.club_ref(seller).slots[slot_idx];
         let value = player_value(
             slot.strength,
@@ -533,8 +588,36 @@ impl World {
                 best = Some((loc, b));
             }
         }
-        let Some((buyer_loc, fee)) = best else {
+        best
+    }
+
+    fn human_may_bid(&self, seller: (usize, usize), slot_idx: usize, ask: i64) -> bool {
+        let Some(h) = self.human_location() else {
             return false;
+        };
+        let c = self.club_ref(h);
+        h != seller
+            && c.fin.cash >= ask
+            && crate::market::may_bid(c, &self.club_ref(seller).slots[slot_idx])
+    }
+
+    /// `1008:39c7`: moves the player, books the fee on both sides and records the transfer.
+    fn settle(
+        &mut self,
+        seller: (usize, usize),
+        slot_idx: usize,
+        buyer_loc: (usize, usize),
+        fee: i64,
+        round: usize,
+    ) {
+        let value = {
+            let sl = &self.club_ref(seller).slots[slot_idx];
+            player_value(
+                sl.strength,
+                self.club_ref(seller).fin.f,
+                self.economy,
+                self.scale,
+            )
         };
         let mut moved = {
             let c = self.club_mut(seller);
@@ -559,6 +642,9 @@ impl World {
             c.fin.book(-fee, finance::Category::Purchases);
             (c.name.clone(), self.year)
         };
+        if self.is_human(seller) {
+            self.remap_plan_after_removal(slot_idx);
+        }
         if self.transfers.len() >= 200 {
             self.transfers.remove(0);
         }
@@ -572,7 +658,127 @@ impl World {
             to,
             fee,
         });
-        true
+        if self.is_human(seller) || self.is_human(buyer_loc) {
+            self.refresh_plan();
+        }
+    }
+
+    /// Keeps the user's plan consistent after the player at `removed` left the squad.
+    fn remap_plan_after_removal(&mut self, removed: usize) {
+        let Some(h) = self.human.as_mut() else { return };
+        let fix = |v: &mut Vec<usize>| {
+            v.retain(|&i| i != removed);
+            for i in v.iter_mut() {
+                if *i > removed {
+                    *i -= 1;
+                }
+            }
+        };
+        fix(&mut h.plan.starters);
+        fix(&mut h.plan.bench);
+        h.plan.subs.retain(|s| s.out != removed && s.inn != removed);
+        for s in &mut h.plan.subs {
+            if s.out > removed {
+                s.out -= 1;
+            }
+            if s.inn > removed {
+                s.inn -= 1;
+            }
+        }
+    }
+
+    /// Settles the auctions left open by the previous round: the computer's best bid wins unless the user bid.
+    fn close_board(&mut self) {
+        let board = std::mem::take(&mut self.board);
+        for l in board {
+            let Some((buyer, fee)) = l.best else { continue };
+            let find = |w: &World, name: &str| {
+                w.all_clubs_by_master()
+                    .into_iter()
+                    .find(|&loc| w.club_ref(loc).name == name)
+            };
+            let (Some(seller), Some(buyer)) = (find(self, &l.seller), find(self, &buyer)) else {
+                continue;
+            };
+            if let Some(idx) = self
+                .club_ref(seller)
+                .names
+                .iter()
+                .position(|n| *n == l.player)
+            {
+                self.settle(seller, idx, buyer, fee, l.round);
+            }
+        }
+    }
+
+    /// The user bids `amount` (a multiple of 1000, above the asking price and the computer's best bid) for a listed player.
+    pub fn human_bid(&mut self, listing: usize, amount: i64) -> Result<(), String> {
+        let l = self
+            .board
+            .get(listing)
+            .cloned()
+            .ok_or("leilão inexistente")?;
+        let human = self.human_location().ok_or("sem clube")?;
+        if amount % 1000 != 0 {
+            return Err("as licitações são em múltiplos de 1000".into());
+        }
+        if amount < l.ask {
+            return Err(format!("a licitação mínima é {}", l.ask));
+        }
+        if let Some((_, best)) = &l.best {
+            if amount <= *best {
+                return Err(format!("é preciso superar a melhor licitação ({best})"));
+            }
+        }
+        let seller = self
+            .all_clubs_by_master()
+            .into_iter()
+            .find(|&loc| self.club_ref(loc).name == l.seller)
+            .ok_or("clube vendedor inexistente")?;
+        let idx = self
+            .club_ref(seller)
+            .names
+            .iter()
+            .position(|n| *n == l.player)
+            .ok_or("o jogador já não está no clube")?;
+        let hc = self.club_ref(human);
+        if hc.fin.cash < amount {
+            return Err("sem dinheiro suficiente".into());
+        }
+        if !crate::market::may_bid(hc, &self.club_ref(seller).slots[idx]) {
+            return Err("o plantel está cheio ou já tens estrangeiros a mais".into());
+        }
+        self.board.remove(listing);
+        self.settle(seller, idx, human, amount, l.round);
+        Ok(())
+    }
+
+    /// The user puts the player at `slot_idx` up for sale at `ask`; the computer-managed clubs bid and the best bid wins.
+    /// Returns the fee, or an explanation.
+    pub fn human_sell(&mut self, slot_idx: usize, ask: i64) -> Result<i64, String> {
+        let human = self.human_location().ok_or("sem clube")?;
+        let club = self.club_ref(human);
+        if slot_idx >= club.slots.len() {
+            return Err("jogador inexistente".into());
+        }
+        let ask = crate::market::floor_1000(ask);
+        match crate::market::sale_blocker(club, slot_idx) {
+            0 => {}
+            1 => return Err("o plantel tem menos de 12 jogadores".into()),
+            3 => {
+                return Err(
+                    "este jogador acabou de chegar ou de renovar e não pode ser vendido".into(),
+                )
+            }
+            5 => return Err("tens de ficar com pelo menos 2 guarda-redes".into()),
+            _ => return Err("tens de ficar com mais de 10 jogadores de campo".into()),
+        }
+        let Some((buyer, fee)) = self.best_bid(human, slot_idx, ask) else {
+            return Err("nenhum clube licitou pelo preço pedido".into());
+        };
+        let round = self.round;
+        self.settle(human, slot_idx, buyer, fee, round);
+        Ok(fee)
     }
 
     /// `1010:3e9c` (and `3aad`) for one computer-managed club after a round: wage renegotiation, forced sale when broke, and
@@ -918,6 +1124,7 @@ impl World {
 
     /// Plays the next round of every division, evolves the squads, and runs the season end after round 14.
     pub fn play_round(&mut self) {
+        self.close_board();
         self.last_round.clear();
         let round = self.round + 1;
         #[allow(clippy::needless_range_loop)]
@@ -1529,5 +1736,103 @@ mod tests {
                     .collect::<Vec<_>>()
             );
         }
+    }
+
+    fn set_human_cash(w: &mut World, cash: i64) {
+        let (d, i) = w.human_location().unwrap();
+        w.divisions[d][i].fin.cash = cash;
+    }
+
+    #[test]
+    fn the_user_can_sell_a_player_to_the_computer_clubs() {
+        let mut w = World::synthetic(5);
+        for _ in 0..2 {
+            w.play_round();
+        }
+        let (d, i) = w.human_location().unwrap();
+        let before = w.divisions[d][i].slots.len();
+        let cash = w.divisions[d][i].fin.cash;
+        let mut sold = None;
+        for k in 0..before {
+            let ask = crate::market::market_value(&w.divisions[d][i].slots[k], w.economy, w.scale);
+            if let Ok(fee) = w.human_sell(k, ask / 4) {
+                sold = Some(fee);
+                break;
+            }
+        }
+        let fee = sold.expect("some club bids for some player");
+        let (d, i) = w.human_location().unwrap();
+        let club = &w.divisions[d][i];
+        assert_eq!(club.slots.len(), before - 1);
+        assert_eq!(club.fin.cash, cash + fee);
+        let max = club.slots.len();
+        assert!(w
+            .human
+            .as_ref()
+            .unwrap()
+            .plan
+            .starters
+            .iter()
+            .all(|&k| k < max));
+        assert!(w
+            .human
+            .as_ref()
+            .unwrap()
+            .plan
+            .bench
+            .iter()
+            .all(|&k| k < max));
+        w.play_round(); // the plan is still playable
+    }
+
+    #[test]
+    fn the_user_can_outbid_the_computer_on_an_open_auction() {
+        let mut w = World::synthetic(9);
+        set_human_cash(&mut w, 900_000_000);
+        let mut bought = false;
+        for _ in 0..14 {
+            w.play_round();
+            if let Some(l) = w.board.first().cloned() {
+                let (d, i) = w.human_location().unwrap();
+                let before = w.divisions[d][i].slots.len();
+                let cash = w.divisions[d][i].fin.cash;
+                let amount = l.best.as_ref().map_or(l.ask, |b| b.1 + 1000).max(l.ask);
+                assert!(
+                    w.human_bid(0, amount.saturating_sub(1000)).is_err()
+                        || l.ask == 0
+                        || amount - 1000 >= l.ask
+                );
+                if w.board.is_empty() {
+                    continue;
+                }
+                w.human_bid(0, amount).expect("a high enough bid wins");
+                let club = &w.divisions[d][i];
+                assert_eq!(club.slots.len(), before + 1);
+                assert_eq!(club.fin.cash, cash - amount);
+                assert!(club.slots.last().unwrap().fresh);
+                bought = true;
+                break;
+            }
+        }
+        assert!(
+            bought,
+            "an auction the user can join appears within a season"
+        );
+        w.play_round();
+    }
+
+    #[test]
+    fn open_auctions_are_saved_and_closed_by_the_next_round() {
+        let mut w = World::synthetic(9);
+        set_human_cash(&mut w, 900_000_000);
+        while w.board.is_empty() {
+            w.play_round();
+            assert!(w.round != 0, "no auction in a whole season");
+        }
+        let back = World::load(&w.save()).unwrap();
+        assert_eq!(back.board, w.board);
+        let mut closed = back;
+        closed.play_round();
+        assert!(closed.board.iter().all(|l| l.round == closed.round));
     }
 }

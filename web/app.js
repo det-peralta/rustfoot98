@@ -287,7 +287,10 @@ function renderClub() {
     tr.className = unavailable ? "out" : role === "T" ? "start" : "";
     tr.innerHTML = `<td class="l">${POS[p.pos]}</td><td class="l">${esc(p.name)}</td><td>${p.str}</td><td>${p.star ? "★" : ""}</td><td class="l">${state_}</td>` +
       `<td class="l"><select class="role" data-i="${p.i}" ${unavailable ? "disabled" : ""} aria-label="Papel de ${esc(p.name)}">` +
-      `<option value="T">Titular</option><option value="B">Banco</option><option value="F">Fora</option></select></td>`;
+      `<option value="T">Titular</option><option value="B">Banco</option><option value="F">Fora</option></select></td>` +
+      `<td>${money(p.wage)}</td><td class="l sellcell">${p.sell ? `<input type="number" class="ask" min="0" step="1000" value="${p.ask}" aria-label="Preço de ${esc(p.name)}"><button class="sell" aria-label="Vender ${esc(p.name)}">Vender</button>` : "—"}</td>`;
+    const sellBtn = tr.querySelector("button.sell");
+    if (sellBtn) sellBtn.onclick = () => { wasm.market_sell(p.i, Number(tr.querySelector("input.ask").value) || 0); read(); };
     tr.querySelector("select").value = unavailable ? "F" : role;
     tr.querySelector("select").onchange = () => { const p2 = planFromDom(); sendPlan(p2.starters, p2.bench, subsFromDom()); };
     body.appendChild(tr);
@@ -356,6 +359,26 @@ function renderCup() {
   $("cup-note").textContent = c.left === 1 ? "Final disputada." : `Ainda em prova: ${c.left} clubes.`;
 }
 
+function renderMarket() {
+  const card = $("market-card");
+  const msg = state.msg || "";
+  const board = state.board || [];
+  if (msg) lastMarketMsg = msg;
+  card.hidden = !board.length && !lastMarketMsg;
+  $("market-msg").textContent = lastMarketMsg;
+  const body = $("board").querySelector("tbody");
+  body.innerHTML = "";
+  board.forEach((l) => {
+    const tr = document.createElement("tr");
+    const need = Math.max(l.ask, l.best ? l.best + 1000 : 0);
+    tr.innerHTML = `<td class="l">${esc(l.player)}</td><td class="l">${POS[l.pos]}</td><td>${l.str}</td><td class="l">${esc(l.seller)}</td><td>${money(l.ask)}</td><td>${l.best ? `${money(l.best)} <small>(${esc(l.bestClub)})</small>` : "—"}</td>` +
+      `<td class="l"><input type="number" class="bid" min="${need}" step="1000" value="${need}" aria-label="Licitação por ${esc(l.player)}"><button class="bidbtn">Licitar</button></td>`;
+    tr.querySelector("button").onclick = () => { wasm.market_bid(l.i, Number(tr.querySelector("input.bid").value) || 0); lastMarketMsg = ""; read(); };
+    body.appendChild(tr);
+  });
+}
+let lastMarketMsg = "";
+
 function renderTransfers() {
   const card = $("transfers-card"), list = state.transfers || [];
   if (!list.length) { card.hidden = true; return; }
@@ -387,6 +410,7 @@ function render() {
   renderResults();
   renderClub();
   renderCup();
+  renderMarket();
   renderTransfers();
   renderSeason();
 }

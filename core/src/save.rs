@@ -10,7 +10,7 @@ use crate::market::{code, country_class};
 use crate::rng::DelphiRng;
 use crate::season::{Club, Plan, PlannedSub};
 use crate::sector::{Slot, Status};
-use crate::world::{Human, World};
+use crate::world::{Human, Listing, World};
 
 const MAGIC: &str = "ELIFOOT98-RS 1";
 
@@ -65,6 +65,22 @@ impl World {
         }
         for name in &self.cup {
             out.push_str(&format!("cup|{}\n", clean(name)));
+        }
+        for l in &self.board {
+            let (b, fee) = l
+                .best
+                .as_ref()
+                .map(|(b, f)| (clean(b), *f))
+                .unwrap_or_default();
+            out.push_str(&format!(
+                "listing|{}|{}|{}|{}|{}|{}\n",
+                clean(&l.seller),
+                clean(&l.player),
+                l.ask,
+                l.round,
+                b,
+                fee
+            ));
         }
         if let Some(c) = &self.cup_champion {
             out.push_str(&format!("cupchampion|{}\n", clean(c)));
@@ -138,6 +154,7 @@ impl World {
         let mut cup_champion: Option<String> = None;
         let mut has_cup = false;
         let mut has_finance = false;
+        let mut board: Vec<Listing> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
         let mut cash_ref = [0i64; 4];
@@ -183,6 +200,19 @@ impl World {
                         .ok_or(format!("line {}: bad economy", n + 1))?
                 }
                 "round" => round = num(n, &f, 1)? as usize,
+                "listing" => {
+                    let best = match (f.get(5), f.get(6).and_then(|x| x.parse::<i64>().ok())) {
+                        (Some(b), Some(fee)) if !b.is_empty() => Some((b.to_string(), fee)),
+                        _ => None,
+                    };
+                    board.push(Listing {
+                        seller: f.get(1).ok_or("listing without seller")?.to_string(),
+                        player: f.get(2).ok_or("listing without player")?.to_string(),
+                        ask: num(n, &f, 3)?,
+                        round: num(n, &f, 4)? as usize,
+                        best,
+                    });
+                }
                 "scale" => scale = num(n, &f, 1)?.max(1),
                 "cashref" => {
                     for (i, r) in cash_ref.iter_mut().enumerate() {
@@ -322,6 +352,7 @@ impl World {
             last_cup: None,
             cup_champion,
             transfers: Vec::new(),
+            board,
         };
         if !has_cup {
             w.reset_cup();

@@ -29,4 +29,5 @@
 - [x] Import of original `.e98` saves: rosters, standings, morale, year, round (see docs/findings.md); economy/finances/injuries still undecoded
 - [x] Finances: wages, gate, ticket price, cash, stadium (docs/finance.md); transfers/loans/prizes still open
 - [x] Computer-managed transfer market: sale decisions, asking price, auction, bids (docs/finance.md; fees calibrated on one save)
-- [ ] The user's market (buy/sell, tickets, salaries)
+- [x] The user's market: bidding in open auctions, selling players (async adaptation, docs/finance.md)
+- [ ] Market leftovers (buy/sell, tickets, salaries)

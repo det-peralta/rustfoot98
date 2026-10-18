@@ -12,6 +12,7 @@ thread_local! {
     static OUT: RefCell<String> = const { RefCell::new(String::new()) };
     static BUF: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static SAVE: RefCell<String> = const { RefCell::new(String::new()) };
+    static MSG: RefCell<String> = const { RefCell::new(String::new()) };
     static TEAMS: RefCell<Vec<EftTeam>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -103,14 +104,17 @@ fn human_json(w: &World) -> String {
         .enumerate()
         .map(|(k, p)| {
             format!(
-                "{{\"i\":{},\"name\":{},\"pos\":{},\"str\":{},\"star\":{},\"ban\":{},\"inj\":{}}}",
+                "{{\"i\":{},\"name\":{},\"pos\":{},\"str\":{},\"star\":{},\"ban\":{},\"inj\":{},\"wage\":{},\"ask\":{},\"sell\":{}}}",
                 k,
                 esc(club.names.get(k).map(String::as_str).unwrap_or("?")),
                 p.position,
                 p.strength,
                 p.star(),
                 p.ban,
-                p.injured
+                p.injured,
+                p.wage,
+                elifoot_core::market::floor_1000(elifoot_core::market::market_value(p, w.economy, w.scale)),
+                elifoot_core::market::sale_blocker(club, k) == 0
             )
         })
         .collect();
@@ -295,7 +299,43 @@ fn world_json(w: &World) -> String {
             )
         })
         .collect();
-    let _ = write!(out, "],\"transfers\":[{}]", transfers.join(","));
+    let board: Vec<String> = w
+        .board
+        .iter()
+        .enumerate()
+        .map(|(i, l)| {
+            let seller = w
+                .divisions
+                .iter()
+                .flatten()
+                .chain(w.pool.iter())
+                .find(|c| c.name == l.seller);
+            let (pos, st) = seller
+                .and_then(|c| c.names.iter().position(|n| *n == l.player).map(|k| c.slots[k]))
+                .map(|sl| (sl.position, sl.strength))
+                .unwrap_or((0, 0));
+            let (bc, bf) = l.best.clone().unwrap_or_default();
+            format!(
+                "{{\"i\":{},\"seller\":{},\"player\":{},\"pos\":{},\"str\":{},\"ask\":{},\"best\":{},\"bestClub\":{}}}",
+                i,
+                esc(&l.seller),
+                esc(&l.player),
+                pos,
+                st,
+                l.ask,
+                bf,
+                esc(&bc)
+            )
+        })
+        .collect();
+    let msg = MSG.with(|m| std::mem::take(&mut *m.borrow_mut()));
+    let _ = write!(
+        out,
+        "],\"transfers\":[{}],\"board\":[{}],\"msg\":{}",
+        transfers.join(","),
+        board.join(","),
+        esc(&msg)
+    );
     let _ = write!(
         out,
         ",\"cup\":{},\"cupLeft\":{},\"lastCup\":{},\"lastSeason\":",
@@ -465,6 +505,41 @@ pub extern "C" fn world_import_e98(len: usize, seed: u32) -> i32 {
             0
         }
     }
+}
+
+/// The user bids `amount` for open auction `listing`; returns 1 on success, 0 with the reason in `msg`.
+#[no_mangle]
+pub extern "C" fn market_bid(listing: u32, amount: f64) -> i32 {
+    let r = WORLD.with(|w| {
+        w.borrow_mut()
+            .as_mut()
+            .map(|w| w.human_bid(listing as usize, amount as i64))
+    });
+    finish_market(
+        r.unwrap_or(Err("sem jogo".into()))
+            .map(|_| "Licitação vencedora: o jogador é teu.".to_string()),
+    )
+}
+
+/// The user offers squad player `slot` for sale at `ask`; returns 1 on success, 0 with the reason in `msg`.
+#[no_mangle]
+pub extern "C" fn market_sell(slot: u32, ask: f64) -> i32 {
+    let r = WORLD.with(|w| {
+        w.borrow_mut()
+            .as_mut()
+            .map(|w| w.human_sell(slot as usize, ask as i64))
+    });
+    finish_market(
+        r.unwrap_or(Err("sem jogo".into()))
+            .map(|fee| format!("Vendido por {fee}.")),
+    )
+}
+
+fn finish_market(r: Result<String, String>) -> i32 {
+    let ok = r.is_ok();
+    MSG.with(|m| *m.borrow_mut() = r.unwrap_or_else(|e| e));
+    publish();
+    ok as i32
 }
 
 /// Makes club `club` of division `division` the user's club.

@@ -126,3 +126,14 @@ Everything below was read from the disassembly; the three trades of the sample s
 - Not modelled: the human taking part in auctions (the original asks the user), loans, stadium expansion, wages demanded by human
   coaches, the second `3e9c` branch for human coaches.
 
+## The user's side of the market (port design, `World::human_bid` / `human_sell`)
+The original stops the game with an auction dialog and lets the user raise bids while the computer clubs bid in a timer loop. The
+port keeps the same rules but makes it asynchronous, because every game runs in one go:
+- **Buying**: when a computer-managed club puts a player up (same triggers and asking price as above) and the user's club could take
+  part (cash >= asking price, squad and foreigner limits of `633d`), the auction stays open as a *listing* with the computer's best
+  bid. The user may bid any multiple of 1000 above both the asking price and that bid; a winning bid settles at once (fee, wage = value,
+  player marked `fresh`). Open listings are saved and settle at the start of the next round with the computer's best bid.
+- **Selling**: the user names a price; the computer clubs bid at once (the original `5a6a` rules apply: >= 12 players, 2 goalkeepers,
+  more than 10 outfield players, not `fresh`); the best bid >= the price wins.
+- Not done: the original's refusal cooldown (`slot+0x36`), user-side loans, the user's price/salary negotiation.
+
