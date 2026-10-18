@@ -350,12 +350,13 @@ pub(super) fn vscroll(
     let range = count.saturating_sub(fit);
     let first = y0 + 15;
     let last = y0 + h - 16 - 16;
+    // Windows 3.1 places the thumb with (len - 2) rounded down, except at the end of the range (measured on a list of 54 rows)
     let ty = if range == 0 {
         first
+    } else if top >= range {
+        last
     } else {
-        first
-            + ((last - first) as i64 * top.min(range) as i64 * 2 + range as i64) as i32
-                / (2 * range as i32)
+        first + (last - first - 2) * top as i32 / range as i32
     };
     fb.fill(x0, ty, 17, 17, BLACK);
     flat_button(fb, x0 + 1, ty + 1, 15, 15);
