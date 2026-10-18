@@ -2,6 +2,7 @@
 use super::fb::{Fb, Rgb, BLACK, GRAY, GREEN, NAVY, SILVER, WHITE};
 use super::form::Node;
 use super::skin::{ansi, Font, Skin};
+use super::widgets;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -288,15 +289,26 @@ pub fn button_face(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, default: bool) {
     }
 }
 
+thread_local! {
+    static FOCUS_ON_BUTTON: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Draws the controls of `root` (the form) in order.
 pub fn controls(fb: &mut Fb, cx: &Ctx, root: &Node) {
     let base = FontSpec::default().inherit(root);
+    // the default button loses its thick frame to the button that has the focus
+    FOCUS_ON_BUTTON.with(|c| {
+        c.set(
+            root.find(cx.focus)
+                .is_some_and(|n| matches!(n.class.as_str(), "TBitBtn" | "TButton")),
+        )
+    });
     for n in &root.children {
         control(fb, cx, n, &base);
     }
 }
 
-fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
+pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
     let visible = match cx.texts.get(&format!("{}.visible", n.name)) {
         Some(v) => v != "0",
         None => n.flag("Visible", true),
@@ -339,7 +351,14 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TGroupBox" => groupbox(fb, cx, n, &f, x, y),
         "TEdit" => edit(fb, cx, n, &f, x, y),
         "TListBox" => listbox(fb, cx, n, &f, x, y),
-        "TRadioButton" => radio(fb, cx, n, &f, x, y),
+        "TRadioButton" => widgets::radio(fb, cx, n, &f, x, y),
+        "TCheckBox" => widgets::checkbox(fb, cx, n, &f, x, y),
+        "TRadioGroup" => widgets::radiogroup(fb, cx, n, &f, x, y),
+        "TComboBox" => widgets::combobox(fb, cx, n, &f, x, y),
+        "TSpinEdit" => widgets::spinedit(fb, cx, n, &f, x, y),
+        "TTabbedNotebook" => widgets::tabbed_notebook(fb, cx, n, &f, x, y),
+        "TSpeedButton" => widgets::speedbutton(fb, cx, n, &f, x, y),
+        "TColorGrid" => widgets::colorgrid(fb, cx, n, &f, x, y),
         "TGauge" => gauge(fb, cx, n, &f, x, y),
         "TImage" => image(fb, cx, n, x, y),
         "TNotebook" => notebook(fb, cx, n, &f, x, y),
@@ -350,7 +369,7 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
 }
 
 /// Whether a control is enabled: its `Enabled` property unless the program changed it (`<name>.enabled=0|1` in the texts).
-fn is_enabled(cx: &Ctx, n: &Node) -> bool {
+pub(super) fn is_enabled(cx: &Ctx, n: &Node) -> bool {
     match cx.texts.get(&format!("{}.enabled", n.name)) {
         Some(v) => v != "0",
         None => n.flag("Enabled", true),
@@ -365,7 +384,7 @@ fn caption_or<'a>(cx: &'a Ctx, n: &'a Node, prop: &str) -> &'a str {
         .unwrap_or("")
 }
 
-fn caption<'a>(cx: &'a Ctx, n: &'a Node) -> &'a str {
+pub(super) fn caption<'a>(cx: &'a Ctx, n: &'a Node) -> &'a str {
     cx.texts
         .get(&n.name)
         .map(String::as_str)
@@ -437,7 +456,7 @@ fn memo(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 }
 
 /// Delphi's `Frame3D`: a 1-pixel rectangle lit from the top left (`tl` there, `br` on the other two sides).
-fn frame3d(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, tl: Rgb, br: Rgb) {
+pub(super) fn frame3d(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, tl: Rgb, br: Rgb) {
     fb.fill(x, y, w - 1, 1, tl);
     fb.fill(x, y, 1, h - 1, tl);
     fb.fill(x, y + h - 1, w, 1, br);
@@ -566,7 +585,7 @@ fn groupbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 
 /// The 3-D frame Ctl3D draws around edits and list boxes: grey outside top/left, white outside bottom/right, a black border and a
 /// white interior.
-fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: Rgb) {
+pub(super) fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: Rgb) {
     fb.fill(x, y, w, h, BLACK);
     fb.fill(x + 1, y + 1, w - 2, h - 2, interior);
     fb.fill(x - 1, y - 1, w, 1, GRAY);
@@ -814,64 +833,24 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         }
         return;
     }
-    let items: Vec<String> = match cx.lists.get(&n.name) {
-        Some(v) => v.clone(),
-        None => n.strings("Items.Strings"),
-    };
-    let ih = n.int("ItemHeight", font.height());
-    let old = fb.clip;
-    fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
-    for (i, it) in items.iter().enumerate() {
-        text(fb, font, x + 2, y + 1 + i as i32 * ih, it, f.color, false);
-    }
-    fb.clip = old;
+    widgets::listbox_rows(fb, cx, n, f, x, y);
 }
 
-/// `TRadioButton` (Windows 3.1 button class): a 13-pixel circle, then the caption.
-fn radio(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
-    const RING: [&str; 13] = [
-        ".....XXX.....",
-        "...XX...XX...",
-        "..X.......X..",
-        ".X.........X.",
-        ".X.........X.",
-        "X...........X",
-        "X...........X",
-        "X...........X",
-        ".X.........X.",
-        ".X.........X.",
-        "..X.......X..",
-        "...XX...XX...",
-        ".....XXX.....",
-    ];
-    let h = n.int("Height", 17);
-    let enabled = is_enabled(cx, n);
-    let ink = if enabled { f.color } else { BLACK };
-    let top = y + (h - 13) / 2;
-    for (r, row) in RING.iter().enumerate() {
-        for (c, ch) in row.chars().enumerate() {
-            if ch == 'X' {
-                fb.set(x + c as i32, top + r as i32, f.color);
-            }
-        }
-    }
-    if let Some(font) = cx.font(f) {
-        let cap = caption(cx, n).replace('&', "");
-        let ty = y + (h - font.ascent) / 2;
-        if enabled {
-            text(fb, font, x + 18, ty, &cap, ink, false);
-        } else {
-            text_dithered(fb, font, x + 18, ty, &cap, BLACK, DITHER_PARITY);
-        }
-    }
-}
-
-const DITHER_PARITY: i32 = 0;
+pub(super) const DITHER_PARITY: i32 = 0;
 
 /// A bevel of `bs` pixels inside the inclusive rectangle `(x1, y1)..(x2, y2)` with 45-degree joints: `tl` on the top and left,
 /// `br` on the bottom and right.
 #[allow(clippy::too_many_arguments)]
-fn bevel_miter(fb: &mut Fb, x1: i32, y1: i32, x2: i32, y2: i32, bs: i32, tl: Rgb, br: Rgb) {
+pub(super) fn bevel_miter(
+    fb: &mut Fb,
+    x1: i32,
+    y1: i32,
+    x2: i32,
+    y2: i32,
+    bs: i32,
+    tl: Rgb,
+    br: Rgb,
+) {
     for k in 0..bs {
         fb.fill(x1 + k, y1 + k, x2 - x1 - 2 * k + 1, 1, tl);
         fb.fill(x1 + k, y1 + k, 1, y2 - y1 - 2 * k + 1, tl);
@@ -1164,7 +1143,9 @@ fn glyph_margin(cx: &Ctx, n: &Node, h: i32, gh: i32, f: &FontSpec) -> i32 {
 fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 64), n.int("Height", 64));
     let enabled = is_enabled(cx, n);
-    let default = (enabled && cx.focus == n.name) || n.flag("Default", false);
+    let default = (enabled && cx.focus == n.name)
+        || ((n.flag("Default", false) || n.ident("Kind") == Some("bkOK"))
+            && !FOCUS_ON_BUTTON.with(|c| c.get()));
     // content of the thin-framed button sits one pixel up and to the right of the default button's
     let (ix, iy) = if default { (0, 2) } else { (1, 1) };
     button_face(fb, x, y, w, h, default);

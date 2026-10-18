@@ -9,6 +9,7 @@ pub mod fb;
 pub mod form;
 pub mod json;
 pub mod skin;
+mod widgets;
 
 pub use fb::Fb;
 pub use form::{Form, Forms, Node};
