@@ -37,6 +37,7 @@ async function boot() {
   $("wasm-size").textContent = (bytes.byteLength / 1024).toFixed(0) + " KB";
   const { instance } = await WebAssembly.instantiate(bytes, {});
   wasm = instance.exports;
+  renderSlots();
   $("load-now").disabled = !store.get();
   if (store.get()) $("save-status").textContent = "Há um jogo guardado neste browser (botão Carregar).";
   newWorld();
@@ -47,6 +48,28 @@ function read() {
   state = JSON.parse(new TextDecoder().decode(new Uint8Array(wasm.memory.buffer, ptr, len)));
   if (needTab && state.human) { division = state.human.div; needTab = false; }
   render();
+}
+
+// Numbered save slots, the same keys and format as the shared canvas UI (web/canvas.js): {label, text}.
+const SLOTS = 8;
+const slotKey = (n) => `elifoot98-rea.slot.${n}`;
+function readSlot(n) { try { return JSON.parse(localStorage.getItem(slotKey(n))); } catch { return null; } }
+function slotLabel() {
+  return `Época ${state.year} · J${state.round}/14 · ${state.human ? state.human.club : "-"}`;
+}
+function renderSlots() {
+  const sel = $("slot"), keep = sel.value || "0";
+  sel.innerHTML = "";
+  for (let n = 0; n < SLOTS; n++) {
+    const o = document.createElement("option");
+    o.value = String(n);
+    o.textContent = `${n + 1}. ${readSlot(n)?.label ?? "(vazia)"}`;
+    sel.appendChild(o);
+  }
+  sel.value = keep;
+  const filled = !!readSlot(Number(sel.value));
+  $("slot-load").disabled = !filled;
+  $("slot-delete").disabled = !filled;
 }
 
 function saveText() {
@@ -482,6 +505,22 @@ $("change-club").onchange = (e) => {
   read();
 };
 $("save-now").onclick = () => saveNow(false);
+$("slot").onchange = renderSlots;
+$("slot-save").onclick = () => {
+  const n = Number($("slot").value);
+  try {
+    localStorage.setItem(slotKey(n), JSON.stringify({ label: slotLabel(), text: saveText() }));
+    $("save-status").textContent = `Gravado na ranhura ${n + 1}.`;
+  } catch { $("save-status").textContent = "Não foi possível gravar (armazenamento do browser bloqueado)."; }
+  renderSlots();
+};
+$("slot-load").onclick = () => { const s = readSlot(Number($("slot").value)); if (s) loadText(s.text); };
+$("slot-delete").onclick = () => {
+  const n = Number($("slot").value);
+  try { localStorage.removeItem(slotKey(n)); } catch {}
+  $("save-status").textContent = `Ranhura ${n + 1} apagada.`;
+  renderSlots();
+};
 $("load-now").onclick = () => { const t = store.get(); if (t) loadText(t); };
 $("export").onclick = () => {
   const blob = new Blob([saveText()], { type: "text/plain" });

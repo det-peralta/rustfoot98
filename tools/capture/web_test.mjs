@@ -22,6 +22,13 @@ try {
   // the user's club (starts in the bottom six of the 4th division, tab opens on it)
   check('club panel visible', await p.locator('#club-card').isVisible());
   check('starts on the 4th division tab', (await p.getAttribute('#tabs button:nth-child(4)', 'aria-selected')) === 'true');
+  await p.selectOption('#slot', '2'); await p.click('#slot-save');
+  check('slot 3 saved with a label', (await p.textContent('#slot option:nth-child(3)')).includes('Época 1998'), await p.textContent('#slot option:nth-child(3)'));
+  check('slot buttons enabled', !(await p.isDisabled('#slot-load')));
+  await p.click('#slot-load');
+  check('slot loads', (await p.textContent('#save-status')).includes('carregado'), await p.textContent('#save-status'));
+  await p.click('#slot-delete');
+  check('slot erased', (await p.textContent('#slot option:nth-child(3)')).includes('vazia'));
   check('twelve formations', (await p.locator('#formation option').count()) === 12);
   const rows = await p.locator('#squad tbody tr').count();
   check('squad listed', rows >= 14, String(rows));

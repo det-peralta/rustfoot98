@@ -67,7 +67,7 @@ The existing DOM page stays as the accessible, most complete front end until the
 2. **Done**: `ui/src/dialogs.rs`: `Táctica` (12 formations, click-to-swap line-up editor, up to 3 planned substitutions), `Mercado` (open auctions with one-click bids, selling with an optional asking price, player search with name/position/strength/price filters and direct purchase) and `Opções` (accept coach invitations, indebted clubs, coach changes). Not ported yet: balance-sheet detail, referee-aid gauges, salary-demand dialog (the computer renegotiates), coach selection.
 3. **Done**: text-input widget (`App::text_field`; `Event::Text`, Backspace/Enter/Esc; the SDL back end maps `SDL_TEXTINPUT`, the web page sends typed characters while `ui_wants_text()` is 1) and wheel scrolling of two lists on the market screen.
 4. Sound/animation hooks (match ticker) behind a `Host` trait so back ends can opt in.
-5. Decide whether the DOM page is retired or kept as the accessible front end (screen readers cannot read a canvas).
+5. **Decided: the DOM page is kept** as the accessible front end (a screen reader cannot read a canvas) and as the most complete one for now. It got the same 8 save slots, stored under the same localStorage keys and format as the canvas UI, so a game saved in one opens in the other. New features go to `core/` + the shared UI first; the DOM page follows when a feature matters for accessibility.
 
 ## Saving, loading and importing
 The screens never touch files: `Opções` lists **8 save slots** (label, Gravar / Carregar / Apagar) and a "Importar .e98 original" button. A click sets
