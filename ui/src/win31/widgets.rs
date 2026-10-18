@@ -469,6 +469,7 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
     let focused = cx.focus == n.name;
     let cols = columns(cx, n);
     let enabled = is_enabled(cx, n);
+    let bold_all = flag(cx, n, "bold");
     let old = fb.clip;
     fb.clip = (
         (x + 1).max(old.0),
@@ -495,7 +496,7 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         if let Some(b) = bg {
             fb.fill(x + 1, ry, right - x - 1, ih, b);
         }
-        let rf = if st.bold {
+        let rf = if st.bold || bold_all {
             cx.font(&FontSpec {
                 bold: true,
                 ..f.clone()
@@ -504,20 +505,30 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         } else {
             font
         };
-        let ty = ry + (ih - rf.height()).max(0) / 2;
+        let ty = ry;
         match &cols {
             Some(cols) => {
                 for (k, cell) in items[i].split('|').enumerate() {
                     let Some(&(off, al)) = cols.get(k) else {
                         break;
                     };
-                    let tw = rf.width(cell);
-                    let tx = match al {
+                    // an upper-case alignment letter (`L`, `R`, `C`) draws the column in bold
+                    let cf = if al.is_ascii_uppercase() && !bold_all {
+                        cx.font(&FontSpec {
+                            bold: true,
+                            ..f.clone()
+                        })
+                        .unwrap_or(rf)
+                    } else {
+                        rf
+                    };
+                    let tw = cf.width(cell);
+                    let tx = match al.to_ascii_lowercase() {
                         'r' => x + off - tw,
                         'c' => x + off - tw / 2,
                         _ => x + off,
                     };
-                    text(fb, rf, tx, ty, cell, fg, false);
+                    text(fb, cf, tx, ty, cell, fg, false);
                 }
             }
             None => {

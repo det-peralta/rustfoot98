@@ -1,7 +1,7 @@
 //! Modal dialogs: one of the original's forms drawn over the screen with texts, lists and states supplied by the program, and a
 //! behaviour (`dialogs/`) that answers clicks and keys. See `docs/classic-dialogs.md` for the conventions.
 use super::{dialogs, Classic, Key};
-use crate::win31::draw::{controls, dialog_frame, dialog_frame_thick, Ctx, Hit};
+use crate::win31::draw::{controls, form_client, form_frame, Ctx, Hit};
 use crate::win31::fb::{Rgb, SILVER};
 use crate::win31::Node;
 use std::cell::RefCell;
@@ -110,7 +110,7 @@ impl Dialog {
         let Some(form) = forms.get(&self.form) else {
             return;
         };
-        let (mut cw, mut ch) = (form.int("ClientWidth", 400), form.int("ClientHeight", 300));
+        let (mut cw, mut ch) = form_client(form);
         if let Some((a, b)) = self.texts.get("@client").and_then(|v| v.split_once('x')) {
             cw = a.parse().unwrap_or(cw);
             ch = b.parse().unwrap_or(ch);
@@ -122,11 +122,7 @@ impl Dialog {
             .map(String::as_str)
             .or(form.str("Caption"))
             .unwrap_or("");
-        let (ox, oy) = if form.ident("BorderStyle") == Some("bsDialog") {
-            dialog_frame_thick(fb, skin, caption, cw, ch, bg)
-        } else {
-            dialog_frame(fb, skin, caption, cw, ch, bg)
-        };
+        let (ox, oy) = form_frame(fb, skin, form, caption, cw, ch, bg);
         let (ox, oy) = (ox + self.num_text("@dx"), oy + self.num_text("@dy"));
         let hits = RefCell::new(Vec::new());
         let cx = Ctx {

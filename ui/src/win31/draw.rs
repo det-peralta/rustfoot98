@@ -1,6 +1,7 @@
 //! Drawing primitives and the controls, following what Windows 3.1 and Delphi 1 drew.
 use super::fb::{Fb, Rgb, BLACK, GRAY, GREEN, NAVY, SILVER, WHITE};
 use super::form::Node;
+use super::json::Json;
 use super::skin::{ansi, Font, Skin};
 use super::widgets;
 use std::cell::RefCell;
@@ -253,6 +254,20 @@ pub fn dialog_frame_thick(
     ch: i32,
     bg: Rgb,
 ) -> (i32, i32) {
+    dialog_frame_thick_sys(fb, skin, caption, cw, ch, bg, false)
+}
+
+/// `dialog_frame_thick`, optionally with the system menu box (the 18-pixel box with a dash that a form shows when its `BorderIcons`
+/// contain `biSystemMenu`, which is also the default) at the left of the caption; the caption is centred in the rest of the bar.
+pub fn dialog_frame_thick_sys(
+    fb: &mut Fb,
+    skin: &Skin,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+    sys: bool,
+) -> (i32, i32) {
     let (w, h) = (cw + 6, ch + 25);
     let (x, y) = ((super::fb::W - w) / 2, (super::fb::H - h) / 2);
     fb.fill(x, y, w, h, BLACK);
@@ -262,11 +277,49 @@ pub fn dialog_frame_thick(
     fb.fill(x + 5, y + 4, 1, 20, WHITE);
     fb.fill(x + w - 6, y + 4, 1, 20, WHITE);
     fb.fill(x + 6, y + 23, w - 12, 1, BLACK);
+    let mut left = x + 6;
+    if sys {
+        let (bx, by) = (x + 6, y + 5);
+        fb.fill(bx, by, 18, 18, SILVER);
+        fb.fill(bx + 18, by, 1, 18, BLACK);
+        fb.fill(bx + 2, by + 7, 13, 3, BLACK);
+        fb.fill(bx + 3, by + 8, 11, 1, WHITE);
+        fb.fill(bx + 15, by + 8, 1, 2, GRAY);
+        fb.fill(bx + 3, by + 10, 13, 1, GRAY);
+        left = bx + 19;
+    }
     if let Some(f) = skin.font("system", 13, false, false) {
         let tw = f.width(caption);
-        text(fb, f, x + (w - tw) / 2, y + 6, caption, WHITE, false);
+        let right = x + w - 6;
+        text(fb, f, left + (right - left - tw) / 2, y + 6, caption, WHITE, false);
     }
     (x + 5, y + 24)
+}
+
+/// The frame a form gets: thick for `bsDialog` (with the system menu box unless `BorderIcons` leaves it out), plain otherwise.
+pub fn form_frame(fb: &mut Fb, skin: &Skin, form: &Node, caption: &str, cw: i32, ch: i32, bg: Rgb) -> (i32, i32) {
+    if form.ident("BorderStyle") == Some("bsDialog") {
+        let sys = !form.props.contains_key("BorderIcons")
+            || form.set("BorderIcons").contains(&"biSystemMenu");
+        dialog_frame_thick_sys(fb, skin, caption, cw, ch, bg, sys)
+    } else {
+        dialog_frame(fb, skin, caption, cw, ch, bg)
+    }
+}
+
+/// The client size to draw a form with. The thick `bsDialog` frame (see `dialog_frame_thick`) surrounds a client area 4 pixels larger
+/// than it was designed for in each direction (measured on the options, profile, stadium and progress dialogs, the calendar and the
+/// scorers list), so these forms are drawn with `ClientWidth + 4` by `ClientHeight + 4`. The exception is the new-game dialog,
+/// which the program shrinks itself. A program that resizes a form passes `@client=WxH` (in the same units) instead.
+pub fn form_client(form: &Node) -> (i32, i32) {
+    let (mut cw, mut ch) = (form.int("ClientWidth", 400), form.int("ClientHeight", 300));
+    if form.ident("BorderStyle") == Some("bsDialog")
+        && !form.class.eq_ignore_ascii_case("TSelectGameDlg")
+    {
+        cw += 4;
+        ch += 4;
+    }
+    (cw, ch)
 }
 
 /// The face of a `TBitBtn`/`TButton` in its normal state: a black outline with cut corners (2 pixels for the default
@@ -310,6 +363,22 @@ pub fn controls(fb: &mut Fb, cx: &Ctx, root: &Node) {
 }
 
 pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
+    // the program resized the control at run time: `<name>.size=WxH`
+    if let Some((w, h)) = cx
+        .texts
+        .get(&format!("{}.size", n.name))
+        .and_then(|v| v.split_once('x'))
+        .and_then(|(a, b)| Some((a.trim().parse::<f64>().ok()?, b.trim().parse::<f64>().ok()?)))
+    {
+        let mut m = n.clone();
+        m.props.insert("Width".into(), Json::Num(w));
+        m.props.insert("Height".into(), Json::Num(h));
+        return control_node(fb, cx, &m, parent);
+    }
+    control_node(fb, cx, n, parent)
+}
+
+fn control_node(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
     let visible = match cx.texts.get(&format!("{}.visible", n.name)) {
         Some(v) => v != "0",
         None => n.flag("Visible", true),
