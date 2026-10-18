@@ -167,6 +167,40 @@ pub fn roulette(rng: &mut DelphiRng, slots: &[Slot], kind: u8) -> Option<usize> 
     None
 }
 
+/// A primary chance (`1038:39b6`): at `minute` the side `side` shoots at the opponent's best goalkeeper. The shooter is the
+/// best attacker unless the user chose one; `outcome` is the shot duel (`81ed`). Goals and misses alike are recorded, because the
+/// original shows its penalty dialog for every primary chance of a game with a human coach.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Primary {
+    pub minute: u16,
+    pub side: Side,
+    pub shooter: usize,
+    pub keeper: usize,
+    pub outcome: Outcome,
+}
+
+/// A decision of the user while the game runs (what the original asks in dialogs). The decisions never change what happened
+/// before their `minute`, so a game can be replayed with them from the same random state.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Decision {
+    /// The shooter of the primary chance at `minute`.
+    Shooter {
+        side: Side,
+        minute: u16,
+        player: usize,
+    },
+    /// The substitution after an injury, or the sending-off of the goalkeeper, at `minute`: `out` (`None`: the injured player)
+    /// makes way for `inn`.
+    Substitute {
+        side: Side,
+        minute: u16,
+        out: Option<usize>,
+        inn: usize,
+    },
+    /// The user closed the dialog of `minute` without substituting (the automatic substitution is skipped).
+    NoSubstitution { side: Side, minute: u16 },
+}
+
 #[derive(Clone, Debug)]
 pub struct Match {
     pub home: TeamState,
@@ -180,6 +214,10 @@ pub struct Match {
     /// Match object `+0x4c` / `+0x4e`: per-match bonus values (`c95c` + 2 for the home side).
     pub home_bonus: i32,
     pub away_bonus: i32,
+    /// Every primary chance of the game.
+    pub primaries: Vec<Primary>,
+    /// What the user decided (see [`Decision`]); empty for a game played without interaction.
+    pub decisions: Vec<Decision>,
 }
 
 impl Match {
@@ -193,6 +231,8 @@ impl Match {
             planned: Vec::new(),
             home_bonus,
             away_bonus,
+            primaries: Vec::new(),
+            decisions: Vec::new(),
         }
     }
 
@@ -213,11 +253,33 @@ impl Match {
     /// AI-resolved chance (`1038:39b6`): best attacker against the best goalkeeper; a goal needs outcome `Goal`.
     fn primary_goal(&mut self, rng: &mut DelphiRng, side: Side) -> Option<usize> {
         let (att, def) = (self.team(side), self.team(side.other()));
-        let shooter = sector::best_attacker(&att.slots)?;
+        let minute = self.minute;
+        let chosen = self.decisions.iter().find_map(|d| match *d {
+            Decision::Shooter {
+                side: s,
+                minute: m,
+                player,
+            } if s == side && m == minute && att.slots.get(player).is_some_and(Slot::starter) => {
+                Some(player)
+            }
+            _ => None,
+        });
+        let shooter = match chosen {
+            Some(p) => p,
+            None => sector::best_attacker(&att.slots)?,
+        };
         let keeper = sector::best_defender(&def.slots)?;
         let force = att.slots[shooter].attack_force();
         let strength = def.slots[keeper].strength;
-        (outcome::shot(rng, force, strength) == Outcome::Goal).then_some(shooter)
+        let outcome = outcome::shot(rng, force, strength);
+        self.primaries.push(Primary {
+            minute,
+            side,
+            shooter,
+            keeper,
+            outcome,
+        });
+        (outcome == Outcome::Goal).then_some(shooter)
     }
 
     /// Main generator for one side; the scorer comes from the roulette (kind 2) and may be nobody.
@@ -291,12 +353,64 @@ impl Match {
     /// `1010:67f7`: automatic substitution. Mode 0 (injury): first designated substitute with the same
     /// goalkeeper-ness. Mode 1 (red card): only for a sent-off goalkeeper; the last starter makes way.
     fn auto_sub(&mut self, side: Side, out: usize, mode: u8) {
+        let minute = self.minute;
+        let decision = self.decisions.iter().find_map(|d| match *d {
+            Decision::Substitute {
+                side: s,
+                minute: m,
+                out,
+                inn,
+            } if s == side && m == minute => Some(Some((out, inn))),
+            Decision::NoSubstitution { side: s, minute: m } if s == side && m == minute => {
+                Some(None)
+            }
+            _ => None,
+        });
         let t = self.team_mut(side);
         if t.subs_left == 0 {
             return;
         }
         let is_gk = t.slots[out].position == 0;
-        let (leaving, coming) = match mode {
+        let (leaving, coming) = match (decision, mode) {
+            (Some(None), _) => (None, None),
+            (Some(Some((o, inn))), _) => {
+                let o = o.unwrap_or(out);
+                let ok = o < t.slots.len()
+                    && inn < t.slots.len()
+                    && (t.slots[o].starter() || o == out)
+                    && t.slots[inn].status == Status::Sub
+                    && t.slots[inn].available();
+                if ok {
+                    (Some(o), Some(inn))
+                } else {
+                    (None, None)
+                }
+            }
+            (None, mode) => Self::automatic(t, out, is_gk, mode),
+        };
+        if let (Some(l), Some(c)) = (leaving, coming) {
+            t.slots[l].status = Status::Out;
+            t.slots[c].status = Status::Starter;
+            t.subs_left -= 1;
+            t.recompute();
+            self.subs.push(SubEvent {
+                minute,
+                side,
+                out: l,
+                inn: c,
+                auto: decision.is_none(),
+            });
+        }
+    }
+
+    /// The choice of `67f7` when nobody decides.
+    fn automatic(
+        t: &TeamState,
+        out: usize,
+        is_gk: bool,
+        mode: u8,
+    ) -> (Option<usize>, Option<usize>) {
+        match mode {
             0 => (
                 Some(out),
                 t.slots
@@ -312,20 +426,6 @@ impl Match {
                 (last_starter, sub)
             }
             _ => (None, None),
-        };
-        if let (Some(l), Some(c)) = (leaving, coming) {
-            t.slots[l].status = Status::Out;
-            t.slots[c].status = Status::Starter;
-            t.subs_left -= 1;
-            t.recompute();
-            let minute = self.minute;
-            self.subs.push(SubEvent {
-                minute,
-                side,
-                out: l,
-                inn: c,
-                auto: true,
-            });
         }
     }
 
@@ -795,5 +895,167 @@ pub mod tests {
         assert!(!planned.iter().any(|s| s.minute == 40 || s.minute == 50));
         assert!(m.home.slots[bench].starter() || m.home.slots[bench].status == Status::Out);
         assert!(m.home.subs_left <= 2);
+    }
+
+    /// Plays the same game again with the user's `decisions`: everything before their minute stays as it was.
+    fn replay(seed: u32, decisions: &[Decision]) -> Match {
+        let mut rng = DelphiRng::new(seed);
+        let mut m = Match::new(squad(6, &mut rng), squad(6, &mut rng), 8, 6);
+        m.decisions = decisions.to_vec();
+        m.play(&mut rng);
+        m
+    }
+
+    /// The squads of `replay(seed, ..)` before kick-off.
+    fn start(seed: u32) -> Vec<Slot> {
+        let mut rng = DelphiRng::new(seed);
+        squad(6, &mut rng)
+    }
+
+    #[test]
+    fn an_injured_player_is_replaced_by_the_one_the_user_chooses() {
+        let mut checked = 0;
+        for seed in 1..4000 {
+            let base = replay(seed, &[]);
+            let Some(inj) = base
+                .events
+                .iter()
+                .find(|e| e.kind == EventKind::Injury && e.side == Side::Home)
+            else {
+                continue;
+            };
+            let Some(auto) = base
+                .subs
+                .iter()
+                .find(|s| s.side == Side::Home && s.minute == inj.minute)
+            else {
+                continue;
+            };
+            // another fit substitute of the same kind than the automatic pick
+            let squad = start(seed);
+            let Some(other) = (0..squad.len()).find(|&i| {
+                i != auto.inn
+                    && squad[i].status == Status::Sub
+                    && squad[i].position == squad[inj.player].position
+                    && base.subs.iter().all(|s| s.inn != i)
+            }) else {
+                continue;
+            };
+            let d = Decision::Substitute {
+                side: Side::Home,
+                minute: inj.minute,
+                out: None,
+                inn: other,
+            };
+            let m = replay(seed, &[d]);
+            let sub = m
+                .subs
+                .iter()
+                .find(|s| s.side == Side::Home && s.minute == inj.minute)
+                .unwrap();
+            assert_eq!((sub.out, sub.inn, sub.auto), (inj.player, other, false));
+            // nothing before the substitution changed
+            let before = |m: &Match| {
+                m.events
+                    .iter()
+                    .filter(|e| e.minute <= inj.minute)
+                    .map(|e| format!("{e:?}"))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(before(&m), before(&base));
+            // declining leaves the team a man down
+            let none = replay(
+                seed,
+                &[Decision::NoSubstitution {
+                    side: Side::Home,
+                    minute: inj.minute,
+                }],
+            );
+            assert!(!none
+                .subs
+                .iter()
+                .any(|s| s.side == Side::Home && s.minute == inj.minute));
+            checked += 1;
+            if checked == 5 {
+                break;
+            }
+        }
+        assert!(checked > 0, "no injury with a spare substitute found");
+    }
+
+    #[test]
+    fn the_user_picks_the_shooter_of_a_primary_chance() {
+        let mut checked = 0;
+        for seed in 1..3000 {
+            let base = replay(seed, &[]);
+            let Some(p) = base.primaries.iter().find(|p| p.side == Side::Home) else {
+                continue;
+            };
+            let start = start(seed);
+            // another starter who is still on the pitch at that minute
+            let Some(other) = (0..start.len()).find(|&i| {
+                i != p.shooter
+                    && start[i].starter()
+                    && start[i].position == 2
+                    && base
+                        .events
+                        .iter()
+                        .all(|e| e.player != i || e.side != Side::Home || e.minute >= p.minute)
+            }) else {
+                continue;
+            };
+            let m = replay(
+                seed,
+                &[Decision::Shooter {
+                    side: Side::Home,
+                    minute: p.minute,
+                    player: other,
+                }],
+            );
+            let q = m
+                .primaries
+                .iter()
+                .find(|q| q.side == Side::Home && q.minute == p.minute)
+                .unwrap();
+            assert_eq!(q.shooter, other);
+            // the chances before it are the same
+            let before = |m: &Match| {
+                m.primaries
+                    .iter()
+                    .filter(|q| q.minute < p.minute)
+                    .copied()
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(before(&m), before(&base));
+            checked += 1;
+            if checked == 20 {
+                break;
+            }
+        }
+        assert!(checked > 0);
+    }
+
+    #[test]
+    fn decisions_that_change_nothing_leave_the_game_untouched() {
+        for seed in 1..60 {
+            let base = replay(seed, &[]);
+            let noop = replay(
+                seed,
+                &[
+                    Decision::Shooter {
+                        side: Side::Away,
+                        minute: 200,
+                        player: 3,
+                    },
+                    Decision::NoSubstitution {
+                        side: Side::Home,
+                        minute: 200,
+                    },
+                ],
+            );
+            assert_eq!(format!("{:?}", base.events), format!("{:?}", noop.events));
+            assert_eq!(base.score(), noop.score());
+            assert_eq!(format!("{:?}", base.subs), format!("{:?}", noop.subs));
+        }
     }
 }

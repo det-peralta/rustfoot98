@@ -10,7 +10,9 @@
 //! formations), tie order, and that ranks are taken after the round's results.
 use crate::evolution::{evolve_squad, level_for_rank};
 use crate::finance::{self, Category, Finance};
-use crate::matchsim::{fixture_value, morale_results, update_morale, Event, Match, Side, SubEvent};
+use crate::matchsim::{
+    fixture_value, morale_results, update_morale, Decision, Event, Match, Primary, Side, SubEvent,
+};
 use crate::rng::DelphiRng;
 use crate::sector::{Slot, Status};
 use std::collections::HashMap;
@@ -274,6 +276,12 @@ pub struct MatchRecord {
     pub gate: i64,
     /// The players' names of both squads as they were in the game (events index into them).
     pub names: [Vec<String>; 2],
+    /// Both squads as they were at the kick-off (status = who started and who was on the bench, strengths as played).
+    pub start: [Vec<Slot>; 2],
+    /// Every primary chance of the game (goals and misses).
+    pub primaries: Vec<Primary>,
+    /// The fixture bonus values `(home, away)` of the game (`match+0x4c` / `+0x4e`), shown by the referee aid.
+    pub bonus: (i32, i32),
 }
 
 /// What a round needs to book the money: the division's ticket price, the economy index and the currency scale.
@@ -355,6 +363,9 @@ pub struct Game {
     pub extra_time: bool,
     /// Who is on the pitch at the end (`Status::Starter`) for each side, in squad order (used by the penalty shootout).
     pub pitch: [Vec<Status>; 2],
+    /// Both squads as they were at the kick-off.
+    pub start: [Vec<Slot>; 2],
+    pub primaries: Vec<Primary>,
 }
 
 /// Plays one game between two clubs whose line-ups are already set (`apply_plan` / `auto_lineup`): `hb` / `ab` are the
@@ -372,7 +383,36 @@ pub fn play_game(
     away_plan: Option<&Plan>,
     extra_time_if_tied: bool,
 ) -> Game {
+    play_game_with(
+        rng,
+        home,
+        away,
+        hb,
+        ab,
+        home_plan,
+        away_plan,
+        extra_time_if_tied,
+        &[],
+    )
+}
+
+/// [`play_game`] with the user's `decisions` (shooters of primary chances, substitutions after injuries). Without decisions the
+/// game is exactly the one `play_game` plays.
+#[allow(clippy::too_many_arguments)]
+pub fn play_game_with(
+    rng: &mut DelphiRng,
+    home: &mut Club,
+    away: &mut Club,
+    hb: i32,
+    ab: i32,
+    home_plan: Option<&Plan>,
+    away_plan: Option<&Plan>,
+    extra_time_if_tied: bool,
+    decisions: &[Decision],
+) -> Game {
     let mut m = Match::new(home.slots.clone(), away.slots.clone(), hb, ab);
+    m.decisions = decisions.to_vec();
+    let start = [m.home.slots.clone(), m.away.slots.clone()];
     m.home.k = home.k;
     m.away.k = away.k;
     for (plan, side) in [(home_plan, Side::Home), (away_plan, Side::Away)] {
@@ -418,6 +458,8 @@ pub fn play_game(
             m.home.slots.iter().map(|p| p.status).collect(),
             m.away.slots.iter().map(|p| p.status).collect(),
         ],
+        start,
+        primaries: m.primaries,
     }
 }
 
@@ -458,7 +500,78 @@ pub fn play_round_with(
     money: Option<MoneyCtx>,
     on_sack: &mut dyn FnMut(&mut [Club], usize),
 ) -> Vec<MatchRecord> {
+    play_round_ctl(
+        rng,
+        clubs,
+        round,
+        names,
+        plans,
+        money,
+        on_sack,
+        &mut Control::default(),
+    )
+}
+
+/// What the user decides while a round is played, and what a replay of the round keeps as it was. The whole round is computed
+/// in one go (`World::play_round_ctl`); to let the user act at a minute of his game, the front end plays the round once, shows it,
+/// and when the user decides something replays the round from a copy of the world with the decision added. Everything the
+/// decision cannot reach stays identical: the random state is recorded at fixed points of the round (`checkpoint`) and restored
+/// at the same points of the replay, so the other games of the round are not disturbed by the user's game consuming
+/// a different number of random numbers.
+#[derive(Clone, Debug, Default)]
+pub struct Control {
+    /// Decisions in the user's league game.
+    pub league: Vec<Decision>,
+    /// Decisions in the user's cup tie of the same round.
+    pub cup: Vec<Decision>,
+    /// Random state at every checkpoint of the round, recorded by a run with `frozen == None`.
+    pub log: Vec<DelphiRng>,
+    /// When set, every checkpoint restores the recorded state of the same index.
+    pub frozen: Option<Vec<DelphiRng>>,
+    cursor: usize,
+}
+
+impl Control {
+    /// A replay of the round that recorded `log`, with the user's decisions of the league game and the cup tie.
+    pub fn replay(log: Vec<DelphiRng>, league: Vec<Decision>, cup: Vec<Decision>) -> Control {
+        Control {
+            league,
+            cup,
+            log: Vec::new(),
+            frozen: Some(log),
+            cursor: 0,
+        }
+    }
+
+    /// Records the random state (a first run) or restores the recorded one (a replay). Called at the start of the league
+    /// round, before every game of it, at the start of the cup draw and before every tie.
+    pub fn checkpoint(&mut self, rng: &mut DelphiRng) {
+        match &self.frozen {
+            Some(f) => {
+                if let Some(s) = f.get(self.cursor) {
+                    *rng = s.clone();
+                }
+            }
+            None => self.log.push(rng.clone()),
+        }
+        self.cursor += 1;
+    }
+}
+
+/// [`play_round_with`] under the user's [`Control`].
+#[allow(clippy::too_many_arguments)]
+pub fn play_round_ctl(
+    rng: &mut DelphiRng,
+    clubs: &mut [Club],
+    round: usize,
+    names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+    plans: &HashMap<usize, Plan>,
+    money: Option<MoneyCtx>,
+    on_sack: &mut dyn FnMut(&mut [Club], usize),
+    ctl: &mut Control,
+) -> Vec<MatchRecord> {
     let mut records = Vec::new();
+    ctl.checkpoint(rng);
     for (i, c) in clubs.iter_mut().enumerate() {
         match plans.get(&i) {
             Some(plan) => apply_plan(&mut c.slots, plan),
@@ -466,6 +579,7 @@ pub fn play_round_with(
         }
     }
     for (h, a) in fixtures(round) {
+        ctl.checkpoint(rng);
         let (division, hn, an) = names(h, a);
         let hb = fixture_value(&division, &hn, true) + 2;
         let ab = fixture_value(&division, &an, true);
@@ -485,7 +599,22 @@ pub fn play_round_with(
             }
             None => (0, 0),
         };
-        let g = play_game(rng, hc, ac, hb, ab, plans.get(&h), plans.get(&a), false);
+        let decisions: &[Decision] = if plans.contains_key(&h) || plans.contains_key(&a) {
+            &ctl.league
+        } else {
+            &[]
+        };
+        let g = play_game_with(
+            rng,
+            hc,
+            ac,
+            hb,
+            ab,
+            plans.get(&h),
+            plans.get(&a),
+            false,
+            decisions,
+        );
         let (x, y) = (g.home_goals, g.away_goals);
         hc.goals_for += x;
         hc.goals_against += y;
@@ -548,6 +677,9 @@ pub fn play_round_with(
             attendance,
             gate,
             names: [clubs[h].names.clone(), clubs[a].names.clone()],
+            start: g.start,
+            primaries: g.primaries,
+            bonus: (hb, ab),
         });
     }
     records

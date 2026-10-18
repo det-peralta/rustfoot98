@@ -12,9 +12,9 @@ use crate::economy::{player_value, walk_index, DEFAULT_SCALE, INITIAL_INDEX};
 use crate::eft::{EftTeam, Position};
 use crate::finance::{self, Finance};
 use crate::market::{code, country_class};
-use crate::matchsim::{Event, SubEvent};
+use crate::matchsim::{Decision, Event, Primary, SubEvent};
 use crate::rng::DelphiRng;
-use crate::season::{apply_plan, auto_lineup, fixtures, play_game, play_round_with};
+use crate::season::{apply_plan, auto_lineup, fixtures, play_game_with, play_round_ctl, Control};
 use crate::season::{
     best_formation, end_of_round, end_of_season, plan_for_formation, standings, Club, MatchRecord,
     MoneyCtx, Plan, FORMATIONS,
@@ -137,6 +137,10 @@ pub struct CupMatch {
     pub attendance: i64,
     /// The kick-by-kick shootout, when it was played in full.
     pub pens: Option<cup::Shootout>,
+    /// Both squads at the kick-off, the primary chances and the fixture bonus values `(home, away)` of the game.
+    pub start: [Vec<Slot>; 2],
+    pub primaries: Vec<Primary>,
+    pub bonus: (i32, i32),
 }
 
 #[derive(Clone, Debug)]
@@ -153,6 +157,20 @@ pub struct SeasonSummary {
     pub tables: [Vec<TableRow>; 4],
     pub moves: Vec<Move>,
     pub cup_winner: Option<String>,
+    /// What the end-of-season window shows besides the winners.
+    pub honours: Honours,
+}
+
+/// The coaches of the champion and the cup winner, the best scorers of the season and the prizes of `1020:2ae6`.
+#[derive(Clone, Debug, Default)]
+pub struct Honours {
+    pub league_coach: String,
+    pub cup_coach: String,
+    /// `(player, club)` of everyone with the most goals.
+    pub top_scorers: Vec<(String, String)>,
+    pub top_goals: u16,
+    /// Prizes of the champion, the cup winner and the club of each top scorer.
+    pub prizes: [i64; 3],
 }
 
 /// The club the user manages: found by name (it changes division at season ends), with the chosen formation and plan.
@@ -164,7 +182,7 @@ pub struct Human {
     pub plan: Plan,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct World {
     pub divisions: [Vec<Club>; 4],
     pub pool: Vec<Club>,
@@ -1391,11 +1409,12 @@ impl World {
     }
 
     /// The cup of `round` (even), played after that round's league games; see `cup.rs` for the rules.
-    fn play_cup_round(&mut self, round: usize) {
+    fn play_cup_round(&mut self, round: usize, ctl: &mut Control) {
         let total = self.divisions.iter().map(Vec::len).sum::<usize>() + self.pool.len();
         if total <= cup::threshold(round) || self.cup.len() < 2 {
             return;
         }
+        ctl.checkpoint(&mut self.rng);
         cup::shuffle(&mut self.rng, &mut self.cup);
         let n = self.cup.len();
         let (k, pairs) = cup::round_size(n);
@@ -1411,6 +1430,7 @@ impl World {
             let (Some(hl), Some(al)) = (self.locate(&hn), self.locate(&an)) else {
                 continue;
             };
+            ctl.checkpoint(&mut self.rng);
             let money = self.money_ctx(hl.0.min(3));
             let placeholder = || Club::new("", Vec::new());
             let mut home = std::mem::replace(self.club_at(hl), placeholder());
@@ -1441,7 +1461,12 @@ impl World {
             );
             let hb = crate::matchsim::fixture_value(b"TACA", home.name.as_bytes(), true) + 2;
             let ab = crate::matchsim::fixture_value(b"TACA", away.name.as_bytes(), true);
-            let g = play_game(
+            let human_in_tie = self
+                .human
+                .as_ref()
+                .is_some_and(|h| h.club == home.name || h.club == away.name);
+            let decisions: &[Decision] = if human_in_tie { &ctl.cup } else { &[] };
+            let g = play_game_with(
                 &mut self.rng,
                 &mut home,
                 &mut away,
@@ -1450,12 +1475,9 @@ impl World {
                 hp.as_ref(),
                 ap.as_ref(),
                 true,
+                decisions,
             );
             let shootout = g.home_goals == g.away_goals;
-            let human_in_tie = self
-                .human
-                .as_ref()
-                .is_some_and(|h| h.club == home.name || h.club == away.name);
             let mut pens = None;
             let home_out = if shootout {
                 if human_in_tie || round == ROUNDS {
@@ -1515,6 +1537,9 @@ impl World {
                 away_players: away.names.clone(),
                 attendance,
                 pens,
+                start: g.start,
+                primaries: g.primaries,
+                bonus: (hb, ab),
             });
             losers.push(loser);
             *self.club_at(hl) = home;
@@ -1621,6 +1646,13 @@ impl World {
 
     /// Plays the next round of every division, evolves the squads, and runs the season end after round 14.
     pub fn play_round(&mut self) {
+        self.play_round_ctl(&mut Control::default());
+    }
+
+    /// [`World::play_round`] under the user's [`Control`]: the decisions made during the games and the replay support (the front
+    /// end plays a round on a copy of the world, shows it, and plays it again on the copy of the world with the user's
+    /// decisions added). Without decisions this is exactly `play_round`.
+    pub fn play_round_ctl(&mut self, ctl: &mut Control) {
         self.close_board();
         self.last_round.clear();
         self.coach_changes.clear();
@@ -1650,7 +1682,7 @@ impl World {
             // the division is taken out so that a sacking can reach the other divisions (the coach swap of `4f40`)
             let mut cur = std::mem::take(&mut self.divisions[d]);
             let mut rng = std::mem::replace(&mut self.rng, DelphiRng::new(0));
-            let records = play_round_with(
+            let records = play_round_ctl(
                 &mut rng,
                 &mut cur,
                 round,
@@ -1658,6 +1690,7 @@ impl World {
                 &plans,
                 Some(money),
                 &mut |cur, i| self.replace_coach(d, cur, i, round == ROUNDS),
+                ctl,
             );
             self.rng = rng;
             self.divisions[d] = cur;
@@ -1675,7 +1708,7 @@ impl World {
         self.round = round;
         self.last_cup = None;
         if round.is_multiple_of(2) {
-            self.play_cup_round(round);
+            self.play_cup_round(round, ctl);
             self.apply_human_move();
         }
         if let Some(h) = self.human.as_mut() {
@@ -1732,6 +1765,40 @@ impl World {
         }
     }
 
+    /// The data of the end-of-season window, read before the prizes are paid and the scorers' tallies start again.
+    fn honours(&self, cup_winner: Option<&str>) -> Honours {
+        let clubs = || self.divisions.iter().flatten().chain(self.pool.iter());
+        let top = clubs()
+            .flat_map(|c| c.slots.iter().map(|s| s.goals))
+            .max()
+            .unwrap_or(0);
+        let top_scorers = clubs()
+            .filter(|_| top > 0)
+            .flat_map(|c| {
+                c.slots
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, s)| s.goals == top)
+                    .map(|(i, _)| (c.names.get(i).cloned().unwrap_or_default(), c.name.clone()))
+            })
+            .collect();
+        let coach = |name: Option<&str>| {
+            name.and_then(|n| clubs().find(|c| c.name == n))
+                .map(|c| c.coach_name.clone())
+                .unwrap_or_default()
+        };
+        let league_winner = standings(&self.divisions[0])
+            .first()
+            .map(|&i| self.divisions[0][i].name.as_str());
+        Honours {
+            league_coach: coach(league_winner),
+            cup_coach: coach(cup_winner),
+            top_scorers,
+            top_goals: top,
+            prizes: finance::season_prizes(self.scale),
+        }
+    }
+
     fn finish_season(&mut self) {
         let table = |d: &Vec<Club>| -> Vec<TableRow> {
             standings(d)
@@ -1764,6 +1831,7 @@ impl World {
             .chain(self.pool.iter().map(|c| (c.name.clone(), 4)))
             .collect();
         let cup_winner = self.cup_champion.clone();
+        let honours = self.honours(cup_winner.as_deref());
         self.pay_prizes(cup_winner.as_deref());
         end_of_season(
             &mut self.rng,
@@ -1798,6 +1866,7 @@ impl World {
             tables,
             moves,
             cup_winner,
+            honours,
         });
         self.year += 1;
         self.round = 0;
@@ -2474,6 +2543,134 @@ mod tests {
         let mut closed = back;
         closed.play_round();
         assert!(closed.board.iter().all(|l| l.round == closed.round));
+    }
+
+    /// The games of a round as text, for comparing runs: score, events and substitutions of every league game.
+    fn round_text(w: &World) -> Vec<String> {
+        w.last_round
+            .iter()
+            .map(|(d, m)| {
+                format!(
+                    "{d} {} {} {}-{} {:?} {:?}",
+                    m.home, m.away, m.home_goals, m.away_goals, m.events, m.subs
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn replaying_a_round_without_decisions_gives_the_same_round() {
+        for seed in [3, 21, 40] {
+            let mut w = World::synthetic(seed);
+            for round in 0..6 {
+                let snapshot = w.clone();
+                let mut ctl = Control::default();
+                w.play_round_ctl(&mut ctl);
+                // the control does not change a round played without help
+                let mut plain = snapshot.clone();
+                plain.play_round();
+                assert_eq!(
+                    round_text(&w),
+                    round_text(&plain),
+                    "seed {seed} round {round}"
+                );
+                assert_eq!(w.rng.seed(), plain.rng.seed());
+                // a replay with no decisions reproduces it, including the random state at the end
+                let mut again = snapshot.clone();
+                again.play_round_ctl(&mut Control::replay(ctl.log.clone(), vec![], vec![]));
+                assert_eq!(round_text(&w), round_text(&again));
+                assert_eq!(w.rng.seed(), again.rng.seed());
+                assert_eq!(
+                    format!("{:?}", w.last_cup.as_ref().map(|c| &c.matches)),
+                    format!("{:?}", again.last_cup.as_ref().map(|c| &c.matches))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_substitution_at_the_break_only_changes_the_users_second_half() {
+        use crate::season::PlannedSub;
+        for seed in [5u32, 11, 29] {
+            let w0 = World::synthetic(seed);
+            let (d, i) = w0.human_location().unwrap();
+            let plan = w0.human.as_ref().unwrap().plan.clone();
+            let slots = &w0.divisions[d][i].slots;
+            let out = *plan
+                .starters
+                .iter()
+                .find(|&&k| slots[k].position == 3)
+                .unwrap();
+            let inn = *plan
+                .bench
+                .iter()
+                .find(|&&k| slots[k].position != 0)
+                .unwrap();
+            // the first run
+            let mut first = w0.clone();
+            let mut ctl = Control::default();
+            first.play_round_ctl(&mut ctl);
+            // the user substitutes at the break: restore the world, add the substitution and replay
+            let mut second = w0.clone();
+            let mut p = plan.clone();
+            p.subs.push(PlannedSub {
+                minute: 46,
+                out,
+                inn,
+            });
+            second.set_plan(p);
+            second.play_round_ctl(&mut Control::replay(ctl.log.clone(), vec![], vec![]));
+            let name = w0.human.as_ref().unwrap().club.clone();
+            let mine = |m: &MatchRecord, w: &World| {
+                let c = |x: usize| w.divisions[d][x].name == name;
+                c(m.home) || c(m.away)
+            };
+            let (a, b) = (round_text(&first), round_text(&second));
+            assert_eq!(a.len(), b.len());
+            for (k, ((da, ma), (db, mb))) in
+                first.last_round.iter().zip(&second.last_round).enumerate()
+            {
+                assert_eq!((da, ma.home, ma.away), (db, mb.home, mb.away));
+                if *da == d && mine(ma, &first) {
+                    let upto = |m: &MatchRecord| {
+                        m.events
+                            .iter()
+                            .filter(|e| e.minute <= 45)
+                            .map(|e| format!("{e:?}"))
+                            .collect::<Vec<_>>()
+                    };
+                    assert_eq!(upto(ma), upto(mb), "first half of seed {seed}");
+                    assert!(
+                        mb.subs.iter().any(|s| s.minute == 46 && !s.auto),
+                        "the planned substitution happens (seed {seed})"
+                    );
+                } else {
+                    assert_eq!(a[k], b[k], "game {k} of seed {seed} is not the user's");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn world_data_for_the_front_end_is_recorded() {
+        let mut w = World::synthetic(9);
+        for _ in 0..8 {
+            w.play_round();
+        }
+        for (_, m) in &w.last_round {
+            assert_eq!(m.start[0].len(), m.names[0].len());
+            assert_eq!(m.start[1].len(), m.names[1].len());
+            assert!(m.start[0].iter().filter(|s| s.starter()).count() >= 10);
+        }
+        let cup = w.last_cup.as_ref().unwrap();
+        assert!(cup.matches.iter().all(|m| !m.start[0].is_empty()));
+        for _ in 0..6 {
+            w.play_round();
+        }
+        let s = w.last_season.as_ref().unwrap();
+        assert_eq!(s.honours.prizes, finance::season_prizes(w.scale));
+        assert!(s.honours.top_goals > 0 && !s.honours.top_scorers.is_empty());
+        assert!(!s.honours.league_coach.is_empty() || w.divisions[0][0].coach_name.is_empty());
     }
 
     #[test]
