@@ -109,6 +109,7 @@ pub fn map_event(e: &sdl2::event::Event) -> Option<Event> {
         E::MouseButtonDown { x, y, .. } => Event::MouseDown(*x, *y),
         E::MouseButtonUp { x, y, .. } => Event::MouseUp(*x, *y),
         E::MouseWheel { y, .. } => Event::Wheel(*y),
+        E::TextInput { text, .. } => Event::Text(text.chars().next()?),
         E::KeyDown {
             keycode: Some(k), ..
         } => Event::Key(match *k {
@@ -120,6 +121,8 @@ pub fn map_event(e: &sdl2::event::Event) -> Option<Event> {
             K::Up => Key::Up,
             K::Down => Key::Down,
             K::Escape => Key::Escape,
+            K::Backspace => Key::Backspace,
+            K::Return | K::KpEnter => Key::Enter,
             K::Num1 | K::Kp1 => Key::Num(1),
             K::Num2 | K::Kp2 => Key::Num(2),
             K::Num3 | K::Kp3 => Key::Num(3),

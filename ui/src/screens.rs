@@ -7,9 +7,9 @@ use elifoot_core::sector::Status;
 pub const PLAY_ROUND: Rect = Rect::new(560, 548, 110, 34);
 pub const PLAY_SEASON: Rect = Rect::new(676, 548, 112, 34);
 
-const POS: [&str; 4] = ["GR", "DEF", "MED", "AVA"];
+pub(crate) const POS: [&str; 4] = ["GR", "DEF", "MED", "AVA"];
 
-fn money(v: i64) -> String {
+pub(crate) fn money(v: i64) -> String {
     let s = v.abs().to_string();
     let mut out = String::new();
     for (i, ch) in s.chars().enumerate() {
@@ -25,13 +25,13 @@ fn money(v: i64) -> String {
     }
 }
 
-fn panel(c: &mut dyn Canvas, r: Rect, title: &str) {
+pub(crate) fn panel(c: &mut dyn Canvas, r: Rect, title: &str) {
     c.fill(r, theme::PANEL);
     c.outline(r, theme::LINE);
     c.text(r.x + 10, r.y + 6, title, theme::ACCENT, 14);
 }
 
-fn footer(app: &mut App, c: &mut dyn Canvas) {
+pub(crate) fn footer(app: &mut App, c: &mut dyn Canvas) {
     c.text(12, 556, &app.message, theme::MUTED, 13);
     c.text(
         12,

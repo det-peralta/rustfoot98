@@ -33,7 +33,8 @@ pub extern "C" fn ui_new(seed: u32) {
     APP.with(|a| *a.borrow_mut() = Some(App::new(seed.max(1))));
 }
 
-/// kind: 0 move, 1 down, 2 up, 3 wheel (a = delta), 4 key (a = 0 space, 1 s, 2 tab, 3..6 digits 1..4, 7 up, 8 down)
+/// kind: 0 move, 1 down, 2 up, 3 wheel (a = delta), 4 key (a = 0 space, 1 s, 2 tab, 3..6 digits 1..4, 7 up, 8 down, 9 backspace,
+/// 10 enter, 11 escape), 5 typed character (a = code point)
 #[no_mangle]
 pub extern "C" fn ui_event(kind: u32, a: i32, b: i32) {
     APP.with(|app| {
@@ -44,17 +45,30 @@ pub extern "C" fn ui_event(kind: u32, a: i32, b: i32) {
             1 => Event::MouseDown(a, b),
             2 => Event::MouseUp(a, b),
             3 => Event::Wheel(a),
+            5 => match char::from_u32(a as u32) {
+                Some(ch) => Event::Text(ch),
+                None => return,
+            },
             _ => Event::Key(match a {
                 0 => Key::Space,
                 1 => Key::S,
                 2 => Key::Tab,
                 3..=6 => Key::Num((a - 2) as u8),
                 7 => Key::Up,
+                9 => Key::Backspace,
+                10 => Key::Enter,
+                11 => Key::Escape,
                 _ => Key::Down,
             }),
         };
         app.event(e);
     });
+}
+
+/// 1 while a text field has the focus: the page then sends typed characters (kind 5) instead of shortcut keys.
+#[no_mangle]
+pub extern "C" fn ui_wants_text() -> i32 {
+    APP.with(|app| app.borrow().as_ref().is_some_and(|a| a.focus.is_some()) as i32)
 }
 
 #[no_mangle]

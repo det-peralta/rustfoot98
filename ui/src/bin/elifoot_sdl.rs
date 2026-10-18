@@ -60,6 +60,7 @@ fn main() -> Result<(), String> {
     canvas
         .set_logical_size(WIDTH as u32, HEIGHT as u32)
         .map_err(|e| e.to_string())?;
+    video.text_input().start();
     let creator = canvas.texture_creator();
     let mut events = sdl.event_pump()?;
     'main: loop {
@@ -68,7 +69,7 @@ fn main() -> Result<(), String> {
                 break 'main;
             }
             if let Some(ev) = map_event(&e) {
-                if ev == Event::Key(Key::Escape) {
+                if ev == Event::Key(Key::Escape) && app.focus.is_none() {
                     break 'main;
                 }
                 app.event(ev);

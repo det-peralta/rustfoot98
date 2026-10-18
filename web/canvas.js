@@ -30,8 +30,10 @@ canvas.addEventListener("pointermove", (e) => { const [x, y] = pos(e); w.ui_even
 canvas.addEventListener("pointerdown", (e) => { const [x, y] = pos(e); w.ui_event(1, x, y); frame(); });
 canvas.addEventListener("pointerup", (e) => { const [x, y] = pos(e); w.ui_event(2, x, y); frame(); });
 canvas.addEventListener("wheel", (e) => { e.preventDefault(); w.ui_event(3, Math.sign(-e.deltaY), 0); frame(); }, { passive: false });
-const KEYS = { " ": 0, s: 1, S: 1, Tab: 2, 1: 3, 2: 4, 3: 5, 4: 6, ArrowUp: 7, ArrowDown: 8 };
+const KEYS = { " ": 0, s: 1, S: 1, Tab: 2, 1: 3, 2: 4, 3: 5, 4: 6, ArrowUp: 7, ArrowDown: 8, Backspace: 9, Enter: 10, Escape: 11 };
 canvas.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (w.ui_wants_text() && e.key.length === 1) { e.preventDefault(); w.ui_event(5, e.key.codePointAt(0), 0); frame(); return; }
   if (e.key in KEYS) { e.preventDefault(); w.ui_event(4, KEYS[e.key], 0); frame(); }
 });
 frame();

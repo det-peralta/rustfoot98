@@ -64,8 +64,8 @@ The existing DOM page stays as the accessible, most complete front end until the
 
 ## Roadmap
 1. **Done**: `ui` (league, squad, finance with loan/stadium buttons, cup), SDL2 renderer, headless shots, canvas back end, tests.
-2. Port the remaining dialogs as screens: auction/market (`Mercado`), player search, line-up editor with substitutions, balance sheet, options.
-3. Text input widget (search names, player/club naming) and list scrolling with the wheel (the squad already scrolls).
+2. **Done**: `ui/src/dialogs.rs`: `Táctica` (12 formations, click-to-swap line-up editor, up to 3 planned substitutions), `Mercado` (open auctions with one-click bids, selling with an optional asking price, player search with name/position/strength/price filters and direct purchase) and `Opções` (accept coach invitations, indebted clubs, coach changes). Not ported yet: balance-sheet detail, referee-aid gauges, salary-demand dialog (the computer renegotiates), coach selection.
+3. **Done**: text-input widget (`App::text_field`; `Event::Text`, Backspace/Enter/Esc; the SDL back end maps `SDL_TEXTINPUT`, the web page sends typed characters while `ui_wants_text()` is 1) and wheel scrolling of two lists on the market screen.
 4. Sound/animation hooks (match ticker) behind a `Host` trait so back ends can opt in.
 5. Decide whether the DOM page is retired or kept as the accessible front end (screen readers cannot read a canvas).
 
