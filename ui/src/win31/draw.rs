@@ -291,13 +291,29 @@ pub fn dialog_frame_thick_sys(
     if let Some(f) = skin.font("system", 13, false, false) {
         let tw = f.width(caption);
         let right = x + w - 6;
-        text(fb, f, left + (right - left - tw) / 2, y + 6, caption, WHITE, false);
+        text(
+            fb,
+            f,
+            left + (right - left - tw) / 2,
+            y + 6,
+            caption,
+            WHITE,
+            false,
+        );
     }
     (x + 5, y + 24)
 }
 
 /// The frame a form gets: thick for `bsDialog` (with the system menu box unless `BorderIcons` leaves it out), plain otherwise.
-pub fn form_frame(fb: &mut Fb, skin: &Skin, form: &Node, caption: &str, cw: i32, ch: i32, bg: Rgb) -> (i32, i32) {
+pub fn form_frame(
+    fb: &mut Fb,
+    skin: &Skin,
+    form: &Node,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+) -> (i32, i32) {
     if form.ident("BorderStyle") == Some("bsDialog") {
         let sys = !form.props.contains_key("BorderIcons")
             || form.set("BorderIcons").contains(&"biSystemMenu");

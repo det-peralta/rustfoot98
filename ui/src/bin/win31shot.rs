@@ -1,8 +1,6 @@
 //! Renders one of the original forms with the pixel-exact Windows 3.1 renderer into a BMP file.
 //! `win31shot TABOUTDLG out.bmp [Control=text ...]`; reads `analysis/out/forms` and `analysis/out/skin` (see `tools/ui/skin.py`).
-use elifoot_ui::win31::draw::{
-    controls, dialog_frame_menu, form_client, form_frame, Ctx, DESKTOP,
-};
+use elifoot_ui::win31::draw::{controls, dialog_frame_menu, form_client, form_frame, Ctx, DESKTOP};
 use elifoot_ui::win31::{Fb, Node, Skin};
 use std::collections::BTreeMap;
 use std::path::PathBuf;

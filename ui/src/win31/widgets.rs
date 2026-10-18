@@ -533,10 +533,14 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
                 }
             }
             None => {
-                text(fb, rf, x + 2, ty, &items[i], fg, false);
+                text(fb, rf, x + 3, ty, &items[i], fg, false);
             }
         }
-        if selected && focused {
+        // the focus rectangle sits on the selected row, or on the first one while nothing is selected
+        if focused
+            && (selected
+                || (sel.is_none() && i == get_num(cx, n, "caret").unwrap_or(0).max(0) as usize))
+        {
             focus_rect_not(fb, x + 1, ry, right - x - 1, ih, x, y, false);
         }
         push_hit(
