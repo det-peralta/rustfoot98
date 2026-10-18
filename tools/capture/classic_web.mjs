@@ -1,5 +1,5 @@
 // Drives the browser build of the classic interface in headless Chromium and saves screenshots of the canvas.
-// node tools/capture/classic_web.mjs out_prefix 'step;step...'  steps: click:x,y key:Name wait:ms shot
+// node tools/capture/classic_web.mjs out_prefix 'step;step...'  steps: click:x,y key:Name type:text wait:ms reload shot
 import { createRequire } from 'module';
 import http from 'http';
 import fs from 'fs';
@@ -29,6 +29,7 @@ for (const step of script.split(';')) {
   else if (k === 'move') { const [x, y] = a.split(',').map(Number); await p.mouse.move(x, y); }
   else if (k === 'key') await p.keyboard.press(a);
   else if (k === 'type') await p.keyboard.type(a);
+  else if (k === 'reload') { await p.reload(); await p.waitForSelector('canvas', { state: 'visible', timeout: 20000 }); }
   else if (k === 'wait') await p.waitForTimeout(Number(a));
   else if (k === 'shot') await p.screenshot({ path: `${prefix}${n++}.png` });
 }

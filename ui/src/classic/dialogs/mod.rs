@@ -108,7 +108,21 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         | Kind::Plantel => market::key(c, d, key),
         Kind::Other(n) if n == market::ASK_MORE_SALARY => market::key(c, d, key),
         Kind::SelectGame | Kind::CoachName => newgame::key(c, d, key),
+        Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan => misc::key(c, d, key),
         _ => None,
+    }
+}
+
+/// Paints what a dialog draws itself under its controls (the stadium's `TPaintBox`); `(ox, oy)` is the origin of the client area.
+pub fn paint_under(
+    d: &Dialog,
+    fb: &mut crate::win31::Fb,
+    skin: &crate::win31::Skin,
+    ox: i32,
+    oy: i32,
+) {
+    if d.kind == Kind::Stadium {
+        misc::paint_stadium(d, fb, skin, ox, oy);
     }
 }
 

@@ -89,8 +89,8 @@ impl Dialog {
         }
     }
 
-    pub fn text(&mut self, k: &str, v: impl Into<String>) {
-        self.texts.insert(k.to_string(), v.into());
+    pub fn text(&mut self, k: impl AsRef<str>, v: impl Into<String>) {
+        self.texts.insert(k.as_ref().to_string(), v.into());
     }
 
     pub fn num(&self, k: &str) -> i64 {
@@ -144,6 +144,7 @@ impl Dialog {
             lists: &self.lists,
             hits: &hits,
         };
+        dialogs::paint_under(self, fb, skin, ox, oy);
         controls(fb, &cx, form);
         self.hits = hits.into_inner();
     }
