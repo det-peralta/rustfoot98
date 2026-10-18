@@ -109,6 +109,8 @@ impl Classic {
                         dialogs::click(self, &mut d, &name)
                     }
                 }
+                // the standings close with a click anywhere on the form (`GoOn`)
+                _ if d.kind == dialog::Kind::Standings => dialogs::click(self, &mut d, "@form"),
                 _ => Outcome::Keep,
             },
             Ev::Key(k) => match dialog::generic_key(self, &mut d, k) {

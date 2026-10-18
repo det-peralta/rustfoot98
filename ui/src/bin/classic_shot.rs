@@ -103,6 +103,16 @@ fn main() -> Result<(), String> {
                     app.frame();
                 }
             }
+            "dialog" => {
+                // opens a dialog by the control name of its menu entry (`CampeonatoClassificao`, `menuCalendrio`...)
+                if let Some(d) = elifoot_ui::classic::dialogs::open_for_menu(&app, v)
+                    .or_else(|| elifoot_ui::classic::dialogs::open_for_button(&app, v))
+                {
+                    app.open(d);
+                } else {
+                    return Err(format!("no dialog {v}"));
+                }
+            }
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }

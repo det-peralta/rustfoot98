@@ -423,6 +423,7 @@ impl World {
             history: History::default(),
         };
         w.reset_cup();
+        w.log_new_game();
         w.refresh_cash_ref();
         w.pick_human();
         Ok(w)
@@ -507,6 +508,7 @@ impl World {
             history: History::default(),
         };
         w.reset_cup();
+        w.log_new_game();
         w.refresh_cash_ref();
         w.pick_human();
         w

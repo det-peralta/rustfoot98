@@ -222,6 +222,22 @@ impl World {
             .collect()
     }
 
+    /// `1020:0148`: at the start of a new game every coach joins his club (event 5).
+    pub(crate) fn log_new_game(&mut self) {
+        let year = self.year as u32;
+        let joins: Vec<(String, String)> = self
+            .divisions
+            .iter()
+            .flatten()
+            .chain(self.pool.iter())
+            .filter(|c| !c.coach_name.is_empty())
+            .map(|c| (c.coach_name.clone(), c.name.clone()))
+            .collect();
+        for (coach, club) in joins {
+            self.history.add_coach_event(&coach, 5, year, &club);
+        }
+    }
+
     /// The calendar of a club as the list of `Calendário` shows it: its fixtures of the league with the results so far, and the
     /// cup ties it has played this season after the round they followed.
     pub fn calendar(&self, club: &str) -> Vec<Fixture> {
