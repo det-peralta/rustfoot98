@@ -42,8 +42,12 @@ three lists (`2e6b`, `2f10`, `2fb5`: fixture entries) · the squad list (`1c26`:
 | 32 | 16 | `+0x17..0x26` history: appearances/goals/red cards/injuries counters |
 
 ## Smaller records
-* **Fixture entry** (`1010:2031`, 16 bytes): `u16 +8, +0xe, +0xa, +0xc`, `u32 +0x10`, `u8 +7`, `u8 +6`, `u16 +4` — opponent team id, home flag,
-  result bytes (`FF` x 8 while unplayed).
+* **Fixture entry** (`1010:2031`, 16 bytes, read order of `1f12`): `u16 +8` opponent team id, `u16 +0xe` venue (0 home, 1 away, 2 neutral), `u16 +0xa` and
+  `u16 +0xc` the goals of the club and of the opponent (`FFFF` while unplayed), `u32 +0x10` attendance, `u8 +7` cup flag, `u8 +6` result kind (0 normal,
+  1 extra time, 2 won and 3 lost on penalties), `u16 +4` round (the first entries of a season are the 14 league games, rounds 1..14).
+* **Lists of the information dialogs**: champions `ca77` (`u16 year`, champion team id, its coach id, cup winner id, its coach id), transfers `cf1f` (`u16 +6` player id,
+  `u16 +0xa` team id of the buyer, `i32 +0xc` fee, `u16 +8` strength, `u8 +5`, `u8 +4` a user's club is involved), team history `TTeamEvent` (`u8` kind, `i32` year, `u16` coach id)
+  and coach history `TCoachEvent` (the same with a team id); the coach record after its score has `u16 +0x16`/`+0x18` titles and the five profile bytes of `+0x1a`.
 * **Game record** (`1010:91cf`): `u8 type` (0 league, 1 cup, 2 ...), `41 bytes` pstr (competition), ids of the two teams, `ext price`
   (`+0x36`), `i32 attendance` (`+0x40`), lines, `u16 +0x4c/+0x4e`, `u8 +0x50`.
 * **Stadium** (`1010:bf74`): `u8 level`, `Real48 filling`.

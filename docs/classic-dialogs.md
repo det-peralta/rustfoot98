@@ -38,9 +38,34 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | About | TABOUTDLG | `dialogs/about.rs` |
 | SelectGame, CoachName, Progress | TSELECTGAMEDLG, TCOACHNAMEDLG, TPROGRESSDLG | `dialogs/newgame.rs` |
 | Options, Stadium, Loan, Message | TOPTIONSDLG, TSTADIUMDLG, TLOANDLG, message boxes | `dialogs/misc.rs` |
-| Standings, Scorers, Calendar, Winners, AllTimeScorers | TCLASSIFICATIONDLG, list dialogs | `dialogs/tables.rs` |
-| Sell, Contract, Search, Observed, Transactions, Acquisitions, Auction, Plantel | main window pages, TCHECKPLAYERDLG, TOBSERVEDPLAYERSDLG, TSELLPLAYERDLG, TPLANTELDLG | `dialogs/market.rs` |
-| CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory, Invitation | TCOACHMANAGERDLG, TCOACHOPTIONSDLG, TINVITECOACHDLG... | `dialogs/coach.rs` |
+| Standings, Scorers, Calendar, Winners, AllTimeScorers, Transactions, Acquisitions | TCLASSIFICATIONDLG, TPRINTLISTDLG | `dialogs/tables.rs` |
+| Sell, Contract, Search, Observed, Auction, Plantel | main window pages, TCHECKPLAYERDLG, TOBSERVEDPLAYERSDLG, TSELLPLAYERDLG, TPLANTELDLG | `dialogs/market.rs` |
+| CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory (TPRINTLISTDLG, TCOACHMANAGERDLG, TCOACHOPTIONSDLG) | `dialogs/coach.rs` |
+| Invitation | TINVITECOACHDLG | `dialogs/matchday.rs` (the arm in `dialogs/mod.rs` still names `coach`) |
 | Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
 
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs.
+
+## The information dialogs (`tables.rs`, `coach.rs`)
+Most commands of the Campeonato, Equipa, Jogador and Treinador menus open **one generic form**, `TPrintListDlg` (a bevel, the owner-drawn list
+`listOfItems` and OK); only the standings (`TClassificationDlg`, four lists on a green form), the coach manager and the coach profile have their own.
+`tables::Spec { caption, rows, flags }` is what each command builds (`1068:0634` / `1050:3938`, `TPrintListDlg.Execute`) and `tables::bind_list`
+lays the form out like the original: the list is as high as its rows but not above the screen (`Min(600 - form height, rows * 16 + 2 - 225)`), `WIDE`
+(flag 8) makes it 200 pixels wider, `SELECT_LAST` (0x10) selects the last row and scrolls to it, `NUMBERED` (2) prefixes `1 2 3`, `AUTOCLOSE` (1)
+closes after rows + 3 seconds. Texts it sets: `@caption`, `@client`, `listOfItems.size`, `Bevel1.size`, `OKBtn.pos`, `listOfItems.sel|top`.
+
+**Rows are in the original's field encoding** (`win31/printlist.rs`): `[modifier] width text TAB` per field, as the item classes (`TPlayer`,
+`TCalendarEntry`, `TLastWinners`, `TLastTransfer`, `TTeam`, `TCoach`, `TTeamEvent`, `TCoachEvent`) build them for `1068:0ad6`; the modifiers are bold
+(`\x02`/`\x04`), italic, right-aligned (`\x06` with 10 pixels of extra space for this and the following fields, `\x07` without), blue (`\xFC`);
+`\u{1}fg;bg\u{1}` before a row colours it (club colours, the red and blue of the calendar). The selected row is drawn inverted. The renderer
+(`draw.rs` `listbox`) takes lists named `listOfItems`, `ListBoxDivision1..4` and `ListBoxOfCoaches` and draws a scroll bar when the rows do not fit
+(approximate look; hits `<list>.up|down|pgup|pgdn` and `<list>#row`).
+
+Other keys added to the renderer: `<name>.size=w,h` resizes any control (`draw.rs` `control`), `TTabbedNotebook` (`<name>.page`, tabs hit as
+`<name>#page`, class `TabSetTab`) and `TRadioGroup` (`<name>.index`, items hit as `<name>#item`) in `win31/tabbed.rs`. The check boxes of the profile and the
+manager bind to `<name>.checked` / `.enabled` and are drawn by whatever renders `TCheckBox`.
+
+Showing the standings from the game flow: `tables::standings_dialog(auto)` (`auto = true` closes it after ten seconds like the original's `Timer1`).
+`classic_shot ... dialog=<menu entry name> play=<rounds>` opens a dialog on a saved game, optionally after playing rounds (`dialog=CampeonatoClassificao`,
+`menuCalendrio`, `campeonatoMelhoresmarcadores`, `ltimosvencedores1`, `Melhoresmarcadoresdesempre1`, `ltimastransferncias1`,
+`EquipaAquisicoes1`, `Historial1`, `treinadorHistoria`, `TreinadorGestao`, `coachRanking`, `Opesindividuais1`, button `opponentCalendarBtn`).
