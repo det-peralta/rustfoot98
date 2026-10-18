@@ -20,6 +20,14 @@ copies, and the renderer (`ui/src/win31/`, `cargo run -p elifoot-ui --release --
 248,252,248; yellow 248,252,0), which `Fb` reproduces. `tools/ui/cmp.py` and `tools/ui/regions.py` compare a render with a capture and list the
 differing regions.
 
+### Driving the original locally (no network, our own saves)
+`analysis/jsdos/` (git-ignored) holds the js-dos v7 player (downloaded from the reference site) and `game.jsdos`, a bundle built from
+`original/bundle` plus our saves. `tools/capture/boot.sh` starts a headless Chromium on it with `tools/capture/driver.mjs`
+(`ELI_URL=http://127.0.0.1:8123/index.html`), clears the player's mouse-lock notice, waits for Windows 3.1 and the game, and presses OK on the About box;
+then `bash tools/capture/c.sh '{"op":"key","key":"Tab"}'` and `{"op":"guest","path":"analysis/shots/x.png"}` drive and capture it. Mouse input is relative
+(pointer lock), so use the keyboard (Tab, Space, Enter; a button shows its focus rectangle only when reached by keyboard; the game quits if Enter
+hits Cancel). The saved game `ABCDEEEE` (a 2-round Brazil/Belgium league) lets "Quero continuar um jogo" reach the main screen.
+
 ## What was learned (About dialog: 220 420 pixels, 229 differ)
 * **Frame**: `bsSingle` form = 1-pixel black border, an 18-pixel navy caption bar, a 1-pixel black rule, then the client area; centred on the
   screen with `x = (800 - width) / 2`. Caption text is the *System* raster font, not bold.
@@ -35,6 +43,11 @@ differing regions.
   corners omitted, around the caption of the focused button.
 * **Banner** (`TBanner`): the scrolling text clipped to its rectangle, drawn at `x + width - scroll` with the parent's font (scroll position is run-time state).
 * **Not reproduced**: the mouse cursor in captures (126 pixels in the About capture); the exact scroll position of the banner at any moment (state).
+
+## Frames captured so far (analysis/shots, local)
+`guest1` About (done), `guest3` new-game dialog (done), `guest11/13` the same with a saved game listed and selected, `guest14` the "A carregar o jogo..."
+gauge dialog (`TProgressDlg`, `TGauge`: filled part black, rest white, percentage text inverted), `guest15` the **main screen** (`TPrepareGameDlg`, 632x434, black
+form, menu bar, owner-drawn player list with positions/strengths/wages, flag image, notebook with tabs Jogo/Jogador/Finanças/Selecção/Adversário, `TBiGauge` morale bar).
 
 ## Plan
 1. Done: About dialog. 2. Widgets still to measure: list boxes, combo boxes, edits, check/radio buttons, group boxes, bevels, panels, notebooks,

@@ -36,3 +36,4 @@ analysis/cmd.jsonl
 analysis/cmd.out
 __pycache__/
 *.pyc
+analysis/jsdos/
