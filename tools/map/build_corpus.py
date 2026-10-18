@@ -1,0 +1,128 @@
+"""Builds the renamed decompilation corpus and the decompilation map.
+
+Inputs (all under analysis/out, produced by the Ghidra scripts): all.c + all_extra.c (decompiler output), functions.txt,
+published.txt (tools/map/published_methods.py), classes.json; tools/map/known_names.tsv (names we decoded).
+Outputs: analysis/out/corpus/<segment>_<unit>.c (git-ignored: derived from the binary), analysis/out/callgraph.json and
+docs/decompilation-map.md (committed: counts and the work queue, no binary content).
+Usage: python3 tools/map/build_corpus.py
+"""
+import collections, glob, json, os, re, sys
+
+OUT = 'analysis/out'
+LIB_SEGS = {'1060', '1068', '1070', '1078', '1080', '1088', '1090', '1098', '10a0', '10a8', '10b0', '10b8', '10c0', '13e8'}
+UNIT = {  # code segment -> unit (from the class descriptors, see docs/classes.md)
+    '1000': 'EditorShell', '1008': 'MainWindowAuction', '1010': 'DomainCore', '1018': 'PrepareGameDlg',
+    '1020': 'RoundFlow', '1028': 'NewGameAndOptions', '1030': 'SpinTimerStadiumLoan', '1038': 'TabsPenalty',
+    '1040': 'NotebookEconomy', '1048': 'JourneyPlantel', '1050': 'CoachCupPenalties', '1058': 'CountriesAndEditorData',
+    '1060': 'Banner', '1068': 'EliObjectsMath', '1070': 'Gauge', '1078': 'Buttons', '1080': 'VclControls1',
+    '1088': 'VclControls2', '1090': 'VclGraphics', '1098': 'VclMenus', '10a0': 'VclControl', '10a8': 'VclForms',
+    '10b0': 'VclClasses', '10b8': 'SysUtils', '10c0': 'SystemRtl', '13e8': 'Thunks',
+}
+
+def read_functions():
+    fs = {}
+    for line in open(f'{OUT}/functions.txt'):
+        p = line.rstrip('\n').split('\t')
+        if len(p) >= 3 and re.match(r'[0-9a-f]{4}:[0-9a-f]{4}$', p[0]):
+            fs[p[0]] = int(p[2])
+    return fs
+
+def read_names():
+    names = {}
+    pub = f'{OUT}/published.txt'
+    if os.path.exists(pub):
+        for line in open(pub):
+            a, n = line.rstrip('\n').split('\t')
+            names[a] = n
+    for line in open('tools/map/known_names.tsv'):
+        a, n = line.rstrip('\n').split('\t')
+        names[a] = n
+    return names
+
+def split_bodies(path):
+    bodies = {}
+    cur, buf = None, []
+    for line in open(path, errors='replace'):
+        m = re.match(r'// ===== ([0-9a-f]{4}:[0-9a-f]{4}) ', line)
+        if m:
+            if cur: bodies[cur] = ''.join(buf)
+            cur, buf = m.group(1), []
+        elif cur:
+            buf.append(line)
+    if cur: bodies[cur] = ''.join(buf)
+    return bodies
+
+def mentioned():
+    txt = ''
+    for f in glob.glob('docs/*.md') + glob.glob('core/src/*.rs') + glob.glob('wasm/src/*.rs'):
+        txt += open(f).read()
+    full = set(re.findall(r'([0-9a-f]{4}:[0-9a-f]{4})', txt))
+    short = set(re.findall(r'`([0-9a-f]{4})`', txt))
+    return full, short
+
+def main():
+    fs = read_functions()
+    names = read_names()
+    bodies = split_bodies(f'{OUT}/all.c')
+    if os.path.exists(f'{OUT}/all_extra.c'):
+        bodies.update(split_bodies(f'{OUT}/all_extra.c'))
+    full, short = mentioned()
+    def label(addr):
+        n = names.get(addr)
+        return (n + '_' if n else 'FUN_') + addr.replace(':', '_') if n else 'FUN_' + addr.replace(':', '_')
+    rename = {f'FUN_{a.replace(":", "_")}': label(a) for a in fs}
+    pat = re.compile(r'FUN_[0-9a-f]{4}_[0-9a-f]{4}')
+    os.makedirs(f'{OUT}/corpus', exist_ok=True)
+    calls, stats = {}, collections.defaultdict(lambda: collections.Counter())
+    files = collections.defaultdict(list)
+    for a in sorted(fs):
+        body = bodies.get(a, '// not decompiled\n')
+        callees = sorted({m.group(0)[4:].replace('_', ':') for m in pat.finditer(body)} - {a})
+        calls[a] = callees
+        named = a in names
+        ported = a in full or (a[:4] == '1010' and a[5:] in short)
+        seg = a[:4]
+        kind = 'lib' if seg in LIB_SEGS else 'app'
+        s = stats[seg]
+        s['funcs'] += 1; s['bytes'] += fs[a]
+        s['named'] += named; s['mentioned'] += ported
+        files[seg].append((a, pat.sub(lambda m: rename.get(m.group(0), m.group(0)), body)))
+    for seg, items in files.items():
+        with open(f'{OUT}/corpus/{seg}_{UNIT.get(seg, "Unit")}.c', 'w') as f:
+            f.write(f'// segment {seg}: {UNIT.get(seg)} (decompiled by Ghidra, names recovered by tools/map)\n\n')
+            for a, body in items:
+                f.write(f'// ===== {a} {names.get(a, "")} size {fs[a]}\n{body}\n')
+    json.dump(calls, open(f'{OUT}/callgraph.json', 'w'))
+    # work queue: unnamed application functions that call domain helpers, biggest first
+    domain_hubs = {'10c0:212d', '10c0:2167', '1010:58bf', '1010:7ff4', '1010:4ec3'}
+    queue = []
+    for a, cs in calls.items():
+        if a[:4] in LIB_SEGS or a in names:
+            continue
+        score = fs[a] + 400 * len(domain_hubs & set(cs))
+        queue.append((score, a, fs[a], sorted(domain_hubs & set(cs))))
+    queue.sort(reverse=True)
+    lines = ['# Decompilation map', '',
+             'Generated by `python3 tools/map/build_corpus.py` (see `tools/map/`); regenerate after decoding more functions.',
+             'Counts are of functions Ghidra found (after `tools/ghidra/FixFunctions.java` added the ones its analysis missed).',
+             '"named" = a name recovered from the published-method tables or decoded by us (`tools/map/known_names.tsv`);',
+             '"documented" = the address appears in `docs/` or in the Rust sources.', '',
+             '| segment | unit | kind | functions | bytes | named | documented |', '|---|---|---|---|---|---|---|']
+    tot = collections.Counter()
+    for seg in sorted(stats):
+        s = stats[seg]
+        lines.append(f"| {seg} | {UNIT.get(seg, '?')} | {'VCL/RTL (library)' if seg in LIB_SEGS else 'application'} | {s['funcs']} | {s['bytes']} | {s['named']} | {s['mentioned']} |")
+        k = 'lib' if seg in LIB_SEGS else 'app'
+        for key in ('funcs', 'bytes', 'named', 'mentioned'):
+            tot[k + key] += s[key]
+    lines += ['', f"Application code: {tot['appfuncs']} functions, {tot['appbytes']} bytes, {tot['appnamed']} named, {tot['appmentioned']} documented.",
+              f"Library code (VCL, Delphi RTL, thunks): {tot['libfuncs']} functions, {tot['libbytes']} bytes — replaced, not ported (see docs/ui-strategy.md).", '',
+              '## Work queue (application functions not yet named, by size and use of core helpers)', '',
+              '| address | bytes | uses |', '|---|---|---|']
+    for score, a, size, hubs in queue[:80]:
+        lines.append(f"| `{a}` | {size} | {', '.join(hubs)} |")
+    open('docs/decompilation-map.md', 'w').write('\n'.join(lines) + '\n')
+    print(len(fs), 'functions;', 'app', tot['appfuncs'], 'lib', tot['libfuncs'])
+
+if __name__ == '__main__':
+    main()
