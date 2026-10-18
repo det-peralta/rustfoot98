@@ -443,6 +443,67 @@ fn columns(cx: &Ctx, n: &Node) -> Option<Vec<(i32, char)>> {
     )
 }
 
+/// Draws one row of a list or combo box: the cells of `s` (`a|b|c`) at the column offsets of `<name>.cols` (from `x`), or the whole
+/// text at `x + 3`. A cell that starts with `@` is a skin bitmap `FORM/NAME` (a flag), drawn at its offset and centred vertically.
+#[allow(clippy::too_many_arguments)]
+fn row_cells(
+    fb: &mut Fb,
+    cx: &Ctx,
+    n: &Node,
+    f: &FontSpec,
+    x: i32,
+    ry: i32,
+    ih: i32,
+    s: &str,
+    fg: Rgb,
+    bold_all: bool,
+) {
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let bold = cx.font(&FontSpec {
+        bold: true,
+        ..f.clone()
+    });
+    let Some(cols) = columns(cx, n) else {
+        let font = if bold_all { bold.unwrap_or(font) } else { font };
+        text(fb, font, x + 3, ry, s, fg, false);
+        return;
+    };
+    for (k, cell) in s.split('|').enumerate() {
+        let Some(&(off, al)) = cols.get(k) else {
+            break;
+        };
+        if let Some(spec) = cell.strip_prefix('@') {
+            if let Some((form, name)) = spec.split_once('/') {
+                if let Some(b) = cx.skin.bitmap(form, name) {
+                    let (bx, by) = (x + off, ry + (ih - b.h) / 2);
+                    for r in 0..b.h {
+                        for c in 0..b.w {
+                            let p = b.px[(r * b.w + c) as usize];
+                            fb.set(bx + c, by + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
+                        }
+                    }
+                }
+            }
+            continue;
+        }
+        // an upper-case alignment letter (`L`, `R`, `C`) draws the column in bold
+        let cf = if bold_all || al.is_ascii_uppercase() {
+            bold.unwrap_or(font)
+        } else {
+            font
+        };
+        let tw = cf.width(cell);
+        let tx = match al.to_ascii_lowercase() {
+            'r' => x + off - tw,
+            'c' => x + off - tw / 2,
+            _ => x + off,
+        };
+        text(fb, cf, tx, ry, cell, fg, false);
+    }
+}
+
 /// The standard list box (and the owner-drawn lists of the dialogs): rows from `lists[name]` or the form's `Items.Strings`, scroll
 /// position `<name>.top`, selected row `<name>.sel`, columns `<name>.cols` / `<name>.align`, per-row style `lists[<name>.style]`, and a
 /// scroll bar when the rows do not fit.
@@ -468,7 +529,6 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         .filter(|&v| v >= 0)
         .map(|v| v as usize);
     let focused = cx.focus == n.name;
-    let cols = columns(cx, n);
     let enabled = is_enabled(cx, n);
     let bold_all = flag(cx, n, "bold");
     let old = fb.clip;
@@ -497,45 +557,18 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         if let Some(b) = bg {
             fb.fill(x + 1, ry, right - x - 1, ih, b);
         }
-        let rf = if st.bold || bold_all {
-            cx.font(&FontSpec {
-                bold: true,
-                ..f.clone()
-            })
-            .unwrap_or(font)
-        } else {
-            font
-        };
-        let ty = ry;
-        match &cols {
-            Some(cols) => {
-                for (k, cell) in items[i].split('|').enumerate() {
-                    let Some(&(off, al)) = cols.get(k) else {
-                        break;
-                    };
-                    // an upper-case alignment letter (`L`, `R`, `C`) draws the column in bold
-                    let cf = if al.is_ascii_uppercase() && !bold_all {
-                        cx.font(&FontSpec {
-                            bold: true,
-                            ..f.clone()
-                        })
-                        .unwrap_or(rf)
-                    } else {
-                        rf
-                    };
-                    let tw = cf.width(cell);
-                    let tx = match al.to_ascii_lowercase() {
-                        'r' => x + off - tw,
-                        'c' => x + off - tw / 2,
-                        _ => x + off,
-                    };
-                    text(fb, cf, tx, ty, cell, fg, false);
-                }
-            }
-            None => {
-                text(fb, rf, x + 3, ty, &items[i], fg, false);
-            }
-        }
+        row_cells(
+            fb,
+            cx,
+            n,
+            f,
+            x,
+            ry,
+            ih,
+            &items[i],
+            fg,
+            bold_all || st.bold,
+        );
         // the focus rectangle sits on the selected row, or on the first one while nothing is selected
         if focused
             && (selected
@@ -587,8 +620,8 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
             .or_else(|| cx.texts.get(&n.name).cloned())
             .unwrap_or_else(|| n.str("Text").unwrap_or("").to_string()),
     };
-    // Windows 3.1 closes a combo box to the height of its text field plus 7 pixels, whatever the form says
-    let h = font.height().max(n.int("ItemHeight", font.height())) + 7;
+    // the closed combo box is a pixel shorter than the control's `Height`
+    let h = n.int("Height", font.height() + 8) - 1;
     let enabled = is_enabled(cx, n);
     sunken_box(fb, x, y, w, h, WHITE);
     fb.fill(x + w - 17, y + 1, 1, h - 2, BLACK);
@@ -596,11 +629,12 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     glyph(
         fb,
         x + w - 12,
-        y + 6,
+        y + 1 + (h - 2 - 9) / 2,
         &ARROW_COMBO,
         if enabled { BLACK } else { GRAY },
     );
-    let ty = y + 1 + (h - 2 - font.height()) / 2;
+    let ih_field = n.int("ItemHeight", font.height()).max(font.height());
+    let ty = y + 1 + (h - 2 - ih_field) / 2;
     let focused = cx.focus == n.name && enabled && !flag(cx, n, "open");
     let list_style = n.ident("Style") != Some("csDropDown");
     let old = fb.clip;
@@ -608,12 +642,11 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     if focused && list_style {
         let hw = w - 19 - 2;
         fb.fill(x + 2, y + 2, hw + 1, h - 4, NAVY);
-        text(fb, font, x + 3, ty, &shown, WHITE, false);
+        row_cells(fb, cx, n, f, x, ty, ih_field, &shown, WHITE, false);
         focus_rect_not(fb, x + 2, y + 2, hw + 1, h - 4, x, y, true);
-    } else if enabled {
-        text(fb, font, x + 3, ty, &shown, f.color, false);
     } else {
-        text(fb, font, x + 3, ty, &shown, GRAY, false);
+        let ink = if enabled { f.color } else { GRAY };
+        row_cells(fb, cx, n, f, x, ty, ih_field, &shown, ink, false);
     }
     fb.clip = old;
     if focused && !list_style {
@@ -692,11 +725,14 @@ fn combo_dropdown(
         if hot {
             fb.fill(x + 1, ry, right - x - 1, ih, NAVY);
         }
-        text(
+        row_cells(
             fb,
-            font,
-            x + 3,
-            ry + (ih - font.height()) / 2,
+            cx,
+            n,
+            f,
+            x,
+            ry,
+            ih,
             &items[i],
             if hot { WHITE } else { f.color },
             false,

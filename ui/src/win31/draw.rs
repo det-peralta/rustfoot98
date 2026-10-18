@@ -682,22 +682,45 @@ pub(super) fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: 
 
 fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    sunken_box(fb, x, y, w, h, WHITE);
-    if let Some(font) = cx.font(f) {
-        let s = caption_or(cx, n, "Text");
-        let old = fb.clip;
-        fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
-        text(
-            fb,
-            font,
-            x + 2,
-            y + (h - font.height()) / 2,
-            s,
-            f.color,
-            false,
-        );
-        fb.clip = old;
+    let enabled = is_enabled(cx, n);
+    sunken_box(fb, x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(WHITE));
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let s = caption_or(cx, n, "Text");
+    let (tx, ty) = (x + 2, y + (h - font.height()) / 2);
+    let old = fb.clip;
+    fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
+    // selected characters: `<name>.selstart` and `<name>.sellen` are character positions
+    let num = |k: &str| {
+        cx.texts
+            .get(&format!("{}.{k}", n.name))
+            .and_then(|v| v.parse::<usize>().ok())
+    };
+    let chars: Vec<char> = s.chars().collect();
+    let (a, len) = (num("selstart").unwrap_or(0).min(chars.len()), num("sellen").unwrap_or(0));
+    let b = (a + len).min(chars.len());
+    let pre: String = chars[..a].iter().collect();
+    let mid: String = chars[a..b].iter().collect();
+    let post: String = chars[b..].iter().collect();
+    let ink = if enabled { f.color } else { GRAY };
+    let mut pen = tx;
+    pen += text(fb, font, pen, ty, &pre, ink, false);
+    if !mid.is_empty() {
+        let mw = font.width(&mid);
+        fb.fill(pen, y + 2, mw, h - 4, NAVY);
+        text(fb, font, pen, ty, &mid, WHITE, false);
+        pen += mw;
     }
+    text(fb, font, pen, ty, &post, ink, false);
+    // the caret: a black line before character `<name>.caret`, a pixel taller than the font's line
+    if cx.focus == n.name && enabled {
+        if let Some(c) = num("caret") {
+            let before: String = chars[..c.min(chars.len())].iter().collect();
+            fb.fill(tx + 1 + font.width(&before), ty, 1, font.height() + 1, BLACK);
+        }
+    }
+    fb.clip = old;
 }
 
 /// The owner-drawn squad list of the main screen: rows `pos|name|strength|wage|mark`, 16 pixels high, grouped by position with a black
