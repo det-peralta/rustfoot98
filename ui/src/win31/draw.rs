@@ -682,7 +682,7 @@ mod tests {
             b.extend_from_slice(&1u16.to_le_bytes());
             b.push(1);
             b.push(b'x');
-            b.extend_from_slice(&[10, 0, 0, 8, 2, 32, 1, 1]);
+            b.extend_from_slice(&[10, 0, 0, 8, 2, 32, 1, 1, 10]);
             for _ in 32..256 {
                 b.extend_from_slice(&[3, 0, 8, 0, 0]);
             }
