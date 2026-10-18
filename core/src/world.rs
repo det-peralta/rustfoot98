@@ -135,6 +135,8 @@ pub struct CupMatch {
     pub home_players: Vec<String>,
     pub away_players: Vec<String>,
     pub attendance: i64,
+    /// The kick-by-kick shootout, when it was played in full.
+    pub pens: Option<cup::Shootout>,
 }
 
 #[derive(Clone, Debug)]
@@ -1057,12 +1059,29 @@ impl World {
                 true,
             );
             let shootout = g.home_goals == g.away_goals;
+            let human_in_tie = self
+                .human
+                .as_ref()
+                .is_some_and(|h| h.club == home.name || h.club == away.name);
+            let mut pens = None;
             let home_out = if shootout {
-                cup::shootout_home_eliminated(
-                    &mut self.rng,
-                    cup::team_rating(&home.slots),
-                    cup::team_rating(&away.slots),
-                )
+                if human_in_tie || round == ROUNDS {
+                    // the dialog with real kicks (always in the final, or when a human plays)
+                    let r = cup::shootout(
+                        &mut self.rng,
+                        (&home.slots, &g.pitch[0]),
+                        (&away.slots, &g.pitch[1]),
+                    );
+                    let out = r.away >= r.home;
+                    pens = Some(r);
+                    out
+                } else {
+                    cup::shootout_home_eliminated(
+                        &mut self.rng,
+                        cup::team_rating(&home.slots),
+                        cup::team_rating(&away.slots),
+                    )
+                }
             } else {
                 g.home_goals < g.away_goals
             };
@@ -1097,6 +1116,7 @@ impl World {
                 home_players: home.names.clone(),
                 away_players: away.names.clone(),
                 attendance,
+                pens,
             });
             losers.push(loser);
             *self.club_at(hl) = home;
@@ -1939,5 +1959,29 @@ mod tests {
         let mut closed = back;
         closed.play_round();
         assert!(closed.board.iter().all(|l| l.round == closed.round));
+    }
+
+    #[test]
+    fn a_tied_final_is_decided_by_real_kicks() {
+        let mut shootouts = 0;
+        for seed in 0..60 {
+            let mut w = World::synthetic(seed);
+            for _ in 0..14 {
+                w.play_round();
+            }
+            // after round 14 `last_cup` is the final
+            let f = w.last_cup.as_ref().unwrap();
+            assert_eq!(f.matches.len(), 1);
+            let m = &f.matches[0];
+            if m.shootout {
+                shootouts += 1;
+                let p = m.pens.as_ref().expect("the final plays the kicks");
+                assert_ne!(p.home, p.away);
+                assert_eq!(m.winner == m.home, p.home > p.away);
+            } else {
+                assert!(m.pens.is_none());
+            }
+        }
+        assert!(shootouts > 0, "some final in 60 seasons goes to penalties");
     }
 }

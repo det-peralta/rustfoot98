@@ -348,7 +348,7 @@ function renderCup() {
     if (mine(m)) li.className = "mine";
     const b = document.createElement("button");
     b.setAttribute("aria-pressed", String(i === selectedCup));
-    const how = m.shootout ? " (g.p.)" : m.extraTime ? " (a.p.)" : "";
+    const how = m.pens ? ` (g.p. ${m.pens.h}–${m.pens.a})` : m.shootout ? " (g.p.)" : m.extraTime ? " (a.p.)" : "";
     b.innerHTML = `<span>${esc(m.home)}</span><span class="score">${m.hg} – ${m.ag}${how}</span><span class="away">${esc(m.away)}</span>`;
     b.onclick = () => { selectedCup = i; renderCup(); };
     li.appendChild(b);
@@ -361,7 +361,8 @@ function renderCup() {
     box.hidden = false;
     const tl = timeline(m);
     const evs = tl.length ? tl.map((e) => `<div class="ev ${e.away ? "away" : ""}"><span class="m">${e.m}'</span><span>${e.html}</span><span></span></div>`).join("") : `<p class="empty">Sem acontecimentos.</p>`;
-    box.innerHTML = `<h3>${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</h3>${evs}<p class="note">Passa: <b>${esc(m.winner)}</b>${m.shootout ? " (grandes penalidades)" : m.extraTime ? " (após prolongamento)" : ""}</p>`;
+    const kicks = m.pens ? `<h4>Grandes penalidades ${m.pens.h}–${m.pens.a}</h4><ol class="kicks">${m.pens.kicks.map((k) => `<li class="${k.side ? "away" : ""}">${esc(k.player)} <small>(${esc(k.side ? m.away : m.home)})</small> — ${k.goal ? "<b>GOLO</b>" : esc(k.out)}</li>`).join("")}</ol>` : "";
+    box.innerHTML = `<h3>${esc(m.home)} ${m.hg} – ${m.ag} ${esc(m.away)}</h3>${evs}${kicks}<p class="note">Passa: <b>${esc(m.winner)}</b>${m.shootout ? " (grandes penalidades)" : m.extraTime ? " (após prolongamento)" : ""}</p>`;
   }
   $("cup-note").textContent = c.left === 1 ? "Final disputada." : `Ainda em prova: ${c.left} clubes.`;
 }

@@ -19,7 +19,7 @@
 - [x] Points 3-1-0, per-game morale, season end: promotion/relegation, titles (verified, implemented)
 - [x] Economy index walk, player value formula, loan interest (docs/finance.md)
 - [x] Transfer market mapped: user <-> AI only (no AI-AI trades); sell rules, priority score, who sells when (docs/finance.md)
-- [ ] Market details for the user (price tiers `63fa`, auction bids), gate receipts (`35e1`), salaries, coach swap partner choice (`5343`), half-time, interactive penalty dialog (cup itself is done: see docs/season.md)
+- [ ] Market details for the user (price tiers `63fa`, auction bids), gate receipts (`35e1`), salaries, coach swap partner choice (`5343`), half-time (cup and its penalty shootouts are done: see docs/season.md)
 - [x] WebAssembly build + browser demo (4-division league, rounds, seasons) — `web/`
 - [x] Real teams from `.EFT` in the UI (local file picker; division assignment by level is an assumption)
 - [x] Division assignment and starting strengths at game start (verified against a real save)

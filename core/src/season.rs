@@ -387,6 +387,8 @@ pub struct Game {
     pub subs: Vec<SubEvent>,
     /// The game went to extra time (minutes 91..=120).
     pub extra_time: bool,
+    /// Who is on the pitch at the end (`Status::Starter`) for each side, in squad order (used by the penalty shootout).
+    pub pitch: [Vec<Status>; 2],
 }
 
 /// Plays one game between two clubs whose line-ups are already set (`apply_plan` / `auto_lineup`): `hb` / `ab` are the
@@ -439,6 +441,10 @@ pub fn play_game(
         events: m.events,
         subs: m.subs,
         extra_time,
+        pitch: [
+            m.home.slots.iter().map(|p| p.status).collect(),
+            m.away.slots.iter().map(|p| p.status).collect(),
+        ],
     }
 }
 

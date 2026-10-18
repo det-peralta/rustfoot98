@@ -79,9 +79,15 @@ is most likely intended; the user counters it by buying players at auction.
   (checked for N = 34..128). Survivors are shuffled (3n remove-and-append swaps); `k` = smallest power of two >= n/2; `n - k`
   pairs are drawn (first of the pair is at home), the other clubs get a bye.
 - Single leg. A draw goes to extra time (to minute 120) and then a shootout.
-- **The automatic shootout is inverted in the original**: each side sums `3 x Random(team rating)` and the *home* side is
-  eliminated when `home_sum >= away_sum`. We keep it faithfully. The interactive (dialog) shootout used when a human plays a final
-  was not decoded; the AI formula is used for everybody.
+- **Two shootout paths** (`1010:9396` calls `1050:0d46` for a level cup game): *automatic* when no human plays the tie and the round is
+  before 14 (and the option at `10c8:2b33` is off): each side sums `3 x Random(team rating)` and the *home* side is eliminated when
+  its sum is greater than or equal to the away sum — **inverted** in the original, kept faithfully. Otherwise (a human plays, or
+  **always in the final**) the *Penaltis* dialog plays real kicks (`Timer1Timer`, decoded from the raw bytes at `1050:114d`):
+  home first, alternating; the taker is the next squad member (cycling the squad list) who is on the pitch; the opponent's best
+  goalkeeper on the pitch defends; each kick is the shot duel `81ed(taker force, keeper strength)` (GOLO = goal); the shootout ends
+  when a side leads by more than the other's remaining kicks of the first five, or, after five each, when a pair of kicks leaves
+  the score apart (sudden death). The side with fewer goals is eliminated (the result flag is `away >= home` = home eliminated).
+  The port plays the kicks (`cup::shootout`) and shows them in the Taça card; the user does not choose the direction.
 - Morale: the home side that advances gets 1.5, the away side that advances 2.0, the loser 0 (see `match-engine.md`).
 - Round names: `FINAL`, `Meias-finais`, `Quartos`, `Oitavos`, then "k avos de final".
 - The browser shows the last cup round in a "Taça" card and the winner in the season-end summary. Saves keep the cup state

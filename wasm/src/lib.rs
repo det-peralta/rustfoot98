@@ -218,12 +218,33 @@ fn cup_json(w: &World) -> String {
                     )
                 })
                 .collect();
+            let pens = match &m.pens {
+                None => "null".to_string(),
+                Some(p) => {
+                    let ks: Vec<String> = p
+                        .kicks
+                        .iter()
+                        .map(|k| {
+                            let side = if k.side == 0 { Side::Home } else { Side::Away };
+                            format!(
+                                "{{\"side\":{},\"player\":{},\"out\":\"{}\",\"goal\":{}}}",
+                                k.side,
+                                pname(side, k.player),
+                                k.outcome.text(),
+                                k.outcome == elifoot_core::outcome::Outcome::Goal
+                            )
+                        })
+                        .collect();
+                    format!("{{\"h\":{},\"a\":{},\"kicks\":[{}]}}", p.home, p.away, ks.join(","))
+                }
+            };
             format!(
-                "{{\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"extraTime\":{},\"shootout\":{},\"att\":{},\"winner\":{},\"events\":[{}],\"subs\":[{}]}}",
+                "{{\"home\":{},\"away\":{},\"hg\":{},\"ag\":{},\"pens\":{},\"extraTime\":{},\"shootout\":{},\"att\":{},\"winner\":{},\"events\":[{}],\"subs\":[{}]}}",
                 esc(&m.home),
                 esc(&m.away),
                 m.home_goals,
                 m.away_goals,
+                pens,
                 m.extra_time,
                 m.shootout,
                 m.attendance,

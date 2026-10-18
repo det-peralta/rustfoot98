@@ -98,3 +98,6 @@ select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid 
 
 #board input.bid, .sellcell input.ask { width: 7rem; }
 .sellcell { white-space: nowrap; }
+
+.kicks { margin: .25rem 0 .5rem 1.25rem; padding: 0; }
+.kicks li.away { color: var(--muted, #888); }
