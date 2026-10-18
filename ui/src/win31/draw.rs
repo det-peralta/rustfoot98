@@ -336,6 +336,7 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TBanner" => banner(fb, cx, n, &f, x, y),
         "TBevel" => bevel(fb, n, x, y),
         "TPanel" => panel(fb, cx, n, &f, x, y),
+        "TGroupBox" => groupbox(fb, cx, n, &f, x, y),
         "TEdit" => edit(fb, cx, n, &f, x, y),
         "TListBox" => listbox(fb, cx, n, &f, x, y),
         "TRadioButton" => radio(fb, cx, n, &f, x, y),
@@ -531,6 +532,35 @@ fn panel(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     };
     for c in &n.children {
         control(fb, &sub, c, &child_font);
+    }
+}
+
+/// `TGroupBox`: an etched frame (grey line, white line one pixel further in) whose top edge is interrupted by the caption.
+fn groupbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let top = y + font.height() / 2 - 1;
+    let (fw, fh) = (w - 1, h - (top - y) - 1);
+    for (dx, c) in [(0, GRAY), (1, WHITE)] {
+        let (l, t) = (x + dx, top + dx);
+        fb.fill(l, t, fw, 1, c);
+        fb.fill(l, t + fh - 1, fw, 1, c);
+        fb.fill(l, t, 1, fh, c);
+        fb.fill(l + fw - 1, t, 1, fh, c);
+    }
+    let cap = caption(cx, n);
+    let tw = font.width(cap);
+    fb.fill(x + 8, top, tw, 2, cx.bg);
+    text(fb, font, x + 8, y, cap, f.color, false);
+    let sub = Ctx {
+        ox: x,
+        oy: y,
+        ..cx.sub()
+    };
+    for c in &n.children {
+        control(fb, &sub, c, f);
     }
 }
 
@@ -896,10 +926,41 @@ fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         return;
     };
     let widths: Vec<i32> = tabs.iter().map(|t| font.width(t)).collect();
-    fb.fill(x, y, w, 1, GRAY);
-    // text positions: the selected tab is padded on both sides by its slanted edges
+    // the text positions: every tab is 9 pixels wider than its caption (the selected one is padded by its slanted edges)
+    let mut pens = Vec::new();
     let mut pen = x + 9;
+    for wd in &widths {
+        pens.push(pen);
+        pen += wd + 9;
+    }
+    // the strip: a grey line over a black one, open above the selected tab
+    let (sl, sr) = if sel < tabs.len() {
+        (pens[sel] - 5, pens[sel] + widths[sel] + 6)
+    } else {
+        (x + w, x + w)
+    };
+    let seg = |fb: &mut Fb, a: i32, b: i32, row: i32, c: Rgb| {
+        if b > a {
+            fb.fill(a, y + row, b - a, 1, c);
+        }
+    };
+    seg(fb, x, sl, 0, GRAY);
+    seg(fb, sr, x + w, 0, GRAY);
+    seg(fb, x, sl, 1, BLACK);
+    seg(fb, sr + 1, x + w, 1, BLACK);
+    // slanted edges of the outlines: `/` leans left going down, `\` leans right
+    let back = |fb: &mut Fb, bx: i32, row0: i32| {
+        for row in row0..=15 {
+            fb.set(bx - row / 3, y + row, BLACK);
+        }
+    };
+    let fwd = |fb: &mut Fb, bx: i32, row0: i32, off: i32| {
+        for row in row0..=15 {
+            fb.set(bx + off + (row - row0) / 3 * (row0 != 2) as i32 + (row / 3) * (row0 == 2) as i32, y + row, BLACK);
+        }
+    };
     for (i, t) in tabs.iter().enumerate() {
+        let pen = pens[i];
         cx.hits.borrow_mut().push(Hit {
             name: format!("{}#{i}", n.name),
             class: "TabSetTab".into(),
@@ -912,8 +973,8 @@ fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         text(fb, font, pen, y + 2, t, f.color, false);
         if i == sel {
             let left = pen - 5;
-            let right = left + widths[i] + 11;
-            fb.fill(left, y, right - left, 1, BLACK);
+            let right = sr;
+            fb.fill(left, y, right - left, 2, cx.bg);
             for (row, dx) in [
                 (1, 0),
                 (2, 0),
@@ -932,11 +993,41 @@ fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             }
             for row in 1..=14 {
                 fb.set(right - ((row + 1) / 3), y + row, GRAY);
+                fb.set(right + 1 - ((row + 1) / 3), y + row, BLACK);
+            }
+            for row in 1..=15 {
+                fb.set(left - 1 + row / 3, y + row, BLACK);
             }
             fb.fill(left + 5, y + 15, right - left - 9, 1, GRAY);
-            pen = right + 3;
+            seg(fb, left + 4, right - 3, 16, BLACK);
         } else {
-            pen += widths[i] + 9;
+            // left edge: the first tab owns a full `\`, the others a short one under the neighbour's `/`
+            let prev_sel = i > 0 && i - 1 == sel;
+            let bl = if i == 0 { pen - 6 } else { pen - 2 };
+            let _ = prev_sel;
+            let mut xl = bl + 1;
+            if i == 0 {
+                fwd(fb, bl, 2, 0);
+                xl = bl + 5;
+            } else {
+                for row in 9..=15 {
+                    fb.set(bl - 1 + (row - 9) / 3, y + row, BLACK);
+                }
+            }
+            // right edge: `/` from the boundary to the next tab
+            let next_sel = i + 1 == sel;
+            let br = pen + widths[i] + if next_sel { 3 } else { 7 };
+            let xr;
+            if next_sel {
+                for row in 9..=15 {
+                    fb.set(br + 1 - (row - 9) / 3, y + row, BLACK);
+                }
+                xr = br - 1;
+            } else {
+                back(fb, br, 2);
+                xr = br - 5;
+            }
+            seg(fb, xl, xr + 1, 16, BLACK);
         }
     }
 }
@@ -1111,7 +1202,11 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
                 0
             };
         let _ = gh;
-        let tx = x + ix + (w - tw) / 2;
+        let (tx, ty) = if n.class == "TButton" {
+            (x + (w - tw) / 2 - 1, y + (h - font.height()) / 2 + 1)
+        } else {
+            (x + ix + (w - tw) / 2, ty)
+        };
         if enabled {
             text(fb, font, tx, ty, &label, f.color, false);
         } else {
@@ -1135,19 +1230,22 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 /// `DrawFocusRect`: a dotted rectangle; the dots follow a checkerboard anchored at the origin `(wx, wy)` of the window it is drawn in
 /// (lit where the offsets from that origin add up to an odd number); the corners stay dark.
 pub fn focus_rect(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, wx: i32, wy: i32) {
-    let lit = |px: i32, py: i32| (px - wx + py - wy).rem_euclid(2) == 1;
+    // the rectangle XORs the pixels: the lit ones go black; over the 16-colour green the others turn olive (index 2 ^ 1 = 3)
+    let dot = |fb: &mut Fb, px: i32, py: i32| {
+        if (px - wx + py - wy).rem_euclid(2) == 1 {
+            fb.set(px, py, BLACK);
+        } else if fb.get(px, py) == GREEN.pack() {
+            fb.set(px, py, Rgb(128, 128, 0));
+        }
+    };
     for i in 1..w - 1 {
         for j in [0, h - 1] {
-            if lit(x + i, y + j) {
-                fb.set(x + i, y + j, BLACK);
-            }
+            dot(fb, x + i, y + j);
         }
     }
     for j in 1..h - 1 {
         for i in [0, w - 1] {
-            if lit(x + i, y + j) {
-                fb.set(x + i, y + j, BLACK);
-            }
+            dot(fb, x + i, y + j);
         }
     }
 }

@@ -4,7 +4,7 @@ use super::{text, Classic, Page};
 use crate::win31::draw::{controls, dialog_frame_menu, text as draw_text, Ctx, Hit, DESKTOP};
 use crate::win31::fb::{Rgb, BLACK, SILVER};
 use crate::win31::Node;
-use elifoot_core::season::{fixtures, standings, Club};
+use elifoot_core::season::{fixtures, Club};
 use elifoot_core::sector::Status;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -33,7 +33,7 @@ fn col(c: Rgb) -> String {
 
 /// Collects the names of the labels of `n` (all depths).
 fn labels(n: &Node, out: &mut Vec<String>) {
-    if n.class == "TLabel" {
+    if n.class == "TLabel" || n.class == "TGroupBox" {
         out.push(n.name.clone());
     }
     for c in &n.children {
@@ -160,7 +160,7 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     lists.insert("ListBoxOfPlayers".to_string(), rows);
     t("ListBoxOfPlayers.color", col(fg));
     t("ListBoxOfPlayers.bg", col(bg));
-    t("ListBoxOfPlayers.focus", "0".into());
+    t("ListBoxOfPlayers.focus", c.main.selected.unwrap_or(0).to_string());
     if let Some(s) = c.main.selected {
         t("ListBoxOfPlayers.sel", s.to_string());
     }
@@ -238,6 +238,54 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         ((club.k * 10.0).round() as i32).clamp(0, 20).to_string(),
     );
     t("gaugeMoral.barcolor", "248,252,0".into());
+    {
+        let sel = c.main.selected.and_then(|r| roster_order(club).get(r).copied());
+        let hide = [
+            "textSelectedPlayerName",
+            "bitmapPlayerCountry",
+            "textSelectedPlayerCountry",
+            "textBosmanDescription",
+            "LabelSuspended",
+            "LabelInjured",
+            "PanelPlayerSalary",
+            "PanelPlayer",
+        ];
+        match sel {
+            None => {
+                for h in hide {
+                    t(&format!("{h}.visible"), "0".into());
+                }
+            }
+            Some(i) => {
+                let s = &club.slots[i];
+                t("PanelPlayer", String::new());
+                t("PanelPlayerSalary", String::new());
+                t("textSelectedPlayerName", club.names[i].clone());
+                let nat = String::from_utf8_lossy(&s.nat).to_string();
+                t(
+                    "textSelectedPlayerCountry",
+                    c.data.countries.get(&nat).cloned().unwrap_or(nat.clone()),
+                );
+                t("bitmapPlayerCountry.image", format!("FLAGS/{nat}"));
+                if s.foreign != 1 {
+                    t("textBosmanDescription.visible", "0".into());
+                }
+                t("LabelSuspended.visible", ((s.ban > 0) as u8).to_string());
+                t("LabelInjured.visible", ((s.injured > 0) as u8).to_string());
+                let word = match s.aggression {
+                    0 | 1 => "Cavalheiro",
+                    2 | 3 => "Caneleiro",
+                    _ => "Sarrafeiro",
+                };
+                t("textPlayerBehaviour", word.into());
+                t("textSeasonGoals", s.goals.to_string());
+                t("textHistoryGamesPlayed", s.history[0].to_string());
+                t("textHistoryGoals", s.history[1].to_string());
+                t("textHistoryRedCards", s.history[2].to_string());
+                t("textHistoryInjuries", s.history[3].to_string());
+            }
+        }
+    }
     if page == Page::Finances {
         let f = &club.fin;
         let revenue = f.gate + f.sales + f.prizes;

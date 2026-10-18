@@ -77,6 +77,8 @@ pub struct Slot {
     pub foreign: u8,
     /// Goals scored (`+0x14`), counted in the line-up ranking `strength + goals`.
     pub goals: u16,
+    /// Career history shown on the player page (`+0x17..0x26`): games, goals, red cards, injuries.
+    pub history: [u32; 4],
 }
 
 impl Slot {
@@ -104,6 +106,7 @@ impl Slot {
             fresh: false,
             foreign: if same_country { 0 } else { 2 },
             goals: 0,
+            history: [0; 4],
         }
     }
 
@@ -203,6 +206,7 @@ mod tests {
             fresh: false,
             foreign: 0,
             goals: 0,
+            history: [0; 4],
         }
     }
     const S: Status = Status::Starter;

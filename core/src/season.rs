@@ -392,6 +392,12 @@ pub fn play_game(
     // carry over what persists between matches: ratings, strength loss, bans, injuries
     for (club, played) in [(&mut *home, &m.home), (&mut *away, &m.away)] {
         for (slot, p) in club.slots.iter_mut().zip(played.slots.iter()) {
+            if slot.starter() || p.starter() {
+                slot.history[0] += 1;
+            }
+            slot.history[1] += (p.goals as u32).saturating_sub(slot.goals as u32);
+            slot.history[2] += (p.ban > 0 && slot.ban == 0) as u32;
+            slot.history[3] += (p.injured > 0 && slot.injured == 0) as u32;
             slot.rating = p.rating;
             slot.goals = p.goals;
             slot.strength = p.strength;

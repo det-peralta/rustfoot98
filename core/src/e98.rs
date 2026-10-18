@@ -377,6 +377,7 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
             s.proneness = p.proneness.min(255) as u8;
             s.g = p.g.min(255) as u8;
             s.goals = p.goals;
+            s.history = p.history;
             s.ban = p.ban;
             s.injured = p.injured;
             s.status = match p.status {
