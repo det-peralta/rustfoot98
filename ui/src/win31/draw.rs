@@ -1136,10 +1136,21 @@ fn banner(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     fb.clip = old;
 }
 
+/// The distance of a glyph on top of a caption from the button's client top: the `Margin` property, or (default `-1`) the margin
+/// that centres glyph, spacing and caption as `TBitBtn.CalcButtonLayout` does.
+fn glyph_margin(cx: &Ctx, n: &Node, h: i32, gh: i32, f: &FontSpec) -> i32 {
+    let m = n.int("Margin", -1);
+    if m >= 0 {
+        return m;
+    }
+    let th = cx.font(f).map_or(0, |t| t.tm_height);
+    (h - 4 - (gh + n.int("Spacing", 4) + th) + 1) / 2
+}
+
 fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 64), n.int("Height", 64));
     let enabled = is_enabled(cx, n);
-    let default = enabled && (cx.focus == n.name || n.flag("Default", false));
+    let default = (enabled && cx.focus == n.name) || n.flag("Default", false);
     // content of the thin-framed button sits one pixel up and to the right of the default button's
     let (ix, iy) = if default { (0, 2) } else { (1, 1) };
     button_face(fb, x, y, w, h, default);
@@ -1174,7 +1185,8 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         };
         let gw = b.w / glyphs;
         let key = b.px[((b.h - 1) * b.w) as usize];
-        let (gx, gy) = (x + (w - gw) / 2, y + 2 + n.int("Margin", 4));
+        let margin = glyph_margin(cx, n, h, gh, f);
+        let (gx, gy) = (x + (w - gw) / 2, y + 2 + margin);
         let gi = if !enabled && glyphs > 1 { gw } else { 0 };
         for r in 0..b.h {
             for c in 0..gw {
@@ -1192,15 +1204,20 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if let Some(font) = cx.font(f) {
         let label: String = cap.replace('&', "");
         let tw = font.width(&label);
-        let ty = y + h
-            - 2
-            - n.int("Margin", 4)
-            - font.tm_height
-            - if font.height() == font.tm_height {
-                2 - iy
-            } else {
-                0
-            };
+        let spaced = n.int("Margin", -1) < 0 && n.int("Spacing", 4) >= 0;
+        let ty = if spaced {
+            y + 2 + glyph_margin(cx, n, h, gh, f) + gh + n.int("Spacing", 4)
+        } else {
+            y + h
+                - 2
+                - n.int("Margin", 4)
+                - font.tm_height
+                - if font.height() == font.tm_height {
+                    2 - iy
+                } else {
+                    0
+                }
+        };
         let _ = gh;
         let (tx, ty) = if n.class == "TButton" {
             (x + (w - tw) / 2 - 1, y + (h - font.height()) / 2 + 1)

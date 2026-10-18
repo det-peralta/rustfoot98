@@ -286,6 +286,27 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
             }
         }
     }
+    {
+        let starters = club.slots.iter().filter(|s| s.starter()).count();
+        let keepers = club
+            .slots
+            .iter()
+            .filter(|s| s.starter() && s.position == 0)
+            .count();
+        t("OKBtn.enabled", ((starters == 11 && keepers == 1) as u8).to_string());
+    }
+    if let Some((o, _)) = opp {
+        t("textOpponentName", o.name.clone());
+        t("textOpponentName.color", col(rgb(o.colors.0)));
+        t("textOpponentCoach", o.coach_name.clone());
+        t("textOpponentCoach.color", col(bg));
+        t(
+            "gaugeOpponentMoral.value",
+            ((o.k * 10.0).round() as i32).clamp(0, 20).to_string(),
+        );
+        t("gaugeOpponentMoral.barcolor", "248,252,0".into());
+        t("opponentPlantelBtn.visible", "0".into());
+    }
     if page == Page::Finances {
         let f = &club.fin;
         let revenue = f.gate + f.sales + f.prizes;
