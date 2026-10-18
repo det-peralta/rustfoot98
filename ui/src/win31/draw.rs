@@ -1198,6 +1198,8 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if let Some(font) = cx.font(f) {
         let label: String = cap.replace('&', "");
         let tw = font.width(&label);
+        // the caption is centred with the odd pixel on the left (the raster MS Sans Serif puts it on the right)
+        let round_up = i32::from(font.face != "ms sans serif");
         let spaced = n.int("Margin", -1) < 0 && n.int("Spacing", 4) >= 0;
         let ty = if spaced {
             y + 2 + glyph_margin(cx, n, h, gh, f) + gh + n.int("Spacing", 4)
@@ -1218,7 +1220,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let (tx, ty) = if n.class == "TButton" {
             (x + (w - tw) / 2 - 1, y + (h - font.height()) / 2 + 1)
         } else {
-            (x + (w - tw + 1) / 2, ty)
+            (x + (w - tw + round_up) / 2, ty)
         };
         if enabled {
             text(fb, font, tx, ty, &label, f.color, false);
@@ -1229,7 +1231,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         if cx.focus == n.name {
             focus_rect(
                 fb,
-                x + (w - tw + 1) / 2 - 1,
+                x + (w - tw + round_up) / 2 - 1,
                 ty - 1,
                 tw + 2,
                 font.height() + 2,

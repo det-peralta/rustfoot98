@@ -842,7 +842,7 @@ pub(super) fn tabbed_notebook(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: 
             fb,
             l + (tw - tab_text_w + 1) / 2 - 2,
             y + TAB_TEXT_Y,
-            tab_text_w + 4,
+            tw - 2 * ((tw - tab_text_w + 1) / 2 - 2) + 1,
             th + 2,
             x,
             y,
