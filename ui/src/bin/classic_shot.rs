@@ -44,7 +44,12 @@ fn main() -> Result<(), String> {
             }
             "coach" => app.coach = v.clone(),
             "page" => {
-                app.main.page = Some(Page::ALL[v.parse::<usize>().map_err(|e| e.to_string())?])
+                app.main.page = Some(match v.as_str() {
+                    "sell" => Page::Sell,
+                    "contract" => Page::Contract,
+                    "message" => Page::Message,
+                    n => Page::ALL[n.parse::<usize>().map_err(|e| e.to_string())?],
+                })
             }
             "select" => app.main.selected = v.parse().ok(),
             "plan" => {
@@ -103,6 +108,8 @@ fn main() -> Result<(), String> {
                     app.frame();
                 }
             }
+            "open" => elifoot_ui::classic::dialogs::market::open_by_name(&mut app, v)?,
+            "registered" => app.main.market.registered = v != "0",
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }

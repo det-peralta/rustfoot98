@@ -44,3 +44,20 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
 
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs.
+
+## Market dialogs (`dialogs/market.rs`)
+* **Pages of the main window** (`Page::Sell`, `Contract`, `Message`; state in `MainState::market`): Jogador > Vender (`Vender1Click`) checks `World::sale_blocker`
+  (original sentences from the data segment, `sale_blocker_text`) and shows the reason on the Mensagem page, otherwise the Vender page (`textSellPrice` in
+  thousands, empty = any price) whose button runs `World::human_sell` and shows the auction dialog with its result (`Vendido ao X por Y` / `Não houve ofertas`).
+  `ChangeSalaryBtn` opens Contrato for a player who is not `fresh` (spin from `50 G` to `50 000 G`); `Propôr` -> `World::human_propose_wage`: a wage above
+  80 % of the player's value is accepted, otherwise `TASKMORESALARYDLG` shows his demand (`1.25 * value` in steps of `50 G`): Sim sets wage and `fresh`, Não puts him
+  up for auction at any price; when the club may not sell him only OK. A player nobody bid for cannot be offered again until the next game (`World::sell_tried`).
+* **Auction** (`TSELLPLAYERDLG`, `auction_dialog`, `queue_auctions`): one dialog per open listing of `World::board` that the user can take part in
+  (`listing_open_to_user`), queued by `matchday::end_of_round`; the offer is in thousands; OK -> `World::human_bid`. The form needs `@client` 4 px larger than declared.
+* **Search** (`TCHECKPLAYERDLG`, Jogador > Procurar): filters as in `1048:3223` (name, strength range, position, nationality, price range of `50 000 G`... and `Qualquer` = for sale,
+  not my team) through `World::search_players` (50 at most, sorted by name); **Equipa...** opens the squad viewer (`TPLANTELDLG`) on the player's club.
+  The viewer is also reached from the opponent page (button visible only when `MainState::market.registered`: the original hides it in unregistered copies, feature `0x10`),
+  buys with `human_buy` (the player arrives after the round) and toggles the observed state (`World::observe`, saved as `observed|club|player`, 15 at most).
+  **Lista** / Jogador > Jogadores sob observação opens `TOBSERVEDPLAYERSDLG` (Remover, Limpar, Equipa...).
+* Lists emit rows `a|b|c` with `<name>.cols` / `<name>.align`; combos use `lists[name]`, `<name>.sel`, `<name>.text`, `<name>.open`; hits `Name#i` for rows.
+* `classic_shot` options: `open=search|observed|plantel|auction|auction_demo|sell|contract|message`, `page=sell|contract|message`, `registered=1`.

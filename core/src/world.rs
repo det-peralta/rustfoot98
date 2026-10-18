@@ -1943,6 +1943,26 @@ impl World {
         Ok(())
     }
 
+    /// Whether the user can still take part in the auction at `listing` of the board (cash, squad and foreigner limits).
+    pub fn listing_open_to_user(&self, listing: usize) -> bool {
+        let Some(l) = self.board.get(listing) else {
+            return false;
+        };
+        let Some(seller) = self.find_club(&l.seller) else {
+            return false;
+        };
+        self.club_ref(seller)
+            .names
+            .iter()
+            .position(|n| *n == l.player)
+            .is_some_and(|idx| self.human_may_bid(seller, idx, l.ask))
+    }
+
+    /// Every club as `(division, index)` in master-list order (the outside pool is division 4).
+    pub fn all_clubs(&self) -> Vec<(usize, usize)> {
+        self.all_clubs_by_master()
+    }
+
     /// Where the club of that name is: `(division, index)`, the outside pool being division 4.
     pub fn find_club(&self, name: &str) -> Option<(usize, usize)> {
         self.all_clubs_by_master()

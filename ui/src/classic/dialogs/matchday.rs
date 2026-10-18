@@ -22,4 +22,6 @@ pub fn halftime(_c: &Classic) -> Dialog {
 }
 
 /// The round view is over: queue what the original shows next (coach changes, invitations, auctions, cup draw, end of season...).
-pub fn end_of_round(_c: &mut Classic) {}
+pub fn end_of_round(c: &mut Classic) {
+    super::market::queue_auctions(c);
+}

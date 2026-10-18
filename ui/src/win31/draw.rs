@@ -377,7 +377,19 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
         return;
     };
-    let w = n.int("Width", 0);
+    let mut w = n.int("Width", 0);
+    if cx
+        .texts
+        .get(&format!("{}.autosize", n.name))
+        .is_some_and(|v| v == "1")
+    {
+        // an AutoSize label that got a new caption shrinks or grows to it
+        w = caption(cx, n)
+            .split('\n')
+            .map(|l| font.width(l))
+            .max()
+            .unwrap_or(0);
+    }
     if let Some(b) = cx.color_of(n, "bgcolor") {
         fb.fill(x, y, w, n.int("Height", 0), b);
     }
@@ -477,11 +489,13 @@ fn bevel(fb: &mut Fb, n: &Node, x: i32, y: i32) {
 /// `TPanel`: face colour, an optional bevel and a centred caption.
 fn panel(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    let color = if n.flag("ParentColor", false) {
-        cx.bg
-    } else {
-        n.color("Color").unwrap_or(SILVER)
-    };
+    let color = cx.color_of(n, "bgcolor").unwrap_or_else(|| {
+        if n.flag("ParentColor", false) {
+            cx.bg
+        } else {
+            n.color("Color").unwrap_or(SILVER)
+        }
+    });
     fb.fill(x, y, w, h, color);
     let bw = n.int("BevelWidth", 1);
     let (outer, inner) = (
@@ -1075,9 +1089,15 @@ fn image(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
         return;
     };
     if let Some(b) = cx.skin.bitmap(form, name) {
-        for r in 0..b.h {
-            for c in 0..b.w {
-                let p = b.px[(r * b.w + c) as usize];
+        // `Stretch`: the bitmap is scaled to the control's size (nearest neighbour, as StretchBlt does for whole factors)
+        let (w, h) = if n.flag("Stretch", false) {
+            (n.int("Width", b.w), n.int("Height", b.h))
+        } else {
+            (b.w, b.h)
+        };
+        for r in 0..h {
+            for c in 0..w {
+                let p = b.px[((r * b.h / h) * b.w + c * b.w / w) as usize];
                 fb.set(x + c, y + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
             }
         }

@@ -16,6 +16,8 @@ pub struct MainState {
     pub selected: Option<usize>,
     /// The open menu: top-level index and the highlighted entry.
     pub menu: Option<(usize, Option<usize>)>,
+    /// The Vender, Contrato and Mensagem pages (see `dialogs/market.rs`).
+    pub market: super::dialogs::market::Pages,
 }
 
 /// The user's club as the main window shows it: with the line-up of the plan applied to the squad's statuses.
@@ -319,7 +321,6 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
             ((o.k * 10.0).round() as i32).clamp(0, 20).to_string(),
         );
         t("gaugeOpponentMoral.barcolor", "248,252,0".into());
-        t("opponentPlantelBtn.visible", "0".into());
     }
     if page == Page::Finances {
         let f = &club.fin;
@@ -358,6 +359,7 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         let price = c.world.money_ctx(d).price;
         t("textTicketPrice", format!("{price:.0} reais"));
     }
+    super::dialogs::market::page_texts(c, page, &mut texts);
     View { texts, lists }
 }
 
@@ -397,7 +399,7 @@ pub fn draw(c: &mut Classic) {
         ox,
         oy,
         bg: bgc,
-        focus: "",
+        focus: v.texts.get("@focus").map_or("", String::as_str),
         lists: &v.lists,
         hits: &hits,
     };

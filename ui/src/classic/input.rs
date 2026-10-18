@@ -201,6 +201,9 @@ impl Classic {
             }
             return;
         }
+        if dialogs::market::main_click(self, name) {
+            return;
+        }
         match name {
             "OKBtn" => self.play_round(),
             _ => {
@@ -212,6 +215,9 @@ impl Classic {
     }
 
     fn main_key(&mut self, k: Key, tops: &[menu::Top]) {
+        if self.main.menu.is_none() && dialogs::market::main_key(self, k) {
+            return;
+        }
         if let Some((open, hl)) = self.main.menu {
             let n = tops[open].entries.len();
             let step = |hl: Option<usize>, up: bool| {
@@ -315,11 +321,7 @@ impl Classic {
                 }
             }
             "jogoSair" | "Sairsemgravar1" => self.requests.push(Request::Quit),
-            "Vender1" => {
-                if self.main.selected.is_some() {
-                    self.main.page = Some(Page::Sell);
-                }
-            }
+            "Vender1" => dialogs::market::vender(self),
             _ => {
                 if let Some(d) = dialogs::open_for_menu(self, name) {
                     self.open(d);

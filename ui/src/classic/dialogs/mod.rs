@@ -48,6 +48,7 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::CoachProfile
         | Kind::TeamHistory
         | Kind::Invitation => coach::bind(c, d),
+        Kind::Other(n) if n == market::ASK_MORE_SALARY => market::bind(c, d),
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan | Kind::Other(_) => {
             misc::bind(c, d)
         }
@@ -83,6 +84,7 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::CoachProfile
         | Kind::TeamHistory
         | Kind::Invitation => coach::click(c, d, name),
+        Kind::Other(n) if n == market::ASK_MORE_SALARY => market::click(c, d, name),
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan | Kind::Other(_) => {
             misc::click(c, d, name)
         }
@@ -104,6 +106,7 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         | Kind::Observed
         | Kind::Auction
         | Kind::Plantel => market::key(c, d, key),
+        Kind::Other(n) if n == market::ASK_MORE_SALARY => market::key(c, d, key),
         Kind::SelectGame | Kind::CoachName => newgame::key(c, d, key),
         _ => None,
     }
@@ -118,12 +121,16 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
             matchday::tick(c, d, ms)
         }
         Kind::Standings | Kind::Calendar => tables::tick(c, d, ms),
+        Kind::Auction | Kind::Plantel => market::tick(c, d, ms),
         _ => Outcome::Keep,
     }
 }
 
 /// The dialog a menu entry opens (`name` is the entry's control name in `TPREPAREGAMEDLG`).
 pub fn open_for_menu(c: &Classic, name: &str) -> Option<Dialog> {
+    if let Some(d) = market::open_for(c, name) {
+        return Some(d);
+    }
     let (kind, form) = match name {
         "Acerca1" => (Kind::About, "TABOUTDLG"),
         "opcoesElifoot" => (Kind::Options, "TOPTIONSDLG"),
@@ -151,6 +158,9 @@ pub fn open_for_menu(c: &Classic, name: &str) -> Option<Dialog> {
 
 /// The dialog a button of the main window opens.
 pub fn open_for_button(c: &Classic, name: &str) -> Option<Dialog> {
+    if let Some(d) = market::open_for(c, name) {
+        return Some(d);
+    }
     let (kind, form) = match name {
         "opponentCalendarBtn" => (Kind::Calendar, "TPRINTLISTDLG"),
         "opponentPlantelBtn" => (Kind::Plantel, "TPLANTELDLG"),
