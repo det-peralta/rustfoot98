@@ -1063,13 +1063,48 @@ impl World {
         Ok(fee)
     }
 
+    /// `3e9c`: the most overpaid (stored wage / value above 1.2) and the most underpaid (below 0.8) player not yet marked
+    /// `fresh` are repriced to their current value and marked.
+    fn renegotiate_wages(&mut self, loc: (usize, usize)) {
+        let (e, g) = (self.economy, self.scale);
+        let club = self.club_mut(loc);
+        let f = club.fin.f;
+        let (mut cut, mut raise) = (None, None);
+        let (mut cut_best, mut raise_best) = (1.2f64, 0.8f64);
+        for (i, s) in club.slots.iter().enumerate() {
+            if s.fresh {
+                continue;
+            }
+            let v = player_value(s.strength, f, e, g);
+            let ratio = s.wage as f64 / v as f64;
+            if ratio > cut_best {
+                cut = Some(i);
+                cut_best = ratio;
+            }
+            if ratio < raise_best {
+                raise = Some(i);
+                raise_best = ratio;
+            }
+        }
+        for i in [cut, raise].into_iter().flatten() {
+            let s = &mut club.slots[i];
+            s.wage = player_value(s.strength, f, e, g);
+            s.fresh = true;
+        }
+    }
+
     /// `1010:3e9c` (and `3aad`) for one computer-managed club after a round: wage renegotiation, forced sale when broke, and
     /// the regular decision to put a player up for sale.
     fn club_after_round(&mut self, loc: (usize, usize), round: usize) {
-        if self.is_human(loc) {
+        let human = self.is_human(loc);
+        let (e, g) = (self.economy, self.scale);
+        if human {
+            // the user's wages are renegotiated by the computer (the coach options of the original ask whether to do so)
+            if round >= 2 && self.club_ref(loc).coach_games > 1 {
+                self.renegotiate_wages(loc);
+            }
             return;
         }
-        let (e, g) = (self.economy, self.scale);
         // `3aad` ends with the stadium: expand when it is full and the club can afford the works plus two wage bills
         {
             let club = self.club_mut(loc);
@@ -1086,30 +1121,8 @@ impl World {
         }
         // wages follow the player's value: the most overpaid and the most underpaid player (outside 0.8..1.2) are repriced
         if self.club_ref(loc).coach_games > 1 {
+            self.renegotiate_wages(loc);
             let club = self.club_mut(loc);
-            let f = club.fin.f;
-            let (mut cut, mut raise) = (None, None);
-            let (mut cut_best, mut raise_best) = (1.2f64, 0.8f64);
-            for (i, s) in club.slots.iter().enumerate() {
-                if s.fresh {
-                    continue;
-                }
-                let v = player_value(s.strength, f, e, g);
-                let ratio = s.wage as f64 / v as f64;
-                if ratio > cut_best {
-                    cut = Some(i);
-                    cut_best = ratio;
-                }
-                if ratio < raise_best {
-                    raise = Some(i);
-                    raise_best = ratio;
-                }
-            }
-            for i in [cut, raise].into_iter().flatten() {
-                let s = &mut club.slots[i];
-                s.wage = player_value(s.strength, f, e, g);
-                s.fresh = true;
-            }
             // a club that is broke sells its lowest-scoring player at any price
             if club.fin.cash < 0 {
                 if let Some(i) = crate::market::pick_for_sale(club) {

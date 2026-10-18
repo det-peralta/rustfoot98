@@ -1,0 +1,11 @@
+[package]
+name = "elifoot-ui-web"
+version = "0.1.0"
+edition = "2021"
+description = "WebAssembly build of the shared UI: frames come out as a command list that web/canvas.js replays on a <canvas>"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+elifoot-ui = { path = "../ui" }

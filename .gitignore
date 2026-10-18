@@ -24,3 +24,4 @@ target/
 
 # build output of the web demo
 web/elifoot_wasm.wasm
+web/elifoot_ui.wasm

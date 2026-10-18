@@ -141,6 +141,20 @@ try {
   await p.setInputFiles('#import-e98', { name: 'x.e98', mimeType: 'application/octet-stream', buffer: Buffer.alloc(200) });
   await p.waitForFunction(() => document.querySelector('#save-status').textContent.includes('Não foi possível'));
   check('bad e98 refused', (await p.textContent('#save-status')).includes('Não foi possível importar'));
+  // the shared UI compiled to wasm and drawn on a canvas
+  const q = await (await b.newContext({ viewport: { width: 900, height: 700 } })).newPage();
+  const qerr = [];
+  q.on('pageerror', (e) => qerr.push(String(e)));
+  await q.goto('http://127.0.0.1:8099/canvas.html', { waitUntil: 'networkidle' });
+  await q.waitForTimeout(500);
+  const lit = async () => q.evaluate(() => { const c = document.getElementById('c'); const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] + d[i + 1] + d[i + 2] > 300) n++; return n; });
+  const before = await lit();
+  check('canvas UI draws text', before > 2000, String(before));
+  await q.focus('#c'); await q.keyboard.press(' '); await q.waitForTimeout(300);
+  const after = await lit();
+  check('canvas UI reacts to the keyboard', after !== before, `${before} -> ${after}`);
+  await q.screenshot({ path: 'analysis/shots/web_canvas.png' });
+  check('canvas UI has no page errors', qerr.length === 0, qerr.join(' | '));
   check('no console errors', errors.length === 0, errors.join(' | '));
   await b.close();
 } finally { srv.kill(); }

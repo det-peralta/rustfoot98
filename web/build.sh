@@ -5,4 +5,7 @@ cd "$(dirname "$0")/.."
 cargo build --release --target wasm32-unknown-unknown -p elifoot-wasm
 cp target/wasm32-unknown-unknown/release/elifoot_wasm.wasm web/
 echo "built web/elifoot_wasm.wasm ($(wc -c < web/elifoot_wasm.wasm) bytes)"
+cargo build --release --target wasm32-unknown-unknown -p elifoot-ui-web
+cp target/wasm32-unknown-unknown/release/elifoot_ui_web.wasm web/elifoot_ui.wasm
+echo "built web/elifoot_ui.wasm ($(wc -c < web/elifoot_ui.wasm) bytes)"
 if [ "$1" = "serve" ]; then cd web && echo "http://localhost:8080" && python3 -m http.server 8080; fi

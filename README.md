@@ -18,6 +18,8 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/findings.md](docs/findings.md) | Facts established about the binary and file formats |
 | [docs/classes.md](docs/classes.md) | Delphi class table |
 | [docs/match-engine.md](docs/match-engine.md) | Verified match-engine rules |
+| [docs/ui-strategy.md](docs/ui-strategy.md) | UI architecture: shared immediate-mode screens, SDL2 / canvas back ends, SDL1->SDL2 notes |
+| [docs/decompilation-map.md](docs/decompilation-map.md) | Every function of the binary: unit, kind, named / documented, work queue |
 | [docs/season.md](docs/season.md) | Season structure: fixtures, rounds, standings, knock-out cup |
 | [docs/finance.md](docs/finance.md) | Economy index, player value, loans; transfer market map |
 | [docs/references.md](docs/references.md) | Third-party research (leads to verify) |
@@ -41,6 +43,9 @@ The computer-managed clubs trade players with each other (`core/src/market.rs`, 
 Native checks:
 `cargo test`, `cargo run --release -p elifoot-core --example sim|season|world`, and the browser smoke test
 `node tools/capture/web_test.mjs`.
+
+## Front ends
+The DOM page (`web/index.html`) is the most complete; the shared UI (`ui/`) runs on SDL2 (`cargo run -p elifoot-ui --features sdl --release`) and in the browser (`web/canvas.html`). See [docs/ui-strategy.md](docs/ui-strategy.md).
 
 ## Layout
 - `core/` pure Rust: formats, RNG, match engine, season, world.  `wasm/` C-ABI bindings.  `web/` the demo page.
