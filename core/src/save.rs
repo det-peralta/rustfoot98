@@ -116,7 +116,7 @@ impl World {
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
-                    "p|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+                    "p|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
                     clean(name),
                     slot.position,
                     slot.strength,
@@ -128,7 +128,8 @@ impl World {
                     0,
                     String::from_utf8_lossy(&slot.nat),
                     slot.wage,
-                    slot.fresh as u8
+                    slot.fresh as u8,
+                    slot.goals
                 ));
             }
         };
@@ -325,6 +326,7 @@ impl World {
                         slot.nat = code(nat);
                         slot.wage = f.get(11).and_then(|x| x.parse().ok()).unwrap_or(0);
                         slot.fresh = f.get(12).is_some_and(|x| *x == "1");
+                        slot.goals = f.get(13).and_then(|x| x.parse().ok()).unwrap_or(0);
                         slot.foreign = country_class(c.country, slot.nat);
                     }
                     c.slots.push(slot);

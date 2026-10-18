@@ -307,63 +307,9 @@ pub fn best_formation(slots: &[Slot]) -> Option<usize> {
     best.map(|(_, k)| k)
 }
 
-/// Stand-in for the auto line-up `1010:4b73` (its choice rule is not decoded): the formation whose starters have the
-/// largest total strength (ties go to the earlier entry of `FORMATIONS`), best players per position, a bench of one
-/// goalkeeper plus the four best remaining outfield players; unavailable players are out.
-pub fn auto_lineup(slots: &mut [Slot]) {
-    for s in slots.iter_mut() {
-        s.status = Status::Out;
-    }
-    let ranked = |slots: &[Slot], pos: u8| -> Vec<usize> {
-        let mut idx: Vec<usize> = (0..slots.len())
-            .filter(|&i| slots[i].position == pos && slots[i].available())
-            .collect();
-        idx.sort_by_key(|&i| std::cmp::Reverse(slots[i].strength));
-        idx
-    };
-    let by_pos: Vec<Vec<usize>> = (0..4).map(|p| ranked(slots, p)).collect();
-    let top = |pos: usize, n: usize| -> i32 {
-        by_pos[pos]
-            .iter()
-            .take(n)
-            .map(|&i| slots[i].strength as i32)
-            .sum()
-    };
-    let best = FORMATIONS
-        .iter()
-        .filter(|&&(d, m, a)| {
-            by_pos[1].len() >= d as usize
-                && by_pos[2].len() >= m as usize
-                && by_pos[3].len() >= a as usize
-        })
-        .max_by_key(|&&(d, m, a)| {
-            (
-                top(1, d as usize) + top(2, m as usize) + top(3, a as usize),
-                std::cmp::Reverse(FORMATIONS.iter().position(|&f| f == (d, m, a)).unwrap()),
-            )
-        })
-        .copied();
-    if let Some(&g) = by_pos[0].first() {
-        slots[g].status = Status::Starter;
-    }
-    let Some((d, m, a)) = best else { return };
-    for (pos, n) in [(1usize, d as usize), (2, m as usize), (3, a as usize)] {
-        for &i in by_pos[pos].iter().take(n) {
-            slots[i].status = Status::Starter;
-        }
-    }
-    if let Some(&g) = by_pos[0].get(1) {
-        slots[g].status = Status::Sub;
-    }
-    let mut rest: Vec<usize> = (0..slots.len())
-        .filter(|&i| {
-            slots[i].position != 0 && slots[i].status == Status::Out && slots[i].available()
-        })
-        .collect();
-    rest.sort_by_key(|&i| std::cmp::Reverse(slots[i].strength));
-    for &i in rest.iter().take(4) {
-        slots[i].status = Status::Sub;
-    }
+/// `1010:4388`: the computer's line-up (see `lineup.rs`); the squad list is shuffled and left in the final order.
+pub fn auto_lineup(rng: &mut DelphiRng, slots: &mut Vec<Slot>, names: &mut Vec<String>) {
+    crate::lineup::auto_lineup(rng, slots, names);
 }
 
 /// Two disjoint mutable references into one slice.
@@ -429,6 +375,7 @@ pub fn play_game(
     for (club, played) in [(&mut *home, &m.home), (&mut *away, &m.away)] {
         for (slot, p) in club.slots.iter_mut().zip(played.slots.iter()) {
             slot.rating = p.rating;
+            slot.goals = p.goals;
             slot.strength = p.strength;
             slot.ban = p.ban;
             slot.injured = p.injured;
@@ -461,7 +408,7 @@ pub fn play_round(
     for (i, c) in clubs.iter_mut().enumerate() {
         match plans.get(&i) {
             Some(plan) => apply_plan(&mut c.slots, plan),
-            None => auto_lineup(&mut c.slots),
+            None => auto_lineup(rng, &mut c.slots, &mut c.names),
         }
     }
     for (h, a) in fixtures(round) {
@@ -681,15 +628,17 @@ mod tests {
     }
 
     #[test]
-    fn auto_lineup_picks_a_442_with_a_bench() {
+    fn auto_lineup_names_eleven_and_a_bench_and_skips_the_injured() {
         let mut rng = DelphiRng::new(1);
         let mut slots = crate::matchsim::tests::squad(6, &mut rng);
+        let mut names: Vec<String> = (0..slots.len()).map(|i| format!("P{i}")).collect();
         slots[3].injured = 2; // an injured defender is never picked
-        auto_lineup(&mut slots);
+        let injured_name = names[3].clone();
+        auto_lineup(&mut rng, &mut slots, &mut names);
         assert_eq!(slots.iter().filter(|s| s.starter()).count(), 11);
-        // one injured player less: a goalkeeper plus the remaining outfield reserves
-        assert_eq!(slots.iter().filter(|s| s.status == Status::Sub).count(), 4);
-        assert_eq!(slots[3].status, Status::Out);
+        assert!(slots.iter().filter(|s| s.status == Status::Sub).count() >= 4);
+        let k = names.iter().position(|n| *n == injured_name).unwrap();
+        assert_eq!(slots[k].status, Status::Out);
     }
 
     fn named_division(prefix: &str, rng: &mut DelphiRng) -> Vec<Club> {
@@ -820,21 +769,6 @@ mod tests {
         // 4-4-2 is feasible, 6-4-0 is not (only five defenders in this squad)
         assert!(plan_for_formation(&slots, (4, 4, 2)).is_some());
         assert!(plan_for_formation(&slots, (6, 4, 0)).is_none());
-        // the automatic choice agrees with the best formation
-        let best = best_formation(&slots).unwrap();
-        let mut auto = slots.clone();
-        auto_lineup(&mut auto);
-        let plan = plan_for_formation(&slots, FORMATIONS[best]).unwrap();
-        let mut by_plan = slots.clone();
-        apply_plan(&mut by_plan, &plan);
-        let starters = |v: &Vec<Slot>| {
-            v.iter()
-                .enumerate()
-                .filter(|(_, s)| s.starter())
-                .map(|(i, _)| i)
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(starters(&auto), starters(&by_plan));
     }
 
     #[test]

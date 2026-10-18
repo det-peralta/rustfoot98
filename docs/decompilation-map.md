@@ -7,18 +7,18 @@ Counts are of functions Ghidra found (after `tools/ghidra/FixFunctions.java` add
 
 | segment | unit | kind | functions | bytes | named | documented |
 |---|---|---|---|---|---|---|
-| 1000 | EditorShell | application | 60 | 12145 | 47 | 0 |
-| 1008 | MainWindowAuction | application | 65 | 12328 | 32 | 4 |
-| 1010 | DomainCore | application | 211 | 52697 | 54 | 68 |
-| 1018 | PrepareGameDlg | application | 69 | 14509 | 62 | 0 |
-| 1020 | RoundFlow | application | 46 | 13658 | 21 | 11 |
-| 1028 | NewGameAndOptions | application | 64 | 11721 | 34 | 5 |
-| 1030 | SpinTimerStadiumLoan | application | 72 | 10540 | 24 | 0 |
-| 1038 | TabsPenalty | application | 73 | 10402 | 11 | 2 |
-| 1040 | NotebookEconomy | application | 52 | 8159 | 10 | 5 |
-| 1048 | JourneyPlantel | application | 60 | 12669 | 49 | 1 |
-| 1050 | CoachCupPenalties | application | 51 | 13347 | 17 | 3 |
-| 1058 | CountriesAndEditorData | application | 66 | 14581 | 3 | 2 |
+| 1000 | EditorShell | application | 60 | 12145 | 47 | 3 |
+| 1008 | MainWindowAuction | application | 65 | 12328 | 32 | 10 |
+| 1010 | DomainCore | application | 211 | 52697 | 55 | 88 |
+| 1018 | PrepareGameDlg | application | 69 | 14509 | 62 | 4 |
+| 1020 | RoundFlow | application | 46 | 13658 | 21 | 13 |
+| 1028 | NewGameAndOptions | application | 64 | 11721 | 34 | 11 |
+| 1030 | SpinTimerStadiumLoan | application | 72 | 10540 | 24 | 2 |
+| 1038 | TabsPenalty | application | 73 | 10402 | 13 | 4 |
+| 1040 | NotebookEconomy | application | 52 | 8159 | 10 | 9 |
+| 1048 | JourneyPlantel | application | 60 | 12669 | 49 | 5 |
+| 1050 | CoachCupPenalties | application | 51 | 13347 | 21 | 8 |
+| 1058 | CountriesAndEditorData | application | 66 | 14581 | 3 | 12 |
 | 1060 | Banner | VCL/RTL (library) | 45 | 12308 | 4 | 0 |
 | 1068 | EliObjectsMath | VCL/RTL (library) | 113 | 11583 | 18 | 8 |
 | 1070 | Gauge | VCL/RTL (library) | 20 | 3491 | 2 | 0 |
@@ -34,7 +34,7 @@ Counts are of functions Ghidra found (after `tools/ghidra/FixFunctions.java` add
 | 10c0 | SystemRtl | VCL/RTL (library) | 141 | 7492 | 29 | 5 |
 | 13e8 | Thunks | VCL/RTL (library) | 506 | 2024 | 0 | 0 |
 
-Application code: 889 functions, 186756 bytes, 364 named, 101 documented.
+Application code: 889 functions, 186756 bytes, 371 named, 169 documented.
 Library code (VCL, Delphi RTL, thunks): 2246 functions, 170662 bytes — replaced, not ported (see docs/ui-strategy.md).
 
 ## Work queue (application functions not yet named, by size and use of core helpers)
@@ -51,7 +51,6 @@ Library code (VCL, Delphi RTL, thunks): 2246 functions, 170662 bytes — replace
 | `1010:3277` | 1251 |  |
 | `1040:299e` | 1247 |  |
 | `1000:0080` | 1189 |  |
-| `1038:328b` | 1183 |  |
 | `1010:c25e` | 1132 |  |
 | `1058:228c` | 1056 |  |
 | `1050:3938` | 977 |  |
@@ -60,7 +59,6 @@ Library code (VCL, Delphi RTL, thunks): 2246 functions, 170662 bytes — replace
 | `1010:879d` | 950 |  |
 | `1058:32a5` | 899 |  |
 | `1058:19de` | 853 |  |
-| `1010:4b73` | 848 |  |
 | `1010:cbd3` | 844 |  |
 | `1030:330e` | 816 |  |
 | `1010:d83a` | 815 |  |
@@ -121,3 +119,5 @@ Library code (VCL, Delphi RTL, thunks): 2246 functions, 170662 bytes — replace
 | `1028:25cc` | 444 |  |
 | `1028:2951` | 429 |  |
 | `1038:2024` | 428 |  |
+| `1038:1e7d` | 423 |  |
+| `1038:1ce4` | 409 |  |

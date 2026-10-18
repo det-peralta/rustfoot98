@@ -42,8 +42,7 @@
 
 ## Assumed in the Rust port (`core/src/season.rs`)
 (3-1-0 points, morale and promotion/relegation are now verified and implemented.)
-- **4-4-2 auto line-up** — the original (`1010:4b73`) chooses a formation; ours is a stand-in.
-- **Auto line-up**: the strongest of the game's twelve formations (`FORMATIONS`, verified from the menu) by total strength; the original's rule (`1010:4b73`) is not decoded. Real squads are uneven (e.g. 3 defenders), so a fixed 4-4-2 does not work.
+- **Auto line-up**: decoded and ported (`lineup.rs`, see `match-engine.md`); the user's *default* plan uses the same rule, formations stay selectable.
 - Ranks for evolution are taken after the round's results (the original sorts at `0c41` start; order not confirmed).
 
 ## What the simulation shows (`cargo run --release -p elifoot-core --example season -- 12 2000`)

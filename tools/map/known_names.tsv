@@ -116,3 +116,10 @@
 1050:114d	Timer1Timer_PenaltyKick
 1050:1f88	GoalkeeperComparer
 1058:0a2f	CountryClass
+1010:4b73	SelectPlayers
+1050:1958	CompareStrengthPlusGoals
+1050:18d7	CompareGoals
+1050:201d	CompareAttackForce
+1038:39b6	PrimaryChance
+1038:328b	PrimaryChanceDialog
+1050:1a61	ComparePoints

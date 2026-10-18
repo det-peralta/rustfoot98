@@ -273,6 +273,7 @@ impl Match {
             if let Some((player, primary)) = hit {
                 let position = self.team(side).slots[player].position;
                 self.team_mut(side).goals += 1;
+                self.team_mut(side).slots[player].goals += 1;
                 self.events.push(Event {
                     minute: m,
                     side,
@@ -441,6 +442,7 @@ impl Match {
                 let t = self.team_mut(last.side);
                 t.annulled += 1;
                 t.goals -= 1;
+                t.slots[last.player].goals = t.slots[last.player].goals.saturating_sub(1);
                 self.events.last_mut().unwrap().kind = EventKind::Annulled;
             }
         }

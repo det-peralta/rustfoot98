@@ -462,11 +462,36 @@ impl World {
 
     /// Makes `club` of `division` the user's club with the automatic line-up.
     pub fn set_human(&mut self, division: usize, club: usize) {
-        let c = &self.divisions[division][club];
-        let formation = best_formation(&c.slots).unwrap_or(0);
-        let plan = plan_for_formation(&c.slots, FORMATIONS[formation]).unwrap_or_default();
+        let c = &mut self.divisions[division][club];
+        // the default line-up is the computer's own selection (`lineup.rs`), without reordering the squad
+        let mut probe = c.slots.clone();
+        crate::lineup::default_statuses(&mut probe);
+        let with = |st: Status| -> Vec<usize> {
+            (0..probe.len())
+                .filter(|&k| probe[k].status == st)
+                .collect()
+        };
+        let (starters, bench) = (with(Status::Starter), with(Status::Sub));
+        let count = |pos: u8| {
+            starters
+                .iter()
+                .filter(|&&k| probe[k].position == pos)
+                .count() as u8
+        };
+        let shape = (count(1), count(2), count(3));
+        let formation = FORMATIONS
+            .iter()
+            .position(|&f| f == shape)
+            .or_else(|| best_formation(&c.slots))
+            .unwrap_or(0);
+        let plan = Plan {
+            starters,
+            bench,
+            subs: Vec::new(),
+        };
+        let name = c.name.clone();
         self.human = Some(Human {
-            club: c.name.clone(),
+            club: name,
             formation,
             plan,
         });
@@ -1024,19 +1049,21 @@ impl World {
             let placeholder = || Club::new("", Vec::new());
             let mut home = std::mem::replace(self.club_at(hl), placeholder());
             let mut away = std::mem::replace(self.club_at(al), placeholder());
-            let plan_of = |c: &mut Club| -> Option<Plan> {
+            let rng = &mut self.rng;
+            let mut plan_of = |c: &mut Club| -> Option<Plan> {
                 match &plan {
                     Some((club, p)) if *club == c.name => {
                         apply_plan(&mut c.slots, p);
                         Some(p.clone())
                     }
                     _ => {
-                        auto_lineup(&mut c.slots);
+                        auto_lineup(rng, &mut c.slots, &mut c.names);
                         None
                     }
                 }
             };
-            let (hp, ap) = (plan_of(&mut home), plan_of(&mut away));
+            let hp = plan_of(&mut home);
+            let ap = plan_of(&mut away);
             let attendance = finance::attendance(
                 &mut self.rng,
                 finance::rating(&home.slots),

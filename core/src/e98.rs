@@ -33,6 +33,13 @@ pub struct E98Player {
     /// Stored wage (`+0x31`) and the "fresh" flag (`+0x16`).
     pub wage: i64,
     pub fresh: bool,
+    /// Goals scored (`+0x14`).
+    pub goals: u16,
+    /// `slot+0x10`: 0 out, 1 starter, 2 substitute.
+    pub status: u8,
+    /// Games of suspension and injury left (`+0x27`, `+0x29`).
+    pub ban: u8,
+    pub injured: u8,
 }
 
 #[derive(Clone, Debug)]
@@ -168,6 +175,10 @@ fn player_at(d: &[u8], o: usize) -> Option<(E98Player, u16, usize)> {
             strength,
             wage: i32::from_le_bytes([tail[25], tail[26], tail[27], tail[28]]) as i64,
             fresh: tail[14] != 0,
+            goals: u16::from_le_bytes([tail[12], tail[13]]),
+            status: tail[8],
+            ban: tail[15],
+            injured: tail[19],
         },
         id,
         o3 + 48,
@@ -370,6 +381,14 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
             s.foreign = country_class(code(&t.country), s.nat);
             s.wage = p.wage;
             s.fresh = p.fresh;
+            s.goals = p.goals;
+            s.ban = p.ban;
+            s.injured = p.injured;
+            s.status = match p.status {
+                1 => Status::Starter,
+                2 => Status::Sub,
+                _ => Status::Out,
+            };
             s
         })
         .collect();
@@ -510,6 +529,46 @@ mod tests {
                 assert_eq!(human.fin.cash, 1_216_448);
                 assert_eq!(human.fin.gate, 47_448);
                 assert_eq!(human.fin.wages, -81_000);
+            }
+            if name == "snap2.e98" {
+                // the computer's line-up rule reproduces the saved statuses of the clubs (list order = the saved order)
+                let (mut ok, mut total) = (0, 0);
+                for idx in divs.iter() {
+                    for &i in idx {
+                        let t = &save.teams[i];
+                        if t.players.iter().all(|p| p.status == 0) {
+                            continue;
+                        }
+                        let mut slots: Vec<Slot> = t
+                            .players
+                            .iter()
+                            .map(|p| {
+                                let mut s =
+                                    Slot::new(&p.name, p.position, p.strength, true, Status::Out);
+                                s.goals = p.goals;
+                                s.ban = p.ban;
+                                s.injured = p.injured;
+                                s
+                            })
+                            .collect();
+                        crate::lineup::default_statuses(&mut slots);
+                        let want: Vec<u8> = t.players.iter().map(|p| p.status).collect();
+                        let got: Vec<u8> = slots
+                            .iter()
+                            .map(|s| match s.status {
+                                Status::Out => 0,
+                                Status::Starter => 1,
+                                Status::Sub => 2,
+                            })
+                            .collect();
+                        total += 1;
+                        ok += (want == got) as usize;
+                    }
+                }
+                assert!(
+                    total >= 28 && ok + 1 >= total,
+                    "line-up rule matched {ok} of {total} clubs"
+                );
             }
             let (d, _) = w.human_location().unwrap();
             assert_eq!(d, 3, "Figueirense starts in the fourth division");

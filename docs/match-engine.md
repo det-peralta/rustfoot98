@@ -37,7 +37,7 @@ three hidden attributes that are **deterministic functions of the player's name*
 - **Attacker force** (`818c`): `round_half_even((position+1) * strength * (g/10 + 1) / 2)`.
 - **Shooter for AI chances**: starter with the highest force (ties -> later slot; `0ee6` + comparer `201d`).
 - **Defender**: starter with the lowest position, i.e. the goalkeeper, strongest on ties (`0ee6` + comparer `1f88`).
-- **Auto line-up** (`4b73`): `team+0x4d` (substitutions left) = `min(3, fit substitutes)`.
+- **Auto line-up** (`4388` -> `4b73`, `core/src/lineup.rs`, verified on 28 of 29 clubs of a real save — the 29th had signed two players after its line-up was built): shuffle the squad list (3n remove-and-append moves), then two selection passes over the list ranked by `strength + goals scored` (`1050:1958`, stable bubble sort `1068:0e0d`): quotas GK 1 / DEF 3 / MID 3 / ATT 2 without a bench, then GK 1 / 10 / 10 / 10 with the bench, which completes the eleven (ten outfield players at most) with the best remaining players of any position and names one reserve goalkeeper plus outfield reserves up to five. Injured and suspended players are skipped. Substitutions allowed = `min(3, bench)` (`team+0x4d`).
 
 ## Weighted roulette — `1010:100b(kind, mode, squad)` (scorers, cards, injuries)
 Weights (`0f2e`): kind 1 `strength`; **kind 2 `position² × strength × g`** (scorer); kind 3 aggression; kind 4 proneness.
@@ -153,7 +153,7 @@ For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)
 - Identity of the two strings fed to `c95c` (division/country name vs a team string); the formula itself is decoded.
 - Role of the global `Real` at `10c8:2b46` that `0c41` random-walks every round (likely a finance/economy index).
 - Half-time (minute 45) and extra-time (minute 90 -> 120) routines; the penalty shoot-out UI path; human-controlled chance path (`1038:328b`).
-- Where `division.base` (division `+4`) comes from, and the auto line-up formation choice in `1010:4b73`.
+- Where `division.base` (division `+4`) comes from.
 - Season calendar generation, standings, finances (`1010:6e48` and the `+0x71..+0x79` team fields), transfers.
 
 ## Minute loop — `1048:069b`

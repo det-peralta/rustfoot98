@@ -75,6 +75,8 @@ pub struct Slot {
     pub fresh: bool,
     /// `+0x35`: 0 same country as the club, 1 same country group (Bosman / PLOP), 2 foreigner.
     pub foreign: u8,
+    /// Goals scored (`+0x14`), counted in the line-up ranking `strength + goals`.
+    pub goals: u16,
 }
 
 impl Slot {
@@ -101,6 +103,7 @@ impl Slot {
             wage: 0,
             fresh: false,
             foreign: if same_country { 0 } else { 2 },
+            goals: 0,
         }
     }
 
@@ -199,6 +202,7 @@ mod tests {
             wage: 0,
             fresh: false,
             foreign: 0,
+            goals: 0,
         }
     }
     const S: Status = Status::Starter;
