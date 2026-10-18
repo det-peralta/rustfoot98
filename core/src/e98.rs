@@ -1,18 +1,9 @@
 //! Reader for the original game's `.e98` saves (`JOGOS\*.e98`), and the import into a [`World`].
 //!
-//! Only part of the format is decoded (see `docs/findings.md`): what is read here was verified on two real saves (a new game
-//! and the same game after two rounds). Not decoded yet and therefore *not* imported: injuries and bans, the finances,
-//! the cup, the fixture results. The imported world starts a fresh cup.
-//!
-//! Layout of what is used, found by scanning for the `EFa` + zeros anchor that opens every team record:
-//! - header: double-delta pstr (save description), `u16` id of the first human club at `0x1f`, `u16` year at `0x24`,
-//!   the economy index as an extended at `0x28`;
-//! - a coach table near the start (one row per team plus the two human managers) that is not needed here;
-//! - per team: `u16` team id, the `.EFT` header (names, colours, country), `level u8`, `wins, draws, losses, goals for,
-//!   goals against, points` as `u16`, the 14 opponent positions, 57 bytes later the morale `K` (Real48), then the squad: per
-//!   player `u16 id, nat pstr, name pstr` + 48 bytes (`+0` position, `+2` strength `u16`);
-//! - league teams (the first 32 of the master list) end with a count (14) and 14 fixture entries of 16 bytes whose `u16` value at `+0` is the
-//!   team id of the opponent. Clubs that play each other form one division.
+//! The whole file is walked with the structure of the original loader (`1020:1d8d`; layout in `docs/e98-format.md`) and
+//! must be consumed to the last byte, which was checked on real saves. Imported: rosters (status, goals, bans, injuries,
+//! wages), standings, morale `K`, finances, the cup entrants and the division lists. Skipped (read but unused): the
+//! coach/event tables, the played-round records and the news lists.
 use crate::cipher::read_pstr_n;
 use crate::economy::DEFAULT_SCALE;
 use crate::finance::Finance;
@@ -74,9 +65,11 @@ pub struct E98 {
     pub economy: f64,
     pub human_id: u16,
     pub teams: Vec<E98Team>,
+    /// Ids of the clubs in the cup draw (`26f2`).
+    pub cup: Vec<u16>,
+    /// Division lists as saved: name and club ids (the fifth is the pool of unemployed-coach clubs).
+    pub divisions: Vec<(String, Vec<u16>)>,
 }
-
-const ANCHOR_ZEROS: usize = 20;
 
 fn u16_at(d: &[u8], o: usize) -> Option<u16> {
     Some(u16::from_le_bytes([*d.get(o)?, *d.get(o + 1)?]))
@@ -120,71 +113,126 @@ pub fn real48(b: &[u8]) -> f64 {
     }
 }
 
-fn anchors(d: &[u8]) -> Vec<usize> {
-    let mut out = Vec::new();
-    let mut pat = b"EFa".to_vec();
-    pat.extend(std::iter::repeat_n(0u8, ANCHOR_ZEROS));
-    let mut o = 0;
-    while o + pat.len() <= d.len() {
-        if d[o..o + pat.len()] == pat[..] {
-            out.push(o);
-            o += pat.len();
-        } else {
-            o += 1;
-        }
-    }
-    out
+/// Byte cursor over the save; every read is bounds-checked.
+struct Cur<'a> {
+    d: &'a [u8],
+    o: usize,
 }
 
-/// Tries to read a player record at `o`: `(player, id, end of the record)`.
-fn player_at(d: &[u8], o: usize) -> Option<(E98Player, u16, usize)> {
-    let id = u16_at(d, o)?;
-    if *d.get(o + 2)? != 3 {
-        return None;
+impl<'a> Cur<'a> {
+    fn raw(&mut self, n: usize) -> Result<&'a [u8], String> {
+        let r = self
+            .d
+            .get(self.o..self.o + n)
+            .ok_or_else(|| format!("truncated save at {:#x}", self.o))?;
+        self.o += n;
+        Ok(r)
     }
-    let (nat, o2) = read_pstr_n(d, o + 2, false)?;
-    if !(nat.len() == 3 && nat.chars().all(|c| c.is_ascii_uppercase())) {
-        return None;
+    fn u8(&mut self) -> Result<u8, String> {
+        Ok(self.raw(1)?[0])
     }
-    let len = *d.get(o2)? as usize;
-    if !(1..=30).contains(&len) {
-        return None;
+    fn u16(&mut self) -> Result<u16, String> {
+        let b = self.raw(2)?;
+        Ok(u16::from_le_bytes([b[0], b[1]]))
     }
-    let (name, o3) = read_pstr_n(d, o2, false)?;
-    if name.is_empty()
-        || !name
-            .chars()
-            .all(|c| c.is_alphabetic() || matches!(c, ' ' | '.' | '\'' | '-'))
-    {
-        return None;
+    fn pstr(&mut self) -> Result<String, String> {
+        let (s, o) = read_pstr_n(self.d, self.o, false).ok_or("truncated string")?;
+        self.o = o;
+        Ok(s)
     }
-    let tail = d.get(o3..o3 + 48)?;
-    if tail[0] > 3 {
-        return None;
+    fn list<T>(
+        &mut self,
+        mut f: impl FnMut(&mut Self) -> Result<T, String>,
+    ) -> Result<Vec<T>, String> {
+        let n = self.u16()?;
+        (0..n).map(|_| f(self)).collect()
     }
-    let strength = u16::from_le_bytes([tail[2], tail[3]]);
-    if !(1..=60).contains(&strength) {
-        return None;
-    }
-    Some((
-        E98Player {
-            id,
-            nationality: nat,
-            name,
-            position: tail[0],
-            strength,
-            wage: i32::from_le_bytes([tail[25], tail[26], tail[27], tail[28]]) as i64,
-            fresh: tail[14] != 0,
-            goals: u16::from_le_bytes([tail[12], tail[13]]),
-            status: tail[8],
-            ban: tail[15],
-            injured: tail[19],
-        },
+}
+
+fn long(b: &[u8], at: usize) -> i64 {
+    i32::from_le_bytes([b[at], b[at + 1], b[at + 2], b[at + 3]]) as i64
+}
+
+fn player(c: &mut Cur) -> Result<E98Player, String> {
+    let id = c.u16()?;
+    let nat = c.pstr()?;
+    let name = c.pstr()?;
+    let tail = c.raw(48)?;
+    Ok(E98Player {
         id,
-        o3 + 48,
-    ))
+        nationality: nat,
+        name,
+        position: tail[0],
+        strength: u16::from_le_bytes([tail[2], tail[3]]),
+        wage: long(tail, 25),
+        fresh: tail[14] != 0,
+        goals: u16::from_le_bytes([tail[12], tail[13]]),
+        status: tail[8],
+        ban: tail[15],
+        injured: tail[19],
+    })
 }
 
+fn team(c: &mut Cur) -> Result<E98Team, String> {
+    let id = c.u16()?;
+    // the .EFT object: 50-byte anchor, full and short name, colours, country, level
+    c.raw(50)?;
+    let full_name = c.pstr()?;
+    let short_name = c.pstr()?;
+    c.raw(8)?;
+    let country = c.pstr()?;
+    let level = c.u8()?;
+    let block = c.raw(0x37)?; // standings, ledger (+0x16..)
+    c.raw(14)?;
+    let k = real48(c.raw(6)?);
+    let k = if (0.3..=11.0).contains(&k) { k } else { 1.0 };
+    c.raw(2 + 28 + 28)?; // coach id and two blocks of 28 bytes
+    let money = c.raw(4 + 4 + 4 + 10)?; // loan, cash, start-of-season cash, F
+    let factor = extended(&money[12..22]);
+    let factor = if (0.1..=10.0).contains(&factor) {
+        factor
+    } else {
+        1.0
+    };
+    c.raw(6 + 4 + 2 + 2)?;
+    let w = |k: usize| u16::from_le_bytes([block[2 * k], block[1 + 2 * k]]);
+    let ledger = [
+        long(block, 0x31 - 0x16),
+        long(block, 0x35 - 0x16),
+        long(block, 0x39 - 0x16),
+        long(block, 0x41 - 0x16),
+    ];
+    let players = c.list(player)?;
+    c.list(|c| c.raw(7).map(|_| ()))?;
+    c.list(|c| c.raw(8).map(|_| ()))?;
+    let opponents = c.list(|c| {
+        let e = c.raw(16)?;
+        Ok(u16::from_le_bytes([e[0], e[1]]))
+    })?;
+    c.raw(1 + 6)?; // stadium level and fill
+    Ok(E98Team {
+        id,
+        full_name,
+        short_name,
+        country,
+        level,
+        wins: w(0),
+        draws: w(1),
+        losses: w(2),
+        goals_for: w(3),
+        goals_against: w(4),
+        points: w(5),
+        k,
+        cash: long(money, 4),
+        loan: long(money, 0),
+        factor,
+        ledger,
+        players,
+        opponents,
+    })
+}
+
+/// Reads a whole save following the original loader (`1020:1d8d`, see `docs/e98-format.md`); the file must be consumed exactly.
 pub fn parse(d: &[u8]) -> Result<E98, String> {
     let (description, _) = read_pstr_n(d, 0, true).ok_or("truncated header")?;
     let year = u16_at(d, 0x24).ok_or("truncated header")?;
@@ -192,104 +240,46 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     if !(1990..=2100).contains(&year) {
         return Err(format!("not an Elifoot 98 save (year field reads {year})"));
     }
-    let a = anchors(d);
-    if a.len() < 34 {
-        return Err(format!("only {} team records found; not a save", a.len()));
+    let mut c = Cur { d, o: 0 };
+    let n = c.u8()? as usize;
+    c.raw(n + 2 + 2 + 1 + 2 + 4 + 10 + 10 + 101)?;
+    c.list(|c| {
+        c.raw(2)?;
+        c.pstr()?;
+        c.raw(1 + 1 + 2 + 4 + 4 + 5)?;
+        c.list(|c| c.raw(7).map(|_| ()))?;
+        Ok(())
+    })?;
+    c.list(|c| {
+        c.raw(3)?;
+        c.pstr()?;
+        c.pstr()?;
+        Ok(())
+    })?;
+    let teams = c.list(team)?;
+    let cup = c.list(|c| c.u16())?;
+    let divisions = c.list(|c| {
+        c.raw(4 + 2)?;
+        let b = c.raw(21)?;
+        let name = String::from_utf8_lossy(&b[1..1 + (b[0] as usize).min(20)]).into_owned();
+        Ok((name, c.list(|c| c.u16())?))
+    })?;
+    c.list(|c| {
+        c.raw(1 + 41 + 2 + 2 + 10 + 4 + 2 + 2 + 2 + 1)?;
+        Ok(())
+    })?;
+    while c.u16()? != 0 {
+        c.list(|c| c.u16())?;
     }
-
-    let ids: Vec<u16> = a
-        .iter()
-        .filter_map(|&p| u16_at(d, p.wrapping_sub(2)))
-        .collect();
-
-    let mut teams = Vec::new();
-    for (i, &p) in a.iter().enumerate() {
-        let end = a.get(i + 1).copied().unwrap_or(d.len());
-        let id = u16_at(d, p.wrapping_sub(2)).ok_or("truncated team")?;
-        let (full_name, o) = read_pstr_n(d, p + 0x32, false).ok_or("bad team name")?;
-        let (short_name, o) = read_pstr_n(d, o, false).ok_or("bad team name")?;
-        let (country, o) = read_pstr_n(d, o + 8, false).ok_or("bad country")?;
-        let stats = d.get(o..o + 13).ok_or("truncated team")?;
-        let w = |k: usize| u16::from_le_bytes([stats[1 + 2 * k], stats[2 + 2 * k]]);
-        let level = stats[0];
-        // morale K: Real48, 57 bytes after the 14 opponent positions that follow the standings
-        let ko = o + 13 + 14 + 43;
-        let k = d.get(ko..ko + 6).map(real48).unwrap_or(1.0);
-        let k = if (0.3..=11.0).contains(&k) { k } else { 1.0 };
-
-        // finances: ledger longs inside the standings block, then cash, loan and F after the morale and the coach id
-        let long = |at: usize| -> i64 {
-            d.get(at..at + 4)
-                .map(|b| i32::from_le_bytes([b[0], b[1], b[2], b[3]]) as i64)
-                .unwrap_or(0)
-        };
-        let ledger = [
-            long(o + 0x31 - 0x15),
-            long(o + 0x35 - 0x15),
-            long(o + 0x39 - 0x15),
-            long(o + 0x41 - 0x15),
-        ];
-        let fo = ko + 6 + 2 + 28 + 28;
-        let (loan, cash) = (long(fo), long(fo + 4));
-        let factor = d.get(fo + 12..fo + 22).map(extended).unwrap_or(1.0);
-        let factor = if (0.1..=10.0).contains(&factor) {
-            factor
-        } else {
-            1.0
-        };
-
-        // squad: scan forward for a run of player records
-        let mut players = Vec::new();
-        let mut q = ko + 6;
-        let mut last_end = q;
-        while q < end {
-            if let Some((pl, _, e)) = player_at(d, q) {
-                players.push(pl);
-                q = e;
-                last_end = e;
-            } else if players.is_empty() {
-                q += 1;
-            } else {
-                break;
-            }
-        }
-        if players.is_empty() {
-            return Err(format!("{short_name}: no players found"));
-        }
-
-        // fixture list: count 14, then 16-byte entries
-        let mut opponents = Vec::new();
-        for s in last_end..(last_end + 32).min(end) {
-            if u16_at(d, s) == Some(14) {
-                let vals: Vec<u16> = (0..14).map_while(|j| u16_at(d, s + 2 + 16 * j)).collect();
-                if vals.len() == 14 && vals.iter().all(|v| ids.contains(v)) {
-                    opponents = vals;
-                    break;
-                }
-            }
-        }
-        teams.push(E98Team {
-            id,
-            full_name,
-            short_name,
-            country,
-            level,
-            wins: w(0),
-            draws: w(1),
-            losses: w(2),
-            goals_for: w(3),
-            goals_against: w(4),
-            points: w(5),
-            k,
-            cash,
-            loan,
-            factor,
-            ledger,
-            players,
-            opponents,
-        });
+    c.list(|c| c.raw(10).map(|_| ()))?;
+    c.list(|c| c.raw(12).map(|_| ()))?;
+    if c.o != d.len() {
+        return Err(format!("{} unread bytes after the save", d.len() - c.o));
     }
-    let economy = d.get(0x28..0x32).map(extended).unwrap_or(0.0);
+    if teams.len() < 33 {
+        return Err(format!("only {} team records; not a save", teams.len()));
+    }
+    let economy = extended(&d[0x28..0x32]);
     let economy = if (0.5..=10.0).contains(&economy) {
         economy
     } else {
@@ -301,12 +291,13 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         economy,
         human_id,
         teams,
+        cup,
+        divisions,
     })
 }
 
 impl E98 {
-    /// Splits the league teams into four divisions: clubs that appear in each other's fixture lists form a group; groups are
-    /// ranked by mean player strength (division 1 is the strongest). Returns indices into `teams`.
+    /// The four divisions as indices into `teams`, from the save's own division lists (sorted by club id).
     pub fn divisions(&self) -> Result<[Vec<usize>; 4], String> {
         let by_key: HashMap<u16, usize> = self
             .teams
@@ -314,53 +305,16 @@ impl E98 {
             .enumerate()
             .map(|(i, t)| (t.id, i))
             .collect();
-        let league: Vec<usize> = (0..self.teams.len())
-            .filter(|&i| !self.teams[i].opponents.is_empty())
-            .collect();
-        if league.len() != 32 {
-            return Err(format!("expected 32 league clubs, found {}", league.len()));
+        let mut out: [Vec<usize>; 4] = Default::default();
+        for (k, (_, ids)) in self.divisions.iter().take(4).enumerate() {
+            let mut v: Vec<usize> = ids.iter().filter_map(|i| by_key.get(i).copied()).collect();
+            v.sort_by_key(|&i| self.teams[i].id);
+            out[k] = v;
         }
-        let mut groups: Vec<Vec<usize>> = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        for &i in &league {
-            if !seen.insert(i) {
-                continue;
-            }
-            let mut group = vec![i];
-            let mut stack = vec![i];
-            while let Some(x) = stack.pop() {
-                for k in &self.teams[x].opponents {
-                    if let Some(&j) = by_key.get(k) {
-                        if seen.insert(j) {
-                            group.push(j);
-                            stack.push(j);
-                        }
-                    }
-                }
-            }
-            groups.push(group);
+        if out.iter().any(|g| g.len() != 8) {
+            return Err("the save does not hold four divisions of eight".into());
         }
-        if groups.len() != 4 || groups.iter().any(|g| g.len() != 8) {
-            return Err("the fixture lists do not form four divisions of eight".into());
-        }
-        let mean = |g: &Vec<usize>| -> f64 {
-            let (s, n) = g
-                .iter()
-                .flat_map(|&i| &self.teams[i].players)
-                .fold((0.0, 0.0), |(s, n), p| (s + p.strength as f64, n + 1.0));
-            s / n
-        };
-        groups.sort_by(|a, b| mean(b).total_cmp(&mean(a)));
-        for g in &mut groups {
-            g.sort_by_key(|&i| self.teams[i].id);
-        }
-        let mut it = groups.into_iter();
-        Ok([
-            it.next().unwrap(),
-            it.next().unwrap(),
-            it.next().unwrap(),
-            it.next().unwrap(),
-        ])
+        Ok(out)
     }
 }
 
@@ -506,6 +460,8 @@ mod tests {
                 save.economy
             );
             assert_eq!(save.teams.len(), 52);
+            assert_eq!(save.cup.len(), 52);
+            assert_eq!(save.divisions.len(), 5);
             let divs = save.divisions().unwrap();
             assert!(divs.iter().all(|g| g.len() == 8));
             let w = World::from_e98(1, &save).unwrap();
