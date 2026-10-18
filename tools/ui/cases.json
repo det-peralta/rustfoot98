@@ -46,5 +46,51 @@
    "gaugeProgress.progress=97"
   ],
   "note": "mouse cursor over the text: ~50 px"
+ },
+ {
+  "form": "TPREPAREGAMEDLG",
+  "golden": "analysis/shots/guest15.png",
+  "region": [
+   83,
+   63,
+   634,
+   474
+  ],
+  "note": "main screen, 'Jogo' page; cursor ~66 px",
+  "args": [
+   "@caption=FIGUEIRENSE F.C.",
+   "@color=0,0,0",
+   "@client=632x434",
+   "textSeason=2026",
+   "textSeason.color=255,255,255",
+   "Label2.color=255,255,255",
+   "textOpponent= SPORT\nFORA 3ª Jornada",
+   "textOpponent.color=255,0,0",
+   "textOpponent.pos=364,32",
+   "bitmapTeamCountry.image=FLAGS/BRA",
+   "textTeamCountry=Brasil",
+   "textTeamCountry.color=255,255,255",
+   "textMyDivision=4ª Divisão",
+   "textMyDivision.color=255,255,255",
+   "textCoachName=joga1",
+   "textCoachName.color=255,255,255",
+   "ListBoxOfPlayers.focus=0",
+   "ListBoxOfPlayers.list=G|Carlos Alberto|5|2500|\nG|Gilberto|4|2500|\nD|Dionisio|7|4000|\nD|Leonardo|6|3000|\nD|Luciano|3|1750|+\nD|Nass|4|3000|\nD|Nilson|5|3500|\nD|Nilson Costa|3|1500|\nM|Marquinhos|3|2000|\nM|Petry|1|1000|\nM|Sandro Ventura*|1|1500|\nM|Vinicius|7|4000|\nA|Marcelinho|6|3500|\nA|Nando|7|4000|\nA|Willian|7|3500|",
+   "Notebook.page=0",
+   "LabelLastResult.visible=0",
+   "Label1.color=255,255,255",
+   "LabelLastResult.color=255,255,255",
+   "Label5.color=255,255,255",
+   "textReferee.color=255,255,255",
+   "textReferee=Leo Feldman (Brasil)",
+   "textMoney2.color=255,255,255",
+   "textMoney2=Dinheiro em caixa\n1 milhão e 216 mil reais",
+   "ListBoxClassification.list=FIGUEIRENSE|0|1|1|1|2|1|255,255,255\nSPORT|1|1|0|2|1|4|255,0,0",
+   "gaugeMoral.value=8",
+   "gaugeMoral.barcolor=255,255,0",
+   "TabSet.tabs=Jogo|Jogador|Finanças|Selecção|Adversário",
+   "TabSet.index=0",
+   "TabSet.color=255,255,255"
+  ]
  }
 ]

@@ -264,7 +264,11 @@ pub fn controls(fb: &mut Fb, cx: &Ctx, root: &Node) {
 }
 
 fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
-    if !n.flag("Visible", true) {
+    let visible = match cx.texts.get(&format!("{}.visible", n.name)) {
+        Some(v) => v != "0",
+        None => n.flag("Visible", true),
+    };
+    if !visible {
         return;
     }
     let mut f = parent.inherit(n);
@@ -274,7 +278,15 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
             f.color = Rgb(v[0], v[1], v[2]);
         }
     }
-    let (x, y) = (cx.ox + n.int("Left", 0), cx.oy + n.int("Top", 0));
+    let (mut left, mut top) = (n.int("Left", 0), n.int("Top", 0));
+    if let Some(p) = cx.texts.get(&format!("{}.pos", n.name)) {
+        // the program moved the control at run time
+        let v: Vec<i32> = p.split(',').filter_map(|t| t.parse().ok()).collect();
+        if v.len() == 2 {
+            (left, top) = (v[0], v[1]);
+        }
+    }
+    let (x, y) = (cx.ox + left, cx.oy + top);
     match n.class.as_str() {
         "TLabel" => label(fb, cx, n, &f, x, y),
         "TBitBtn" | "TButton" => bitbtn(fb, cx, n, &f, x, y),
@@ -287,6 +299,9 @@ fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TRadioButton" => radio(fb, cx, n, &f, x, y),
         "TGauge" => gauge(fb, cx, n, &f, x, y),
         "TImage" => image(fb, cx, n, x, y),
+        "TNotebook" => notebook(fb, cx, n, &f, x, y),
+        "TBiGauge" => bigauge(fb, cx, n, x, y),
+        "TTabSet" => tabset(fb, cx, n, &f, x, y),
         _ => {}
     }
 }
@@ -569,12 +584,69 @@ fn roster(
     fb.clip = old;
 }
 
+/// The two-row score table of the main screen's first notebook page: `name|w|d|l|gf|ga|pts|r,g,b` per row, 16 pixels high.
+fn classification(fb: &mut Fb, font: &Font, x: i32, y: i32, rows: &[String]) {
+    // glyph start of each number relative to the list's left edge: wins, draws, losses, goals for, colon, goals against, points
+    const COLS: [i32; 7] = [137, 157, 177, 207, 220, 232, 262];
+    for (i, row) in rows.iter().enumerate() {
+        let c: Vec<&str> = row.split('|').collect();
+        let color = c
+            .get(7)
+            .map(|t| {
+                t.split(',')
+                    .filter_map(|v| v.parse::<u8>().ok())
+                    .collect::<Vec<_>>()
+            })
+            .filter(|v| v.len() == 3)
+            .map_or(WHITE, |v| Rgb(v[0], v[1], v[2]));
+        let ty = y + 1 + i as i32 * 16;
+        text(
+            fb,
+            font,
+            x + 3,
+            ty,
+            c.first().copied().unwrap_or(""),
+            color,
+            false,
+        );
+        let toks = [
+            c.get(1),
+            c.get(2),
+            c.get(3),
+            c.get(4),
+            Some(&":"),
+            c.get(5),
+            c.get(6),
+        ];
+        for (k, t) in toks.iter().enumerate() {
+            let t = t.copied().unwrap_or("");
+            let bearing = t
+                .chars()
+                .next()
+                .and_then(|ch| font.glyph(ansi(ch)))
+                .map_or(0, |g| g.left);
+            text(fb, font, x + COLS[k] - bearing, ty, t, color, false);
+        }
+    }
+}
+
 fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    sunken_box(fb, x, y, w, h);
+    let flat = !n.flag("Ctl3D", true) && n.flag("ParentColor", false);
+    if flat {
+        fb.fill(x, y, w, h, cx.bg);
+    } else {
+        sunken_box(fb, x, y, w, h);
+    }
     let Some(font) = cx.font(f) else {
         return;
     };
+    if n.name == "ListBoxClassification" {
+        if let Some(rows) = cx.lists.get(&n.name) {
+            classification(fb, font, x, y, rows);
+        }
+        return;
+    }
     if n.ident("Style") == Some("lbOwnerDrawVariable") {
         if let Some(rows) = cx.lists.get(&n.name) {
             roster(fb, cx, n, font, f.color, x, y, w, h, rows);
@@ -634,6 +706,130 @@ fn radio(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 }
 
 const DITHER_PARITY: i32 = 0;
+
+/// A bevel of `bs` pixels inside the inclusive rectangle `(x1, y1)..(x2, y2)` with 45-degree joints: `tl` on the top and left,
+/// `br` on the bottom and right.
+fn bevel_miter(fb: &mut Fb, x1: i32, y1: i32, x2: i32, y2: i32, bs: i32, tl: Rgb, br: Rgb) {
+    for k in 0..bs {
+        fb.fill(x1 + k, y1 + k, x2 - x1 - 2 * k + 1, 1, tl);
+        fb.fill(x1 + k, y1 + k, 1, y2 - y1 - 2 * k + 1, tl);
+        fb.fill(x1 + k + 1, y2 - k, x2 - x1 - 2 * k, 1, br);
+        fb.fill(x2 - k, y1 + k + 1, 1, y2 - y1 - 2 * k, br);
+    }
+}
+
+/// `TBiGauge` (a VBX control): black frame, grey/white bevel, silver face and a bar of `value / max` of the inner width.
+/// `<name>.value` and `<name>.barcolor` (r,g,b) in the texts set the run-time state.
+fn bigauge(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let get = |k: &str| cx.texts.get(&format!("{}.{k}", n.name));
+    let value: i32 = get("value")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(n.int("Value", 0));
+    let (min, max) = (n.int("Min", 0), n.int("Max", 100));
+    let bar = get("barcolor")
+        .map(|c| {
+            c.split(',')
+                .filter_map(|v| v.parse::<u8>().ok())
+                .collect::<Vec<_>>()
+        })
+        .filter(|v| v.len() == 3)
+        .map(|v| Rgb(v[0], v[1], v[2]))
+        .or_else(|| n.color("BarColor"))
+        .unwrap_or(Rgb(0, 255, 0));
+    let bs = n.int("BevelSize", 3);
+    let margin = n.int("Margin", 3);
+    if n.int("BorderStyle", 0) == 1 {
+        fb.fill(x, y, w, h, BLACK);
+    }
+    let (x1, y1, x2, y2) = (x + 1, y + 1, x + w - 2, y + h - 2);
+    fb.fill(x1, y1, x2 - x1 + 1, y2 - y1 + 1, SILVER);
+    bevel_miter(fb, x1, y1, x2, y2, bs, GRAY, WHITE);
+    let (bx, by) = (x1 + bs + margin, y1 + bs + margin);
+    let (bw, bh) = (
+        x2 - x1 + 1 - 2 * (bs + margin),
+        y2 - y1 + 1 - 2 * (bs + margin),
+    );
+    let filled = if max > min {
+        bw * (value - min).clamp(0, max - min) / (max - min)
+    } else {
+        0
+    };
+    fb.fill(bx, by, filled, bh, bar);
+}
+
+/// `TTabSet` (bottom tabs): the labels in MS Sans Serif; the selected tab is outlined by slanted edges and a base line, a grey line
+/// runs along the top everywhere else. `<name>.tabs=a|b|c`, `<name>.index=n`, `<name>.color=r,g,b` in the texts.
+fn tabset(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let w = n.int("Width", 0);
+    let tabs: Vec<String> = match cx.texts.get(&format!("{}.tabs", n.name)) {
+        Some(t) => t.split('|').map(str::to_string).collect(),
+        None => n.strings("Tabs.Strings"),
+    };
+    let sel: usize = cx
+        .texts
+        .get(&format!("{}.index", n.name))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(n.int("TabIndex", 0) as usize);
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let widths: Vec<i32> = tabs.iter().map(|t| font.width(t)).collect();
+    fb.fill(x, y, w, 1, GRAY);
+    // text positions: the selected tab is padded on both sides by its slanted edges
+    let mut pen = x + 9;
+    for (i, t) in tabs.iter().enumerate() {
+        text(fb, font, pen, y + 2, t, f.color, false);
+        if i == sel {
+            let left = pen - 5;
+            let right = left + widths[i] + 11;
+            fb.fill(left, y, right - left, 1, BLACK);
+            for (row, dx) in [
+                (1, 0),
+                (2, 0),
+                (3, 1),
+                (4, 1),
+                (5, 1),
+                (6, 2),
+                (7, 2),
+                (8, 2),
+                (10, 3),
+                (11, 3),
+                (13, 4),
+                (14, 4),
+            ] {
+                fb.set(left + dx, y + row, WHITE);
+            }
+            for row in 1..=14 {
+                fb.set(right - ((row + 1) / 3), y + row, GRAY);
+            }
+            fb.fill(left + 5, y + 15, right - left - 9, 1, GRAY);
+            pen = right + 3;
+        } else {
+            pen += widths[i] + 9;
+        }
+    }
+}
+
+/// `TNotebook`: only the current page is drawn (`<name>.page=<index>` in the texts; the form's `PageIndex` otherwise); the pages
+/// start at the notebook's corner.
+fn notebook(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
+    let page: usize = cx
+        .texts
+        .get(&format!("{}.page", n.name))
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(n.int("PageIndex", 0) as usize);
+    if let Some(p) = n.children.get(page) {
+        let sub = Ctx {
+            ox: x,
+            oy: y,
+            ..cx.sub()
+        };
+        for c in &p.children {
+            control(fb, &sub, c, f);
+        }
+    }
+}
 
 /// `TImage`: a bitmap of the skin, named by `<name>.image=FORM/NAME` (e.g. `FLAGS/BRA`) in the texts.
 fn image(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
