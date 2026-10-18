@@ -445,6 +445,7 @@ fn control_node(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TTabbedNotebook" => widgets::tabbed_notebook(fb, cx, n, &f, x, y),
         "TSpeedButton" => widgets::speedbutton(fb, cx, n, &f, x, y),
         "TColorGrid" => widgets::colorgrid(fb, cx, n, &f, x, y),
+        "TPaintBox" => widgets::paintbox(fb, cx, n, x, y),
         "TGauge" => gauge(fb, cx, n, &f, x, y),
         "TImage" => image(fb, cx, n, x, y),
         "TNotebook" => notebook(fb, cx, n, &f, x, y),
@@ -505,15 +506,14 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             Some("taRightJustify") => x + w - tw,
             _ => x,
         };
-        text(
-            fb,
-            font,
-            lx,
-            y + i as i32 * font.height(),
-            line,
-            f.color,
-            f.underline,
-        );
+        let ly = y + i as i32 * font.height();
+        if is_enabled(cx, n) {
+            text(fb, font, lx, ly, line, f.color, f.underline);
+        } else {
+            // a disabled label is embossed: white shifted by one pixel, grey on top
+            text(fb, font, lx + 1, ly + 1, line, WHITE, f.underline);
+            text(fb, font, lx, ly, line, GRAY, f.underline);
+        }
     }
 }
 
@@ -698,7 +698,10 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             .and_then(|v| v.parse::<usize>().ok())
     };
     let chars: Vec<char> = s.chars().collect();
-    let (a, len) = (num("selstart").unwrap_or(0).min(chars.len()), num("sellen").unwrap_or(0));
+    let (a, len) = (
+        num("selstart").unwrap_or(0).min(chars.len()),
+        num("sellen").unwrap_or(0),
+    );
     let b = (a + len).min(chars.len());
     let pre: String = chars[..a].iter().collect();
     let mid: String = chars[a..b].iter().collect();
@@ -717,7 +720,13 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if cx.focus == n.name && enabled {
         if let Some(c) = num("caret") {
             let before: String = chars[..c.min(chars.len())].iter().collect();
-            fb.fill(tx + 1 + font.width(&before), ty, 1, font.height() + 1, BLACK);
+            fb.fill(
+                tx + 1 + font.width(&before),
+                ty,
+                1,
+                font.height() + 1,
+                BLACK,
+            );
         }
     }
     fb.clip = old;

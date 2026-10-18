@@ -2,8 +2,8 @@
 //! (closed and with the drop-down list), spin edits, notebooks with tabs, colour grids, speed buttons, scroll bars and the lists with
 //! columns. The text keys that drive them are documented in `docs/classic-dialogs.md`.
 use super::draw::{
-    bevel_miter, caption, control, focus_rect, is_enabled, sunken_box, text, text_dithered, Ctx,
-    FontSpec, Hit, DITHER_PARITY,
+    bevel_miter, button_face, caption, control, focus_rect, is_enabled, sunken_box, text,
+    text_dithered, Ctx, FontSpec, Hit, DITHER_PARITY,
 };
 use super::fb::{Fb, Rgb, BLACK, GRAY, NAVY, SILVER, WHITE};
 use super::form::Node;
@@ -143,7 +143,7 @@ const ARROW_COMBO: [&str; 9] = [
 
 /// The 13x13 square of a check box and the cross inside it.
 fn check_square(fb: &mut Fb, x: i32, y: i32, checked: bool, color: Rgb) {
-    fb.fill(x, y, 13, 13, color);
+    fb.fill(x, y, 13, 13, BLACK);
     fb.fill(x + 1, y + 1, 11, 11, SILVER);
     if checked {
         for i in 1..=11 {
@@ -206,7 +206,7 @@ pub(super) fn checkbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     let enabled = is_enabled(cx, n);
     let checked = match get(cx, n, "checked") {
         Some(v) => v != "0",
-        None => n.flag("Checked", false),
+        None => n.flag("Checked", false) || n.ident("State") == Some("cbChecked"),
     };
     let ink = if enabled { BLACK } else { GRAY };
     marked_button(
@@ -481,7 +481,11 @@ fn row_cells(
                     for r in 0..b.h {
                         for c in 0..b.w {
                             let p = b.px[(r * b.w + c) as usize];
-                            fb.set(bx + c, by + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
+                            fb.set(
+                                bx + c,
+                                by + r,
+                                Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
+                            );
                         }
                     }
                 }
@@ -557,18 +561,7 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         if let Some(b) = bg {
             fb.fill(x + 1, ry, right - x - 1, ih, b);
         }
-        row_cells(
-            fb,
-            cx,
-            n,
-            f,
-            x,
-            ry,
-            ih,
-            &items[i],
-            fg,
-            bold_all || st.bold,
-        );
+        row_cells(fb, cx, n, f, x, ry, ih, &items[i], fg, bold_all || st.bold);
         // the focus rectangle sits on the selected row, or on the first one while nothing is selected
         if focused
             && (selected
@@ -659,9 +652,11 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     }
 }
 
+/// An open combo box to draw on top of everything: name, position, size and font.
+type Overlay = (String, i32, i32, i32, i32, FontSpec);
+
 thread_local! {
-    /// Open combo boxes of the frame being drawn: name, position, size and font.
-    static OVERLAYS: std::cell::RefCell<Vec<(String, i32, i32, i32, i32, FontSpec)>> =
+    static OVERLAYS: std::cell::RefCell<Vec<Overlay>> =
         const { std::cell::RefCell::new(Vec::new()) };
 }
 
@@ -1012,15 +1007,17 @@ pub(super) fn speedbutton(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32,
         None => n.flag("Down", false),
     };
     let enabled = is_enabled(cx, n);
-    fb.fill(x, y, w, h, SILVER);
     if down {
-        fb.fill(x, y, w, h, BLACK);
-        fb.fill(x + 1, y + 1, w - 1, h - 1, GRAY);
-        fb.fill(x + 2, y + 2, w - 3, h - 3, SILVER);
-    } else {
+        // pressed: the outline with cut corners, a shadow along the top and left, no bevel
         fb.fill(x, y, w, h, BLACK);
         fb.fill(x + 1, y + 1, w - 2, h - 2, SILVER);
-        bevel_miter(fb, x + 1, y + 1, x + w - 2, y + h - 2, 2, WHITE, GRAY);
+        fb.fill(x + 1, y + 1, w - 2, 1, GRAY);
+        fb.fill(x + 1, y + 1, 1, h - 2, GRAY);
+        for (cx_, cy_) in [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)] {
+            fb.set(x + cx_, y + cy_, SILVER);
+        }
+    } else {
+        button_face(fb, x, y, w, h, false);
     }
     let shift = i32::from(down);
     let bmp = cx.skin.bitmap(cx.form, &n.name);
@@ -1049,15 +1046,13 @@ pub(super) fn speedbutton(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32,
         let cap = caption(cx, n).replace('&', "");
         let tw = font.width(&cap);
         let ty = y + 2 + n.int("Margin", 4) + gh + n.int("Spacing", 1).max(0) + shift;
-        text(
-            fb,
-            font,
-            x + (w - tw) / 2 + shift,
-            ty,
-            &cap,
-            if enabled { f.color } else { GRAY },
-            false,
-        );
+        let tx = x + (w - tw) / 2 + shift;
+        if enabled {
+            text(fb, font, tx, ty, &cap, f.color, false);
+        } else {
+            text(fb, font, tx + 1, ty + 1, &cap, WHITE, false);
+            text(fb, font, tx, ty, &cap, GRAY, false);
+        }
     }
 }
 
@@ -1118,5 +1113,142 @@ pub(super) fn colorgrid(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y
     if cx.focus == n.name {
         let (gx, gy) = (x + (fg % 4) * cw, y + (fg / 4) * ch);
         focus_rect(fb, gx + 2, gy + 2, cw - 3, ch - 3, x, y);
+    }
+}
+
+/// `TPaintBox`: only the stadium's (`PaintBoxStadium`) is known; `<name>.level` is the stadium level (0..24, one stand of 5000 seats
+/// per level). The picture is the original's `PaintBoxStadiumPaint`: up to three rings of stands (grey, 2-pixel light yellow
+/// outline) around an ellipse with a green pitch. Stand fractions: level 1..6 fill the first ring (of 6 parts), 7..14 the second
+/// (of 8), 15..24 the third (of 10). The ring and ellipse geometry were fitted to a capture of a level-2 stadium (approximate).
+pub(super) fn paintbox(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
+    if !n.name.to_lowercase().contains("stadium") {
+        return;
+    }
+    let (w, h) = (n.int("Width", 332), n.int("Height", 241));
+    let level = get_num(cx, n, "level").unwrap_or(0).clamp(0, 24);
+    let stands = [(3, level - 14, 10), (2, level - 6, 8), (1, level, 6)];
+    let (ccx, ccy) = (w as f64 / 2.0, h as f64 / 2.0);
+    let (ox, oy) = (66.0, 47.8);
+    let (dx_ring, dy_ring) = (27.7, 20.6);
+    let grey = Rgb(128, 128, 128);
+    let yellow = Rgb(255, 255, 128);
+    for (k, n_, cap) in stands {
+        if n_ <= 0 {
+            continue;
+        }
+        let f = (n_.min(cap)) as f64 / cap as f64;
+        let (rx, ry) = (ox + k as f64 * dx_ring, oy + k as f64 * dy_ring);
+        ellipse_part(fb, x, y, w, h, (ccx, ccy), (rx, ry), f, Some(grey), yellow);
+    }
+    ellipse_part(
+        fb,
+        x,
+        y,
+        w,
+        h,
+        (ccx, ccy),
+        (ox, oy),
+        1.0,
+        Some(Rgb(0, 128, 0)),
+        yellow,
+    );
+    // the pitch: white lines, 3 pixels around, 2 pixels inside
+    let (px, py) = (x + ccx as i32 - 44, y + ccy as i32 - 32);
+    let line =
+        |fb: &mut Fb, a: i32, b: i32, w_: i32, h_: i32| fb.fill(px + a, py + b, w_, h_, WHITE);
+    line(fb, 0, 0, 88, 3);
+    line(fb, 0, 62, 88, 3);
+    line(fb, 0, 0, 3, 65);
+    line(fb, 85, 0, 3, 65);
+    line(fb, 43, 3, 2, 59);
+    line(fb, 0, 19, 14, 2);
+    line(fb, 0, 43, 14, 2);
+    line(fb, 12, 19, 2, 26);
+    line(fb, 73, 19, 15, 2);
+    line(fb, 73, 43, 15, 2);
+    line(fb, 73, 19, 2, 26);
+    // centre circle (15 pixels across, 2-pixel line)
+    const CIRCLE: [&str; 15] = [
+        "....#####....",
+        "..###...###..",
+        ".##.......##.",
+        ".#.........#.",
+        "##.........##",
+        "#...........#",
+        "#...........#",
+        "#...........#",
+        "#...........#",
+        "#...........#",
+        "##.........##",
+        ".#.........#.",
+        ".##.......##.",
+        "..###...###..",
+        "....#####....",
+    ];
+    glyph(fb, px + 37, py + 24, &CIRCLE, WHITE);
+}
+
+/// Reach of the 2-pixel outline of the stadium picture from the geometric outline.
+const PEN: f64 = 1.1;
+
+/// A filled ellipse (centre and half axes in the paint box's coordinates) or the part of it above the radial cut lines that span the
+/// fraction `f` of the circle around the top, with a 2-pixel outline: GDI's `Ellipse` and `Pie` with a wide pen.
+#[allow(clippy::too_many_arguments)]
+fn ellipse_part(
+    fb: &mut Fb,
+    ox: i32,
+    oy: i32,
+    w: i32,
+    h: i32,
+    (cx, cy): (f64, f64),
+    (rx, ry): (f64, f64),
+    f: f64,
+    fill: Option<Rgb>,
+    pen: Rgb,
+) {
+    let half = std::f64::consts::PI * f.min(1.0);
+    // the cut lines run from the centre to the ellipse points at +-`half` from the top (parametric angle)
+    let (ex, ey) = (rx * half.sin(), -ry * half.cos());
+    let phi = ex.atan2(-ey);
+    let full = f >= 1.0;
+    for py in 0..h {
+        for px in 0..w {
+            let (dx, dy) = (px as f64 + 0.5 - cx, py as f64 + 0.5 - cy);
+            let rho2 = (dx / rx).powi(2) + (dy / ry).powi(2);
+            let grad = 2.0 * ((dx / (rx * rx)).powi(2) + (dy / (ry * ry)).powi(2)).sqrt();
+            let d_arc = if grad > 0.0 {
+                (rho2 - 1.0).abs() / grad
+            } else {
+                f64::MAX
+            };
+            let theta = dx.abs().atan2(-dy);
+            let in_sector = full || theta <= phi;
+            let mut d = f64::MAX;
+            if in_sector || (full && d_arc < 1.0) {
+                d = d_arc;
+            }
+            if !full {
+                // distance to the two rays (segments from the centre to the ellipse point)
+                let seg = |sx: f64| {
+                    let (vx, vy) = (sx, ey);
+                    let len2 = vx * vx + vy * vy;
+                    let t = ((dx * vx + dy * vy) / len2).clamp(0.0, 1.0);
+                    ((dx - t * vx).powi(2) + (dy - t * vy).powi(2)).sqrt()
+                };
+                d = d.min(seg(ex)).min(seg(-ex));
+                // the arc counts only where it is part of the outline
+                if !in_sector && d_arc < 1.0 && theta - phi > 0.0 && d > d_arc {
+                    d = f64::MAX.min(d);
+                }
+            }
+            let inside = rho2 <= 1.0 && in_sector;
+            if d < PEN && (rho2 <= 1.0 || d_arc < PEN) {
+                fb.set(ox + px, oy + py, pen);
+            } else if inside {
+                if let Some(c) = fill {
+                    fb.set(ox + px, oy + py, c);
+                }
+            }
+        }
     }
 }
