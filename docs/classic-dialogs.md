@@ -44,3 +44,24 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
 
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs.
+
+## Widgets and their text keys (`win31/draw.rs`)
+All keys are in `Dialog::texts` (`<name>` is the control's name in the form). Anything not set keeps the form's design-time value.
+
+| widget | keys |
+|---|---|
+| any control | `.visible=0\|1`, `.enabled=0\|1` (disabled look: dithered or embossed text, greyed glyphs), `.pos=x,y`, `.color=r,g,b` (font), `.bgcolor=r,g,b` |
+| `TCheckBox`, `TRadioButton`, `TSpeedButton` | `.checked=0\|1` (speed button: pressed down); caption `texts[name]` |
+| `TEdit` | text `texts[name]`; `.caret=N` (caret before character N, drawn when the control has the focus); `.selstart=N` and `.sellen=N` (highlighted range) |
+| `TComboBox` | edit text `<name>.text`; `<name>.items` (items separated by `\n`, or `lists[name]`); `<name>.sel` (highlighted row); `<name>.open=1` shows the drop-down list below the control; `<name>.top` first visible row of an open list |
+| `TListBox` | rows `lists[name]` (a row is `a\|b\|c` for several columns), `<name>.sel` (selected row), `<name>.top` (first visible row); a vertical scroll bar appears when the rows exceed the box; `<name>.cols=x1,x2,...` x offsets of the columns inside the box and `<name>.align=lrr...` per column (`l`, `r` or `c`); `<name>.rowcolors` and `<name>.colors` are not used: use `<name>.color` |
+| `TSpinEdit` | `<name>.value` |
+| `TRadioGroup` | `<name>.index` selected item (items are the form's `Items.Strings`) |
+| `TTabbedNotebook` | `<name>.page` (index of the visible `TTabPage`); the tab strip is drawn from the pages' captions |
+| `TColorGrid` | `<name>.index` selected colour |
+| `TPaintBox` | drawn by the dialog (`Dialog` supplies the content through `lists`/`texts`, see the stadium) |
+| `TGauge` | `.progress`; `TBiGauge`: `.value`, `.barcolor` |
+
+Hits recorded for the mouse (`Dialog::hits`, `Hit::class`): `TCheckBox`, `TRadioButton`, `TComboBox`, `TSpinEdit`, `TEdit`, `TListBox`;
+`ListRow` (rows named `Name#i`, `i` the index in the whole list), `ComboItem` (rows `Name#i` of an open drop-down), `ScrollUp`, `ScrollDown`,
+`ScrollThumb` (named `Name#up`, `Name#down`, `Name#thumb`) and `ScrollPage` (`Name#pgup`, `Name#pgdn`).
