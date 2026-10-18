@@ -57,7 +57,7 @@ fn main() -> Result<(), String> {
             human: false,
         });
     }
-    let view = RoundView { title: "3ª Jornada - 2026".into(), divisions, minute, acc_ms: 0 };
+    let view = RoundView { title: "3ª Jornada - 2026".into(), divisions, minute, acc_ms: 0, halftime_seen: false };
     let mut fb = Fb::new();
     draw(&mut fb, &skin, &view);
     std::fs::write(out, fb.bmp()).map_err(|e| e.to_string())?;

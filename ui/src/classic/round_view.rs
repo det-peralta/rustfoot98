@@ -60,6 +60,8 @@ pub struct RoundView {
     /// Elapsed minutes (0..=90) and the milliseconds toward the next one.
     pub minute: u16,
     pub acc_ms: u32,
+    /// The halftime pause of the user's game has been shown.
+    pub halftime_seen: bool,
 }
 
 /// Milliseconds per game minute while the clock runs.
@@ -75,9 +77,10 @@ impl RoundView {
                 let c = &world.divisions[*d][i];
                 Club {
                     name: c.name.clone(),
+                    // the form's colour is the EFT foreground, the lettering the EFT background
                     colors: (
-                        Rgb(c.colors.0[0], c.colors.0[1], c.colors.0[2]),
                         Rgb(c.colors.1[0], c.colors.1[1], c.colors.1[2]),
+                        Rgb(c.colors.0[0], c.colors.0[1], c.colors.0[2]),
                     ),
                 }
             };
@@ -109,7 +112,13 @@ impl RoundView {
             divisions,
             minute: 0,
             acc_ms: 0,
+            halftime_seen: false,
         }
+    }
+
+    /// Whether the user's club plays in this round.
+    pub fn human_plays(&self) -> bool {
+        self.divisions.iter().flatten().any(|g| g.human)
     }
 
     /// Advances the clock; false once the full time is reached.

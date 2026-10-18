@@ -682,6 +682,15 @@ fn roster(
         if focus == Some(i) {
             focus_rect(fb, x + 1, ty, w - 2, 16, x + 1, y + 1);
         }
+        cx.hits.borrow_mut().push(Hit {
+            name: format!("{}#{i}", n.name),
+            class: "ListRow".into(),
+            x: x + 1,
+            y: ty,
+            w: w - 2,
+            h: 16,
+            enabled: true,
+        });
         top = ty + 16;
     }
     fb.clip = old;

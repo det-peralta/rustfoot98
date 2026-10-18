@@ -1,6 +1,6 @@
 //! Renders the classic interface from a saved game into a BMP: `classic_shot game.e98 out.bmp [key=value ...]`
 //! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`). Needs the skin pack in `analysis/out/skin`.
-use elifoot_ui::classic::{Classic, Data, Page};
+use elifoot_ui::classic::{Classic, Data, Ev, Key, Page};
 use elifoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
 
@@ -54,6 +54,53 @@ fn main() -> Result<(), String> {
             "hl" => {
                 if let Some((m, _)) = app.main.menu {
                     app.main.menu = Some((m, v.parse().ok()));
+                }
+            }
+            "ev" => {
+                // a script of events: `click:x,y`, `move:x,y`, `key:F5|Enter|a`, `tick:ms`, separated by `;`
+                app.draw();
+                for step in v.split(';') {
+                    let (kind, arg) = step.split_once(':').unwrap_or((step, ""));
+                    let xy = || {
+                        let (a, b) = arg.split_once(',').unwrap_or(("0", "0"));
+                        (a.parse().unwrap_or(0), b.parse().unwrap_or(0))
+                    };
+                    match kind {
+                        "click" => {
+                            let (x, y) = xy();
+                            app.event(Ev::Move(x, y));
+                            app.event(Ev::Down(x, y));
+                            app.event(Ev::Up(x, y));
+                        }
+                        "move" => {
+                            let (x, y) = xy();
+                            app.event(Ev::Move(x, y));
+                        }
+                        "tick" => {
+                            for _ in 0..arg.parse::<u32>().unwrap_or(0) / 20 {
+                                app.tick(20);
+                            }
+                        }
+                        "key" => {
+                            let k = match arg {
+                                "Enter" => Key::Enter,
+                                "Escape" => Key::Escape,
+                                "Tab" => Key::Tab,
+                                "Up" => Key::Up,
+                                "Down" => Key::Down,
+                                "Left" => Key::Left,
+                                "Right" => Key::Right,
+                                "Backspace" => Key::Backspace,
+                                f if f.starts_with('F') && f.len() > 1 => {
+                                    Key::F(f[1..].parse().unwrap_or(1))
+                                }
+                                c => Key::Char(c.chars().next().unwrap_or(' ')),
+                            };
+                            app.event(Ev::Key(k));
+                        }
+                        _ => return Err(format!("bad step {step}")),
+                    }
+                    app.frame();
                 }
             }
             "noplan" => app.world.set_plan(Default::default()),

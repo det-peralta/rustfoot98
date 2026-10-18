@@ -18,6 +18,16 @@ pub struct MainState {
     pub menu: Option<(usize, Option<usize>)>,
 }
 
+/// The user's club as the main window shows it: with the line-up of the plan applied to the squad's statuses.
+pub fn human_club(c: &Classic) -> Option<((usize, usize), Club)> {
+    let (d, i) = c.world.human_location()?;
+    let mut club = c.world.divisions[d][i].clone();
+    if let Some(h) = &c.world.human {
+        elifoot_core::season::apply_plan(&mut club.slots, &h.plan);
+    }
+    Some(((d, i), club))
+}
+
 /// The squad in the order of the list: goalkeepers, defenders, midfielders, attackers, each group by name.
 pub fn roster_order(club: &Club) -> Vec<usize> {
     let mut idx: Vec<usize> = (0..club.slots.len()).collect();
@@ -171,11 +181,7 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     t("TabSet.tabs", tabs.into());
     t(
         "TabSet.index",
-        Page::ALL
-            .iter()
-            .position(|p| *p == page)
-            .unwrap()
-            .to_string(),
+        page.tab_index().to_string(),
     );
     t("TabSet.color", col(bg));
     // the next opponent
@@ -351,10 +357,9 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
 
 /// Draws the desktop, the application's caption bar and the main window.
 pub fn draw(c: &mut Classic) {
-    let Some((d, i)) = c.world.human_location() else {
+    let Some(((_d, _i), club)) = human_club(c) else {
         return;
     };
-    let club = c.world.divisions[d][i].clone();
     let page = c.main.page.unwrap_or(Page::Game);
     let v = view(c, &club, page);
     c.fb.fill(0, 0, 800, 600, DESKTOP);

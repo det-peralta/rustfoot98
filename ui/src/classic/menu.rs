@@ -21,7 +21,7 @@ pub struct Top {
 /// Frame position of the main window (client 632x434 with a menu bar).
 pub const FRAME: (i32, i32) = (83, 63);
 
-fn formation_of(label: &str) -> Option<usize> {
+pub fn formation_of(label: &str) -> Option<usize> {
     let v: Vec<u8> = label.split('-').filter_map(|p| p.parse().ok()).collect();
     if v.len() != 3 {
         return None;

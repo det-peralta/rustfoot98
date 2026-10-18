@@ -39,6 +39,13 @@ impl Node {
         })
     }
 
+    /// The control called `name` anywhere below this node.
+    pub fn find(&self, name: &str) -> Option<&Node> {
+        self.children
+            .iter()
+            .find_map(|c| if c.name == name { Some(c) } else { c.find(name) })
+    }
+
     pub fn int(&self, k: &str, default: i32) -> i32 {
         self.props
             .get(k)
