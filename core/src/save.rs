@@ -89,6 +89,12 @@ impl World {
                 fee
             ));
         }
+        for (club, player) in &self.observed {
+            out.push_str(&format!("observed|{}|{}\n", clean(club), clean(player)));
+        }
+        for player in &self.sell_tried {
+            out.push_str(&format!("selltried|{}\n", clean(player)));
+        }
         if let Some(c) = &self.cup_champion {
             out.push_str(&format!("cupchampion|{}\n", clean(c)));
         }
@@ -178,6 +184,8 @@ impl World {
         let mut has_finance = false;
         let mut board: Vec<Listing> = Vec::new();
         let mut pending: Vec<Pending> = Vec::new();
+        let mut observed: Vec<(String, String)> = Vec::new();
+        let mut sell_tried: Vec<String> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
         let mut cash_ref = [0i64; 4];
@@ -227,6 +235,13 @@ impl World {
                     seller: f.get(1).ok_or("pending without seller")?.to_string(),
                     player: f.get(2).ok_or("pending without player")?.to_string(),
                 }),
+                "observed" => observed.push((
+                    f.get(1).ok_or("observed without club")?.to_string(),
+                    f.get(2).ok_or("observed without player")?.to_string(),
+                )),
+                "selltried" => {
+                    sell_tried.push(f.get(1).ok_or("selltried without player")?.to_string())
+                }
                 "listing" => {
                     let best = match (f.get(5), f.get(6).and_then(|x| x.parse::<i64>().ok())) {
                         (Some(b), Some(fee)) if !b.is_empty() => Some((b.to_string(), fee)),
@@ -403,6 +418,8 @@ impl World {
             transfers: Vec::new(),
             board,
             pending,
+            observed,
+            sell_tried,
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,

@@ -193,6 +193,10 @@ pub struct World {
     pub board: Vec<Listing>,
     /// Direct purchases of the user waiting for the end of the round.
     pub pending: Vec<Pending>,
+    /// Players of other clubs the user watches (`Jogadores sob observação`), as `(club, player)` in the order they were added.
+    pub observed: Vec<(String, String)>,
+    /// Players of the user's club whose sale found no buyer: they cannot be offered again before the next game (`5a6a` code 4).
+    pub sell_tried: Vec<String>,
     /// Whether the user accepts an invitation to take over a club whose coach was sacked (the original asks in a dialog).
     pub accept_invitations: bool,
     /// Coach changes of the last round played, as `(sacked club, club that gave its coach)`; the second is the club the
@@ -414,6 +418,8 @@ impl World {
             transfers: Vec::new(),
             board: Vec::new(),
             pending: Vec::new(),
+            observed: Vec::new(),
+            sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
@@ -450,6 +456,8 @@ impl World {
             transfers: Vec::new(),
             board: Vec::new(),
             pending: Vec::new(),
+            observed: Vec::new(),
+            sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
@@ -496,6 +504,8 @@ impl World {
             transfers: Vec::new(),
             board: Vec::new(),
             pending: Vec::new(),
+            observed: Vec::new(),
+            sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
             human_moved: None,
@@ -1063,19 +1073,13 @@ impl World {
             return Err("jogador inexistente".into());
         }
         let ask = crate::market::floor_1000(ask);
-        match crate::market::sale_blocker(club, slot_idx) {
-            0 => {}
-            1 => return Err("o plantel tem menos de 12 jogadores".into()),
-            3 => {
-                return Err(
-                    "este jogador acabou de chegar ou de renovar e não pode ser vendido".into(),
-                )
-            }
-            5 => return Err("tens de ficar com pelo menos 2 guarda-redes".into()),
-            _ => return Err("tens de ficar com mais de 10 jogadores de campo".into()),
+        if let Some(why) = self.sale_blocker_text(slot_idx) {
+            return Err(why.into());
         }
         let Some((buyer, fee)) = self.best_bid(human, slot_idx, ask) else {
-            return Err("nenhum clube licitou pelo preço pedido".into());
+            let name = self.club_ref(human).names[slot_idx].clone();
+            self.sell_tried.push(name);
+            return Err("Não houve ofertas".into());
         };
         let round = self.round;
         self.settle(human, slot_idx, buyer, fee, round);
@@ -1622,6 +1626,7 @@ impl World {
     /// Plays the next round of every division, evolves the squads, and runs the season end after round 14.
     pub fn play_round(&mut self) {
         self.close_board();
+        self.sell_tried.clear();
         self.last_round.clear();
         self.coach_changes.clear();
         self.human_moved = None;
@@ -1812,6 +1817,276 @@ impl World {
                 break;
             }
         }
+    }
+}
+
+/// A player's answer to the contract the user proposes (`newSalaryBtnClick`, `1018:46ee`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WageReply {
+    /// The proposed wage is accepted and the player renewed (`fresh`).
+    Accepted,
+    /// The player wants `amount`; `can_sell` is false when the club may not sell him, so the user has to accept.
+    Demand { amount: i64, can_sell: bool },
+}
+
+/// What the price column of the player search asks for (the price combo box of `TCheckPlayerDlg`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PriceFilter {
+    /// No price chosen: every player, for sale or not.
+    #[default]
+    Any,
+    /// `Qualquer`: the players that are for sale.
+    ForSale,
+    /// For sale at a price within `lo..=hi`.
+    Between(i64, i64),
+}
+
+/// The criteria of `findBtnClick` (`1048:34f5`, `3223`).
+#[derive(Clone, Debug, Default)]
+pub struct PlayerQuery {
+    /// Part of the name (case-insensitive).
+    pub name: String,
+    pub nationality: Option<[u8; 3]>,
+    /// Inclusive range of strengths.
+    pub strength: Option<(u16, u16)>,
+    pub position: Option<u8>,
+    pub price: PriceFilter,
+    /// `Não mostrar os jogadores da minha equipa`.
+    pub hide_mine: bool,
+}
+
+/// The most players the search lists.
+pub const SEARCH_LIMIT: usize = 50;
+
+impl World {
+    /// `1010:5a6a`: 0 when the user's player at `slot_idx` may be offered for sale, otherwise the reason (1 squad too small,
+    /// 3 renewed or just arrived, 4 already offered without success in this game, 5 goalkeepers, 6 outfield players).
+    pub fn sale_blocker(&self, slot_idx: usize) -> u8 {
+        let Some(human) = self.human_location() else {
+            return 1;
+        };
+        let club = self.club_ref(human);
+        let code = crate::market::sale_blocker(club, slot_idx);
+        if (code == 0 || code > 4) && self.sell_tried.contains(&club.names[slot_idx]) {
+            return 4;
+        }
+        code
+    }
+
+    /// The original's sentence for a sale blocker (`None` when the player may be sold).
+    pub fn sale_blocker_text(&self, slot_idx: usize) -> Option<&'static str> {
+        match self.sale_blocker(slot_idx) {
+            0 => None,
+            1 => Some("Não pode vender mais jogadores"),
+            2 => Some("Este jogador já está vendido"),
+            3 => Some("Este jogador só pode ser vendido na próxima época"),
+            4 => Some("Só pode tentar vender este jogador novamente no próximo jogo"),
+            5 => Some("Não pode vender mais guarda-redes"),
+            _ => Some("Não pode vender mais jogadores de campo"),
+        }
+    }
+
+    /// Lowest and highest wage the contract dialog accepts (`ChangeSalaryBtnClick`: `50 G` and `50 000 G`).
+    pub fn wage_bounds(&self) -> (i64, i64) {
+        (50 * self.scale, 50_000 * self.scale)
+    }
+
+    /// What the player at `slot_idx` of the user's club is worth to the club (`PlayerValue`, `1010:7ff4`).
+    pub fn human_player_value(&self, slot_idx: usize) -> Option<i64> {
+        let human = self.human_location()?;
+        let club = self.club_ref(human);
+        let s = club.slots.get(slot_idx)?;
+        Some(player_value(
+            s.strength,
+            club.fin.f,
+            self.economy,
+            self.scale,
+        ))
+    }
+
+    /// The user proposes `wage` to the player at `slot_idx` (`newSalaryBtnClick`): a proposal above 80 % of his value is
+    /// accepted (the wage is set and the player marked `fresh`); otherwise he demands `1.25 *` his value rounded to `50 G`.
+    pub fn human_propose_wage(&mut self, slot_idx: usize, wage: i64) -> Result<WageReply, String> {
+        let human = self.human_location().ok_or("sem clube")?;
+        let club = self.club_ref(human);
+        let s = club.slots.get(slot_idx).ok_or("jogador inexistente")?;
+        if s.fresh {
+            return Err("este jogador já renovou o contrato".into());
+        }
+        let (lo, hi) = self.wage_bounds();
+        let wage = wage.clamp(lo, hi);
+        let value = player_value(s.strength, club.fin.f, self.economy, self.scale);
+        if wage as f64 > value as f64 * 0.8 {
+            let s = &mut self.club_mut(human).slots[slot_idx];
+            s.wage = wage;
+            s.fresh = true;
+            return Ok(WageReply::Accepted);
+        }
+        let unit = (50 * self.scale) as f64;
+        let amount = (value as f64 * 1.25 / unit).round_ties_even() as i64 * 50 * self.scale;
+        Ok(WageReply::Demand {
+            amount,
+            can_sell: self.sale_blocker(slot_idx) == 0,
+        })
+    }
+
+    /// The user accepts the player's demand (`YesBtnClick`, `1030:363e`).
+    pub fn human_accept_wage(&mut self, slot_idx: usize, wage: i64) -> Result<(), String> {
+        let human = self.human_location().ok_or("sem clube")?;
+        let s = self
+            .club_mut(human)
+            .slots
+            .get_mut(slot_idx)
+            .ok_or("jogador inexistente")?;
+        s.wage = wage;
+        s.fresh = true;
+        Ok(())
+    }
+
+    /// Where the club of that name is: `(division, index)`, the outside pool being division 4.
+    pub fn find_club(&self, name: &str) -> Option<(usize, usize)> {
+        self.all_clubs_by_master()
+            .into_iter()
+            .find(|&loc| self.club_ref(loc).name == name)
+    }
+
+    /// The club at a location returned by [`World::find_club`] or [`World::human_location`].
+    pub fn club_of(&self, loc: (usize, usize)) -> &Club {
+        self.club_ref(loc)
+    }
+
+    /// The price at which the club of `club` would sell its player `index` to the user's club (0: not for sale).
+    pub fn price_for_user(&self, club: &str, index: usize) -> i64 {
+        let (Some(human), Some(seller)) = (self.human_location(), self.find_club(club)) else {
+            return 0;
+        };
+        if seller == human || index >= self.club_ref(seller).slots.len() {
+            return 0;
+        }
+        crate::market::direct_price(
+            self.club_ref(seller),
+            index,
+            Some(self.club_ref(human)),
+            self.economy,
+            self.scale,
+        )
+    }
+
+    /// What `human_buy` would check before the purchase of a player (price, cash, squad and foreigner limits).
+    pub fn user_can_buy(&self, club: &str, index: usize) -> bool {
+        let (Some(human), Some(seller)) = (self.human_location(), self.find_club(club)) else {
+            return false;
+        };
+        let price = self.price_for_user(club, index);
+        let me = self.club_ref(human);
+        let Some(slot) = self.club_ref(seller).slots.get(index) else {
+            return false;
+        };
+        let name = &self.club_ref(seller).names[index];
+        price > 0
+            && me.fin.cash > price
+            && crate::market::may_bid(me, slot)
+            && !self
+                .pending
+                .iter()
+                .any(|p| p.seller == club && p.player == *name)
+    }
+
+    fn offer_of(&self, loc: (usize, usize), index: usize) -> Offer {
+        let c = self.club_ref(loc);
+        let s = &c.slots[index];
+        Offer {
+            club: c.name.clone(),
+            index,
+            player: c.names[index].clone(),
+            position: s.position,
+            strength: s.strength,
+            nationality: s.nat,
+            price: self.price_for_user(&c.name, index),
+        }
+    }
+
+    /// `findBtnClick` (`1048:34f5`): the players of all clubs that match, the last clubs of the list first, at most
+    /// [`SEARCH_LIMIT`]; the flag is set when the limit cut the list.
+    pub fn search_players(&self, q: &PlayerQuery) -> (Vec<Offer>, bool) {
+        let human = self.human_location();
+        let needle = q.name.to_uppercase();
+        let mut out = Vec::new();
+        let mut order = self.all_clubs_by_master();
+        order.reverse();
+        for loc in order {
+            if q.hide_mine && Some(loc) == human {
+                continue;
+            }
+            let c = self.club_ref(loc);
+            for i in (0..c.slots.len()).rev() {
+                let s = &c.slots[i];
+                if q.position.is_some_and(|p| p != s.position)
+                    || q.nationality.is_some_and(|n| n != s.nat)
+                    || (!needle.is_empty() && !c.names[i].to_uppercase().contains(&needle))
+                    || q.strength
+                        .is_some_and(|(lo, hi)| s.strength < lo || s.strength > hi)
+                {
+                    continue;
+                }
+                let price = self.price_for_user(&c.name, i);
+                let ok = match q.price {
+                    PriceFilter::Any => true,
+                    PriceFilter::ForSale => price != 0,
+                    PriceFilter::Between(lo, hi) => price != 0 && price >= lo && price <= hi,
+                };
+                if !ok {
+                    continue;
+                }
+                if out.len() == SEARCH_LIMIT {
+                    return (out, true);
+                }
+                out.push(self.offer_of(loc, i));
+            }
+        }
+        (out, false)
+    }
+
+    /// Whether the user watches the player.
+    pub fn is_observed(&self, club: &str, player: &str) -> bool {
+        self.observed.iter().any(|(c, p)| c == club && p == player)
+    }
+
+    /// Puts a player under observation (`FUN_1010_8cbe`); watching the same player twice does nothing.
+    pub fn observe(&mut self, club: &str, player: &str) {
+        if !self.is_observed(club, player) {
+            self.observed.push((club.into(), player.into()));
+        }
+    }
+
+    /// Stops watching a player (`FUN_1010_8d18`).
+    pub fn unobserve(&mut self, club: &str, player: &str) {
+        self.observed.retain(|(c, p)| !(c == club && p == player));
+    }
+
+    /// The watched players where they are now (a player who changed club is followed; one who is gone is left out).
+    pub fn observed_players(&self) -> Vec<Offer> {
+        let mut out = Vec::new();
+        for (club, player) in &self.observed {
+            let mut found = None;
+            if let Some(loc) = self.find_club(club) {
+                if let Some(i) = self.club_ref(loc).names.iter().position(|n| n == player) {
+                    found = Some((loc, i));
+                }
+            }
+            if found.is_none() {
+                for loc in self.all_clubs_by_master() {
+                    if let Some(i) = self.club_ref(loc).names.iter().position(|n| n == player) {
+                        found = Some((loc, i));
+                        break;
+                    }
+                }
+            }
+            if let Some((loc, i)) = found {
+                out.push(self.offer_of(loc, i));
+            }
+        }
+        out
     }
 }
 
@@ -2575,5 +2850,136 @@ mod tests {
             ..Search::default()
         });
         assert!(cheap.iter().all(|o| o.price <= 5000));
+    }
+
+    fn played_world() -> World {
+        let mut w = World::synthetic(5);
+        for _ in 0..2 {
+            w.play_round();
+        }
+        w
+    }
+
+    #[test]
+    fn a_wage_above_80_percent_of_the_value_renews_the_contract() {
+        let mut w = played_world();
+        let k = {
+            let (d, i) = w.human_location().unwrap();
+            w.divisions[d][i]
+                .slots
+                .iter()
+                .position(|s| !s.fresh)
+                .unwrap()
+        };
+        let value = w.human_player_value(k).unwrap();
+        let (lo, hi) = w.wage_bounds();
+        assert_eq!((lo, hi), (50 * w.scale, 50_000 * w.scale));
+        // a low offer is refused with the player's demand: 1.25 times his value in steps of 50 G
+        let low = (value as f64 * 0.8) as i64;
+        let Ok(WageReply::Demand { amount, .. }) = w.human_propose_wage(k, low) else {
+            panic!("0.8 times the value is not enough");
+        };
+        assert_eq!(amount % (50 * w.scale), 0);
+        assert!((amount as f64 - value as f64 * 1.25).abs() <= 25.0 * w.scale as f64);
+        let (d, i) = w.human_location().unwrap();
+        assert!(
+            !w.divisions[d][i].slots[k].fresh,
+            "a refusal changes nothing"
+        );
+        // accepting the demand sets the wage and the flag
+        w.human_accept_wage(k, amount).unwrap();
+        assert_eq!(w.divisions[d][i].slots[k].wage, amount);
+        assert!(w.divisions[d][i].slots[k].fresh);
+        assert!(w.human_propose_wage(k, amount).is_err(), "only once");
+        // a good offer is accepted straight away
+        let j = w.divisions[d][i]
+            .slots
+            .iter()
+            .position(|s| !s.fresh)
+            .unwrap();
+        let v = w.human_player_value(j).unwrap();
+        assert_eq!(w.human_propose_wage(j, v), Ok(WageReply::Accepted));
+        assert_eq!(w.divisions[d][i].slots[j].wage, v);
+        assert!(w.divisions[d][i].slots[j].fresh);
+    }
+
+    #[test]
+    fn a_player_nobody_bids_for_cannot_be_offered_again_before_the_next_game() {
+        let mut w = played_world();
+        let (d, i) = w.human_location().unwrap();
+        let k = w.divisions[d][i]
+            .slots
+            .iter()
+            .position(|s| !s.fresh)
+            .unwrap();
+        // nobody has that much money
+        assert!(w.human_sell(k, 1_000_000_000_000).is_err());
+        assert_eq!(w.sale_blocker(k), 4);
+        assert!(w.sale_blocker_text(k).unwrap().contains("próximo jogo"));
+        assert!(w.human_sell(k, 0).is_err());
+        w.play_round();
+        let (d, i) = w.human_location().unwrap();
+        let name = w.divisions[d][i]
+            .names
+            .iter()
+            .position(|n| !w.sell_tried.contains(n));
+        assert!(name.is_some() && w.sell_tried.is_empty());
+    }
+
+    #[test]
+    fn observed_players_are_followed_and_saved() {
+        let mut w = played_world();
+        let found = w.search_offers(&Search::default());
+        let o = found[0].clone();
+        w.observe(&o.club, &o.player);
+        w.observe(&o.club, &o.player);
+        assert_eq!(w.observed.len(), 1);
+        assert!(w.is_observed(&o.club, &o.player));
+        let again = World::load(&w.save()).unwrap();
+        assert_eq!(again.observed, w.observed);
+        let list = w.observed_players();
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].player, o.player);
+        w.unobserve(&o.club, &o.player);
+        assert!(w.observed_players().is_empty());
+    }
+
+    #[test]
+    fn the_search_filters_by_strength_price_and_name() {
+        let w = played_world();
+        let (all, cut) = w.search_players(&PlayerQuery::default());
+        assert_eq!(all.len(), SEARCH_LIMIT);
+        assert!(cut);
+        let (strong, _) = w.search_players(&PlayerQuery {
+            strength: Some((20, 30)),
+            ..PlayerQuery::default()
+        });
+        assert!(strong.iter().all(|o| (20..=30).contains(&o.strength)));
+        let (for_sale, _) = w.search_players(&PlayerQuery {
+            price: PriceFilter::ForSale,
+            ..PlayerQuery::default()
+        });
+        assert!(for_sale.iter().all(|o| o.price > 0));
+        let (ranged, _) = w.search_players(&PlayerQuery {
+            price: PriceFilter::Between(1, 50_000),
+            ..PlayerQuery::default()
+        });
+        assert!(ranged.iter().all(|o| (1..=50_000).contains(&o.price)));
+        let name = all[0].player.to_uppercase();
+        let part: String = name.chars().take(4).collect();
+        let (named, _) = w.search_players(&PlayerQuery {
+            name: part.to_lowercase(),
+            ..PlayerQuery::default()
+        });
+        assert!(named
+            .iter()
+            .all(|o| o.player.to_uppercase().contains(&part)));
+        assert!(named.iter().any(|o| o.player == all[0].player));
+        let me = w.club_ref(w.human_location().unwrap()).name.clone();
+        let (not_mine, _) = w.search_players(&PlayerQuery {
+            hide_mine: true,
+            ..PlayerQuery::default()
+        });
+        assert!(not_mine.iter().all(|o| o.club != me));
     }
 }
