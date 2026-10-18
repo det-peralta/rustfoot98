@@ -1245,7 +1245,7 @@ impl World {
     /// below this club's (`5661`), the lowest coach score first (`1050:1d59`); the user's coach only when invitations are
     /// accepted. Without a candidate nothing happens (the check repeats after every lost game). The two clubs swap
     /// coaches, both coaches' game counters and both clubs' morale reset; the user's coach takes the club it moved to.
-    fn replace_coach(&mut self, d: usize, cur: &mut [Club], i: usize, round: usize) {
+    fn replace_coach(&mut self, d: usize, cur: &mut [Club], i: usize, no_humans: bool) {
         let get = |this: &World, cur: &[Club], loc: (usize, usize)| -> Club {
             if loc.0 == d {
                 cur[loc.1].clone()
@@ -1260,7 +1260,7 @@ impl World {
             .flat_map(|(dd, v)| {
                 (0..if dd == d { cur.len() } else { v.len() }).map(move |k| (dd, k))
             })
-            .chain((0..self.pool.len()).map(|k| (4, k)))
+            .chain((0..if d == 4 { cur.len() } else { self.pool.len() }).map(|k| (4, k)))
             .collect();
         locs.sort_by_key(|&l| get(self, cur, l).master);
         let me = (d, i);
@@ -1268,7 +1268,7 @@ impl World {
         let rating_t = crate::cup::team_rating(&t.slots) as i32;
         let human_name = self.human.as_ref().map(|h| h.club.clone());
         let is_human = |c: &Club| human_name.as_deref() == Some(c.name.as_str());
-        let exclude_humans = round == 14;
+        let exclude_humans = no_humans;
         // coach list order: computer coaches by club order, the user's coach last
         let mut cands: Vec<((usize, usize), Club)> = Vec::new();
         for l in locs {
@@ -1341,6 +1341,33 @@ impl World {
                 s.wage = s.wage.min(player_value(s.strength, f, e, g));
             }
             c.fin.cash = c.fin.cash.max(0);
+        }
+    }
+
+    /// The user's coach was swapped to another club: the user manages that club from now on.
+    fn apply_human_move(&mut self) {
+        let Some((_, to)) = self.human_moved.clone() else {
+            return;
+        };
+        if self.human.as_ref().is_some_and(|h| h.club != to) {
+            if let Some((d, i)) = self.locate(&to).filter(|l| l.0 < 4) {
+                self.set_human(d, i);
+            }
+        }
+    }
+
+    /// A cup loser's coach is sacked (flag `0x400`: the user's coach is never a candidate).
+    fn sack_at(&mut self, (d, i): (usize, usize)) {
+        let mut cur = if d < 4 {
+            std::mem::take(&mut self.divisions[d])
+        } else {
+            std::mem::take(&mut self.pool)
+        };
+        self.replace_coach(d, &mut cur, i, true);
+        if d < 4 {
+            self.divisions[d] = cur;
+        } else {
+            self.pool = cur;
         }
     }
 
@@ -1458,9 +1485,14 @@ impl World {
                 c.fin.book(-interest, finance::Category::Interest);
             }
             finance::update_fill(&mut home.fin, attendance);
-            let (mh, ma) = cup::morale_results(!home_out);
-            home.k = crate::matchsim::update_morale(home.k, mh);
-            away.k = crate::matchsim::update_morale(away.k, ma);
+            // `1010:9396`, game type 1: the winner's coach scores 3, the loser's coach may be sacked (before the morale update)
+            let (winner_club, loser_club) = if home_out {
+                (&mut away, &mut home)
+            } else {
+                (&mut home, &mut away)
+            };
+            winner_club.coach_score += 3;
+            let sack = loser_club.sack_due();
             let (winner, loser) = if home_out {
                 (an.clone(), hn.clone())
             } else {
@@ -1484,6 +1516,16 @@ impl World {
             losers.push(loser);
             *self.club_at(hl) = home;
             *self.club_at(al) = away;
+            if sack {
+                let loc = if home_out { hl } else { al };
+                self.sack_at(loc);
+            }
+            let (mh, ma) = cup::morale_results(!home_out);
+            for (loc, r) in [(hl, mh), (al, ma)] {
+                let c = self.club_at(loc);
+                c.k = crate::matchsim::update_morale(c.k, r);
+                c.coach_games = c.coach_games.saturating_add(1).min(i16::MAX as u16);
+            }
         }
         self.cup.retain(|c| !losers.contains(c));
         if self.cup.len() == 1 {
@@ -1612,18 +1654,11 @@ impl World {
                 &mut names,
                 &plans,
                 Some(money),
-                &mut |cur, i| self.replace_coach(d, cur, i, round),
+                &mut |cur, i| self.replace_coach(d, cur, i, round == ROUNDS),
             );
             self.rng = rng;
             self.divisions[d] = cur;
-            if let Some((_, to)) = self.human_moved.clone() {
-                if let Some((hd, hi)) = self.locate(&to).filter(|l| l.0 < 4) {
-                    let keep = self.human.as_ref().map(|h| h.club == to).unwrap_or(false);
-                    if !keep {
-                        self.set_human(hd, hi);
-                    }
-                }
-            }
+            self.apply_human_move();
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
         }
         // order of `1020:0c41`: games, economic factors (`6e48`), clubs sell and renegotiate (`3e9c`), then the evolution
@@ -1638,6 +1673,7 @@ impl World {
         self.last_cup = None;
         if round.is_multiple_of(2) {
             self.play_cup_round(round);
+            self.apply_human_move();
         }
         if let Some(h) = self.human.as_mut() {
             h.plan.subs.clear(); // planned substitutions are for one round only (league game and cup tie)
@@ -1804,7 +1840,7 @@ mod tests {
         w.divisions[3][0].coach_score = 4; // the lowest score is chosen
         w.divisions[3][0].coach_games = 20;
         let mut cur = std::mem::take(&mut w.divisions[0]);
-        w.replace_coach(0, &mut cur, 0, 3);
+        w.replace_coach(0, &mut cur, 0, false);
         w.divisions[0] = cur;
         let t = &w.divisions[0][0];
         assert_eq!((t.k, t.coach_games, t.coach_score), (1.0, 0, 4));
@@ -1824,7 +1860,7 @@ mod tests {
             t.coach_games = 12;
         }
         let mut cur = std::mem::take(&mut w.divisions[0]);
-        w.replace_coach(0, &mut cur, 0, 3);
+        w.replace_coach(0, &mut cur, 0, false);
         w.divisions[0] = cur;
         assert_eq!(w.divisions[0][0].k, 0.5);
         assert!(w.coach_changes.is_empty());

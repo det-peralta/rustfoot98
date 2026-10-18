@@ -96,7 +96,7 @@ is most likely intended; the user counters it by buying players at auction.
 Coaches are objects (`coach+0x07` user flag, `+0x0c` games coached, `+0x0e` score) that belong to a team and **move between
 teams**; the 54 entries of the save's first list are the 52 clubs' coaches plus the two users' coaches.
 * **Scores** (`9396`, league games): home win +2 for the home coach; away win +3 for the away coach; draw +1 home / +2 away; the
-  loser gets nothing. Cup ties: the winner's coach +3.
+  loser gets nothing. Cup ties (also `9396`): the winner's coach +3, and both coaches' game counters grow as in the league.
 * **Sack check** (`8b5d`) runs right after the game, before the morale update, **only for the loser** (both clubs after a draw;
   the loser of a cup tie with flag `0x400`): the coach has coached at least 10 games and the team's `K <= 0.65`. (A user's coach on a
   club of the outside pool is dismissed at once; the pool never plays here.)
