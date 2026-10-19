@@ -1,6 +1,7 @@
 //! Drawing primitives and the controls, following what Windows 3.1 and Delphi 1 drew.
 use super::fb::{Fb, Rgb, BLACK, GRAY, GREEN, NAVY, SILVER, WHITE};
 use super::form::Node;
+use super::json::Json;
 use super::skin::{ansi, Font, Skin};
 use super::widgets;
 use std::cell::RefCell;
@@ -262,6 +263,20 @@ pub fn dialog_frame_thick(
     ch: i32,
     bg: Rgb,
 ) -> (i32, i32) {
+    dialog_frame_thick_sys(fb, skin, caption, cw, ch, bg, false)
+}
+
+/// `dialog_frame_thick`, optionally with the system menu box (the 18-pixel box with a dash that a form shows when its `BorderIcons`
+/// contain `biSystemMenu`, which is also the default) at the left of the caption; the caption is centred in the rest of the bar.
+pub fn dialog_frame_thick_sys(
+    fb: &mut Fb,
+    skin: &Skin,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+    sys: bool,
+) -> (i32, i32) {
     let (w, h) = (cw + 6, ch + 25);
     let (x, y) = frame_origin(((super::fb::W - w) / 2, (super::fb::H - h) / 2));
     fb.fill(x, y, w, h, BLACK);
@@ -271,11 +286,65 @@ pub fn dialog_frame_thick(
     fb.fill(x + 5, y + 4, 1, 20, WHITE);
     fb.fill(x + w - 6, y + 4, 1, 20, WHITE);
     fb.fill(x + 6, y + 23, w - 12, 1, BLACK);
+    let mut left = x + 6;
+    if sys {
+        let (bx, by) = (x + 6, y + 5);
+        fb.fill(bx, by, 18, 18, SILVER);
+        fb.fill(bx + 18, by, 1, 18, BLACK);
+        fb.fill(bx + 2, by + 7, 13, 3, BLACK);
+        fb.fill(bx + 3, by + 8, 11, 1, WHITE);
+        fb.fill(bx + 15, by + 8, 1, 2, GRAY);
+        fb.fill(bx + 3, by + 10, 13, 1, GRAY);
+        left = bx + 19;
+    }
     if let Some(f) = skin.font("system", 13, false, false) {
         let tw = f.width(caption);
-        text(fb, f, x + (w - tw) / 2, y + 6, caption, WHITE, false);
+        let right = x + w - 6;
+        text(
+            fb,
+            f,
+            left + (right - left - tw) / 2,
+            y + 6,
+            caption,
+            WHITE,
+            false,
+        );
     }
     (x + 5, y + 24)
+}
+
+/// The frame a form gets: thick for `bsDialog` (with the system menu box unless `BorderIcons` leaves it out), plain otherwise.
+pub fn form_frame(
+    fb: &mut Fb,
+    skin: &Skin,
+    form: &Node,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+) -> (i32, i32) {
+    if form.ident("BorderStyle") == Some("bsDialog") {
+        let sys = !form.props.contains_key("BorderIcons")
+            || form.set("BorderIcons").contains(&"biSystemMenu");
+        dialog_frame_thick_sys(fb, skin, caption, cw, ch, bg, sys)
+    } else {
+        dialog_frame(fb, skin, caption, cw, ch, bg)
+    }
+}
+
+/// The client size to draw a form with. The thick `bsDialog` frame (see `dialog_frame_thick`) surrounds a client area 4 pixels larger
+/// than it was designed for in each direction (measured on the options, profile, stadium and progress dialogs, the calendar and the
+/// scorers list), so these forms are drawn with `ClientWidth + 4` by `ClientHeight + 4`. The exception is the new-game dialog,
+/// which the program shrinks itself. A program that resizes a form passes `@client=WxH` (in the same units) instead.
+pub fn form_client(form: &Node) -> (i32, i32) {
+    let (mut cw, mut ch) = (form.int("ClientWidth", 400), form.int("ClientHeight", 300));
+    if form.ident("BorderStyle") == Some("bsDialog")
+        && !form.class.eq_ignore_ascii_case("TSelectGameDlg")
+    {
+        cw += 4;
+        ch += 4;
+    }
+    (cw, ch)
 }
 
 /// The face of a `TBitBtn`/`TButton` in its normal state: a black outline with cut corners (2 pixels for the default
@@ -315,9 +384,26 @@ pub fn controls(fb: &mut Fb, cx: &Ctx, root: &Node) {
     for n in &root.children {
         control(fb, cx, n, &base);
     }
+    widgets::draw_overlays(fb, cx, root);
 }
 
 pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
+    // the program resized the control at run time: `<name>.size=WxH`
+    if let Some((w, h)) = cx
+        .texts
+        .get(&format!("{}.size", n.name))
+        .and_then(|v| v.split_once('x'))
+        .and_then(|(a, b)| Some((a.trim().parse::<f64>().ok()?, b.trim().parse::<f64>().ok()?)))
+    {
+        let mut m = n.clone();
+        m.props.insert("Width".into(), Json::Num(w));
+        m.props.insert("Height".into(), Json::Num(h));
+        return control_node(fb, cx, &m, parent);
+    }
+    control_node(fb, cx, n, parent)
+}
+
+fn control_node(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
     let visible = match cx.texts.get(&format!("{}.visible", n.name)) {
         Some(v) => v != "0",
         None => n.flag("Visible", true),
@@ -368,6 +454,7 @@ pub(super) fn control(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         "TTabbedNotebook" => widgets::tabbed_notebook(fb, cx, n, &f, x, y),
         "TSpeedButton" => widgets::speedbutton(fb, cx, n, &f, x, y),
         "TColorGrid" => widgets::colorgrid(fb, cx, n, &f, x, y),
+        "TPaintBox" => widgets::paintbox(fb, cx, n, x, y),
         "TGauge" => gauge(fb, cx, n, &f, x, y),
         "TImage" => image(fb, cx, n, x, y),
         "TNotebook" => notebook(fb, cx, n, &f, x, y),
@@ -428,38 +515,75 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             Some("taRightJustify") => x + w - tw,
             _ => x,
         };
-        text(
-            fb,
-            font,
-            lx,
-            y + i as i32 * font.height(),
-            line,
-            f.color,
-            f.underline,
-        );
+        let ly = y + i as i32 * font.height();
+        if is_enabled(cx, n) {
+            text(fb, font, lx, ly, line, f.color, f.underline);
+        } else {
+            // a disabled label is embossed: white shifted by one pixel, grey on top
+            text(fb, font, lx + 1, ly + 1, line, WHITE, f.underline);
+            text(fb, font, lx, ly, line, GRAY, f.underline);
+        }
     }
 }
 
+/// `TMemo`: the lines (`lists[name]`, else `texts[name]` split at newlines, else `Lines.Strings`) with the control's alignment. A bordered
+/// memo is a sunken box on its `Color` and shows a vertical scroll bar (`ScrollBars`) when the lines do not fit; `<name>.top` is the
+/// first visible line.
 fn memo(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
         return;
     };
-    let w = n.int("Width", 0);
-    for (i, line) in n.strings("Lines.Strings").iter().enumerate() {
+    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    let lines: Vec<String> = match (cx.lists.get(&n.name), cx.texts.get(&n.name)) {
+        (Some(v), _) => v.clone(),
+        (None, Some(t)) => t.split('\n').map(str::to_string).collect(),
+        _ => n.strings("Lines.Strings"),
+    };
+    let bordered = n.ident("BorderStyle") != Some("bsNone");
+    let (mut x0, mut y0, mut right, mut bottom) = (x, y, x + w, y + h);
+    if bordered {
+        sunken_box(fb, x, y, w, h, n.color("Color").unwrap_or(WHITE));
+        (x0, y0, right, bottom) = (x + 2, y + 1, x + w - 1, y + h - 1);
+    } else if let Some(c) = n.color("Color").filter(|_| !n.flag("ParentColor", false)) {
+        fb.fill(x, y, w, h, c);
+    }
+    let ih = font.height();
+    let fit = ((bottom - y0) / ih).max(1) as usize;
+    let vertical = matches!(n.ident("ScrollBars"), Some("ssVertical" | "ssBoth"));
+    let scrolled = bordered && vertical && lines.len() > fit;
+    if scrolled {
+        right -= 16;
+    }
+    let top = widgets::get_num(cx, n, "top").unwrap_or(0).max(0) as usize;
+    let top = top.min(lines.len().saturating_sub(fit));
+    let old = fb.clip;
+    fb.clip = (
+        x0.max(old.0),
+        y0.max(old.1),
+        right.min(old.2),
+        bottom.min(old.3),
+    );
+    for (r, line) in lines.iter().skip(top).enumerate() {
         let tw = font.width(line);
         let lx = match n.ident("Alignment") {
-            Some("taCenter") => x + (w - tw) / 2,
-            Some("taRightJustify") => x + w - tw,
-            _ => x,
+            Some("taCenter") => x0 + (right - x0 - tw) / 2,
+            Some("taRightJustify") => x0 + right - x0 - tw,
+            _ => x0,
         };
-        text(
+        text(fb, font, lx, y0 + r as i32 * ih, line, f.color, false);
+    }
+    fb.clip = old;
+    if scrolled {
+        widgets::vscroll(
             fb,
-            font,
-            lx,
-            y + i as i32 * font.height(),
-            line,
-            f.color,
-            false,
+            cx,
+            &n.name,
+            x + w - 17,
+            y + 1,
+            h - 2,
+            top,
+            lines.len(),
+            fit,
         );
     }
 }
@@ -604,30 +728,62 @@ fn groupbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
 pub(super) fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: Rgb) {
     fb.fill(x, y, w, h, BLACK);
     fb.fill(x + 1, y + 1, w - 2, h - 2, interior);
-    fb.fill(x - 1, y - 1, w, 1, GRAY);
-    fb.fill(x - 1, y - 1, 1, h, GRAY);
-    fb.fill(x - 1, y + h, w + 1, 1, WHITE);
-    fb.fill(x + w, y - 1, 1, h + 1, WHITE);
+    fb.fill(x - 1, y - 1, w + 1, 1, GRAY);
+    fb.fill(x - 1, y - 1, 1, h + 1, GRAY);
+    fb.fill(x, y + h, w + 1, 1, WHITE);
+    fb.fill(x + w, y, 1, h + 1, WHITE);
 }
 
 fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    sunken_box(fb, x, y, w, h, WHITE);
-    if let Some(font) = cx.font(f) {
-        let s = caption_or(cx, n, "Text");
-        let old = fb.clip;
-        fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
-        text(
-            fb,
-            font,
-            x + 2,
-            y + (h - font.height()) / 2,
-            s,
-            f.color,
-            false,
-        );
-        fb.clip = old;
+    let enabled = is_enabled(cx, n);
+    sunken_box(fb, x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(WHITE));
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let s = caption_or(cx, n, "Text");
+    let (tx, ty) = (x + 2, y + (h - font.height()) / 2);
+    let old = fb.clip;
+    fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
+    // selected characters: `<name>.selstart` and `<name>.sellen` are character positions
+    let num = |k: &str| {
+        cx.texts
+            .get(&format!("{}.{k}", n.name))
+            .and_then(|v| v.parse::<usize>().ok())
+    };
+    let chars: Vec<char> = s.chars().collect();
+    let (a, len) = (
+        num("selstart").unwrap_or(0).min(chars.len()),
+        num("sellen").unwrap_or(0),
+    );
+    let b = (a + len).min(chars.len());
+    let pre: String = chars[..a].iter().collect();
+    let mid: String = chars[a..b].iter().collect();
+    let post: String = chars[b..].iter().collect();
+    let ink = if enabled { f.color } else { GRAY };
+    let mut pen = tx;
+    pen += text(fb, font, pen, ty, &pre, ink, false);
+    if !mid.is_empty() {
+        let mw = font.width(&mid);
+        fb.fill(pen + 1, ty, mw, font.height(), NAVY);
+        text(fb, font, pen, ty, &mid, WHITE, false);
+        pen += mw;
     }
+    text(fb, font, pen, ty, &post, ink, false);
+    // the caret: a black line before character `<name>.caret`, a pixel taller than the font's line
+    if cx.focus == n.name && enabled {
+        if let Some(c) = num("caret") {
+            let before: String = chars[..c.min(chars.len())].iter().collect();
+            fb.fill(
+                tx + 1 + font.width(&before),
+                ty,
+                1,
+                font.height() + 1,
+                BLACK,
+            );
+        }
+    }
+    fb.clip = old;
 }
 
 /// The owner-drawn squad list of the main screen: rows `pos|name|strength|wage|mark`, 16 pixels high, grouped by position with a black
@@ -1177,8 +1333,6 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let default = (enabled && cx.focus == n.name)
         || ((n.flag("Default", false) || n.ident("Kind") == Some("bkOK"))
             && !FOCUS_ON_BUTTON.with(|c| c.get()));
-    // content of the thin-framed button sits one pixel up and to the right of the default button's
-    let (ix, iy) = if default { (0, 2) } else { (1, 1) };
     button_face(fb, x, y, w, h, default);
     let kind = n.ident("Kind").unwrap_or("bkCustom");
     let std = match kind {
@@ -1230,16 +1384,20 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if let Some(font) = cx.font(f) {
         let label: String = cap.replace('&', "");
         let tw = font.width(&label);
+        // the caption is centred with the odd pixel on the left (the raster MS Sans Serif puts it on the right)
+        let round_up = i32::from(font.face != "ms sans serif");
         let spaced = n.int("Margin", -1) < 0 && n.int("Spacing", 4) >= 0;
         let ty = if spaced {
             y + 2 + glyph_margin(cx, n, h, gh, f) + gh + n.int("Spacing", 4)
         } else {
-            y + h
-                - 2
-                - n.int("Margin", 4)
-                - font.tm_height
-                - if font.height() == font.tm_height {
-                    2 - iy
+            y + h - 2 - n.int("Margin", 4) - font.tm_height
+                + if font.height() != font.tm_height {
+                    0
+                } else if font.face == "ms sans serif" {
+                    1
+                } else if !default && !font.bold {
+                    // a thin-framed button raises the caption of a regular raster font by a pixel
+                    -1
                 } else {
                     0
                 }
@@ -1248,7 +1406,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let (tx, ty) = if n.class == "TButton" {
             (x + (w - tw) / 2 - 1, y + (h - font.height()) / 2 + 1)
         } else {
-            (x + ix + (w - tw) / 2, ty)
+            (x + (w - tw + round_up) / 2, ty)
         };
         if enabled {
             text(fb, font, tx, ty, &label, f.color, false);
@@ -1259,7 +1417,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         if cx.focus == n.name {
             focus_rect(
                 fb,
-                x + ix + (w - tw) / 2 - 1,
+                x + (w - tw + round_up) / 2 - 1,
                 ty - 1,
                 tw + 2,
                 font.height() + 2,

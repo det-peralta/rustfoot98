@@ -1,7 +1,9 @@
 //! Modal dialogs: one of the original's forms drawn over the screen with texts, lists and states supplied by the program, and a
 //! behaviour (`dialogs/`) that answers clicks and keys. See `docs/classic-dialogs.md` for the conventions.
 use super::{dialogs, Classic, Key};
-use crate::win31::draw::{controls, dialog_frame, dialog_frame_thick, Ctx, Hit, FRAME_ORIGIN};
+use crate::win31::draw::{
+    controls, dialog_frame_thick, form_client, form_frame, Ctx, Hit, FRAME_ORIGIN,
+};
 use crate::win31::fb::{Rgb, SILVER};
 use crate::win31::Node;
 use std::cell::RefCell;
@@ -112,7 +114,7 @@ impl Dialog {
         let Some(form) = forms.get(&self.form) else {
             return;
         };
-        let (mut cw, mut ch) = (form.int("ClientWidth", 400), form.int("ClientHeight", 300));
+        let (mut cw, mut ch) = form_client(form);
         if let Some((a, b)) = self.texts.get("@client").and_then(|v| v.split_once('x')) {
             cw = a.parse().unwrap_or(cw);
             ch = b.parse().unwrap_or(ch);
@@ -132,10 +134,10 @@ impl Dialog {
             Some((a.parse().ok()?, b.parse().ok()?))
         });
         FRAME_ORIGIN.with(|o| o.set(origin));
-        let (ox, oy) = if thick {
+        let (ox, oy) = if thick && form.ident("BorderStyle") != Some("bsDialog") {
             dialog_frame_thick(fb, skin, caption, cw, ch, bg)
         } else {
-            dialog_frame(fb, skin, caption, cw, ch, bg)
+            form_frame(fb, skin, form, caption, cw, ch, bg)
         };
         FRAME_ORIGIN.with(|o| o.set(None));
         let (fx, fy) = (ox, oy);
@@ -191,6 +193,16 @@ impl Dialog {
                         | "TabSetTab"
                         | "TColorGrid"
                         | "TPaintBox"
+                        | "ComboItem"
+                        | "ScrollUp"
+                        | "ScrollDown"
+                        | "ScrollThumb"
+                        | "ScrollPage"
+                        | "NotebookTab"
+                        | "RadioItem"
+                        | "SpinUp"
+                        | "SpinDown"
+                        | "ColorCell"
                 )
         })
     }
@@ -247,12 +259,17 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
                     | "TListBox"
                     | "TComboBox"
                     | "TSpinEdit"
+                    | "TTabbedNotebook"
+                    | "TRadioGroup"
             )
     };
     let is_edit = d
         .hits
         .iter()
         .any(|h| h.name == d.focus && h.class == "TEdit");
+    if let Some(act) = super::widget_input::key(c, d, key) {
+        return act;
+    }
     match key {
         Key::Enter => {
             // a button that has the focus takes the key (Windows: the default button only when the focus is elsewhere)

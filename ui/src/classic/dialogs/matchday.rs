@@ -289,10 +289,10 @@ fn club_list(d: &mut Dialog, name: &str, ink: &str, form: &str, cols: &str, ih: 
     d.text(format!("{name}.bgcolor"), form);
     d.text(format!("{name}.flat"), "1");
     d.text(format!("{name}.cols"), cols);
-    d.text(format!("{name}.align"), "llr");
-    d.text(format!("{name}.boldcols"), "1,2");
+    // (an upper-case letter draws the column in bold: the name and the strength)
+    d.text(format!("{name}.align"), "lLR");
     d.text(format!("{name}.itemheight"), ih.to_string());
-    d.text(format!("{name}.inset"), "0");
+    d.text(format!("{name}.inset"), "1");
 }
 
 fn set_sel(d: &mut Dialog, name: &str, row: Option<usize>) {

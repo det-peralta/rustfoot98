@@ -40,3 +40,5 @@ analysis/jsdos/
 
 # the skin pack for the browser (the game's own data)
 web/skin/
+# captures of the widgets work (local goldens for tools/ui/check.py)
+analysis/shots/w/
