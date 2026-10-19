@@ -17,35 +17,6 @@ use elifoot_core::sector::{Slot, Status};
 use elifoot_core::world::World;
 use std::collections::{HashMap, VecDeque};
 
-/// The options of the original's *Opções* that act on a match day (defaults of the original's INI).
-#[derive(Clone, Debug)]
-pub struct Options {
-    /// Game time profile 1..=6 (Lento, Médio, Rápido, Super-rápido, Rapidíssimo, Ultrassónico); `Médio` by default.
-    pub time_profile: usize,
-    /// Substitutions at the break: the dialog of the break shows for the user's games.
-    pub halftime_subs: bool,
-    /// Watch the draw of the cup: 0 never, 1 when the user's club is drawn (default), 2 always.
-    pub cup_draw: u8,
-    /// Show the psychological whips (sackings): 0 never, 1 those of the human coaches (default), 2 all.
-    pub lashes: u8,
-    /// The check boxes of the break dialog: list the red cards and the injuries.
-    pub view_red: bool,
-    pub view_injuries: bool,
-}
-
-impl Default for Options {
-    fn default() -> Options {
-        Options {
-            time_profile: 2,
-            halftime_subs: true,
-            cup_draw: 1,
-            lashes: 1,
-            view_red: false,
-            view_injuries: false,
-        }
-    }
-}
-
 /// What happens next at the end of a round, once the dialogs open are closed.
 pub enum Step {
     Open(Box<Dialog>),
@@ -76,7 +47,9 @@ pub struct Session {
 
 #[derive(Default)]
 pub struct State {
-    pub opts: Options,
+    /// The check boxes of the break dialog: list the red cards and the injuries.
+    pub view_red: bool,
+    pub view_injuries: bool,
     pub session: Option<Session>,
     pub todo: VecDeque<Step>,
     /// Titles won in this run of the program: `club -> (league, cup)` (the end-of-season window counts them).
@@ -226,7 +199,7 @@ impl Classic {
         if let Some(s) = &self.md.session {
             v.title = format!("{}ª Jornada - {}", s.snapshot.round + 1, s.snapshot.year);
         }
-        v.interval = round_view::interval(self.md.opts.time_profile, v.humans());
+        v.interval = round_view::interval(self.opts.profile as usize + 1, v.humans());
         self.screen = Screen::Round(Box::new(v));
         self.dirty = true;
     }
@@ -407,7 +380,7 @@ impl Classic {
                 rv.page = 0;
                 if rv.shown().next().is_some() {
                     rv.max = 120;
-                    rv.interval = round_view::interval(self.md.opts.time_profile, rv.humans());
+                    rv.interval = round_view::interval(self.opts.profile as usize + 1, rv.humans());
                     if let Some(d) = self.halftime_dialog(rv, 91) {
                         return Tick::Ask(d);
                     }
@@ -425,7 +398,7 @@ impl Classic {
 
     /// The dialog of the break for the user's game (`next`: the minute the substitutions made now take place, 46 or 91).
     fn halftime_dialog(&self, rv: &RoundView, next: u16) -> Option<Dialog> {
-        if !self.md.opts.halftime_subs {
+        if !self.opts.half_time_subs {
             return None;
         }
         let g = rv.shown().find(|g| g.human)?;
@@ -452,6 +425,10 @@ impl Classic {
     pub fn finish_round(&mut self) {
         self.screen = Screen::Main;
         self.md.session = None;
+        // the game is saved after the round as the options say (the world is final now: the replays are over)
+        if self.opts.saves_after(self.world.round) {
+            self.save_now();
+        }
         self.dirty = true;
     }
 
@@ -474,7 +451,7 @@ impl Classic {
             }
             Step::CupView => {
                 if let Some(mut v) = RoundView::of_cup(&self.world) {
-                    v.interval = round_view::interval(self.md.opts.time_profile, v.humans());
+                    v.interval = round_view::interval(self.opts.profile as usize + 1, v.humans());
                     self.screen = Screen::Round(Box::new(v));
                 }
             }
@@ -630,7 +607,7 @@ mod tests {
             let mut c = classic(seed);
             let mut plain = c.world.clone();
             plain.play_round();
-            c.md.opts.halftime_subs = false;
+            c.opts.half_time_subs = false;
             c.play_round();
             // no decision is taken: the dialogs that ask something are not answered, the replay never happens
             run(&mut c);

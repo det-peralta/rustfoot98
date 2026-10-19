@@ -5,6 +5,7 @@ pub mod dialogs;
 pub mod input;
 pub mod main_win;
 pub mod menu;
+pub mod options;
 pub mod round_view;
 pub mod session;
 pub mod text;
@@ -24,6 +25,8 @@ pub struct Data {
     pub referees: Vec<(String, String)>,
     /// Names of the games the player has saved (the host keeps their text).
     pub saves: Vec<String>,
+    /// The description of each saved game (coach and date, lines joined by `\n`), by name; may lack entries.
+    pub save_desc: HashMap<String, String>,
 }
 
 impl Data {
@@ -44,6 +47,21 @@ impl Data {
                 .filter_map(split)
                 .collect(),
             saves: Vec::new(),
+            save_desc: HashMap::new(),
+        }
+    }
+
+    /// Takes the host's list of saved games: one per line, `NAME` or `NAME<TAB>first line of the saved text` (whose header describes it).
+    pub fn set_saves(&mut self, list: &str) {
+        self.saves.clear();
+        self.save_desc.clear();
+        for l in list.lines().filter(|l| !l.is_empty()) {
+            let (name, head) = l.split_once('\t').unwrap_or((l, ""));
+            self.saves.push(name.to_string());
+            let d = options::Header::split(head).0.description();
+            if !d.is_empty() {
+                self.save_desc.insert(name.to_string(), d);
+            }
         }
     }
 }
@@ -157,6 +175,19 @@ pub struct Classic {
     pub requests: Vec<Request>,
     /// The match day: options that act on it, the round being shown with what is needed to replay it, the dialogs still to come.
     pub md: session::State,
+    /// The player's options (`TOptionsDlg`).
+    pub opts: options::Options,
+    /// False until a game was started or loaded: only the start dialogs show over the empty desktop.
+    pub started: bool,
+    /// The teams a new game is made of (empty: invented clubs) and the seed for it.
+    pub teams: Vec<elifoot_core::eft::EftTeam>,
+    pub seed: u32,
+    /// Name the current game is saved under (empty before the first game starts).
+    pub game_name: String,
+    /// The name of the game being loaded (waiting for the host's text).
+    pub loading: Option<String>,
+    /// The wall clock as `dd/mm/yy hh:mm`, set by the host (it goes into the description of saved games).
+    pub clock: String,
     pub mouse: (i32, i32),
     pub hits: Vec<Hit>,
     /// Set whenever something changed that needs a new frame.
@@ -178,16 +209,102 @@ impl Classic {
             queue: Default::default(),
             requests: Vec::new(),
             md: Default::default(),
+            opts: options::Options::default(),
+            started: true,
+            teams: Vec::new(),
+            seed: 1,
+            game_name: String::new(),
+            loading: None,
+            clock: String::new(),
             mouse: (0, 0),
             hits: Vec::new(),
             dirty: true,
         }
     }
 
+    /// The interface before any game exists: the About box opens first, then the choice of game (see `dialogs/newgame.rs`).
+    /// `teams` are the `.EFT` files of the pack (none: invented clubs) and `seed` seeds the new game's world.
+    pub fn start(
+        skin: Skin,
+        forms: Forms,
+        data: Data,
+        teams: Vec<elifoot_core::eft::EftTeam>,
+        seed: u32,
+    ) -> Classic {
+        let blank = World::empty(1, Default::default(), Vec::new(), 1998, 0);
+        let mut c = Classic::new(blank, skin, forms, data);
+        c.started = false;
+        c.teams = teams;
+        c.seed = seed.max(1);
+        c.dialogs.push(dialogs::about::open_startup());
+        c
+    }
+
+    /// The text of the game for the host to keep: a header line (coach, date, options) and the world.
+    pub fn save_text(&self) -> String {
+        let h = options::Header {
+            coach: self.coach.clone(),
+            stamp: self.clock.clone(),
+            opts: None,
+        };
+        format!("{}\n{}", h.line(&self.opts), self.world.save())
+    }
+
+    /// Takes the text of the game the host was asked for with `Request::Load` and starts playing it. On a bad text a message box
+    /// tells so and the choice of game opens again.
+    pub fn load_text(&mut self, text: &str) -> Result<(), String> {
+        let (h, body) = options::Header::split(text);
+        match World::load(body) {
+            Ok(w) => {
+                self.world = w;
+                if !h.coach.is_empty() {
+                    self.coach = h.coach;
+                }
+                if let Some(o) = h.opts {
+                    self.opts = o;
+                }
+                if let Some(n) = self.loading.take() {
+                    self.game_name = n;
+                }
+                self.enter_game();
+                Ok(())
+            }
+            Err(e) => {
+                self.loading = None;
+                self.dialogs.clear();
+                self.dialogs.push(dialogs::newgame::open_select());
+                self.message("Erro", "Não foi possível carregar o jogo.");
+                self.dirty = true;
+                Err(e)
+            }
+        }
+    }
+
+    /// Shows the main window of the game just created or loaded.
+    pub fn enter_game(&mut self) {
+        self.started = true;
+        self.dialogs.clear();
+        self.queue.clear();
+        self.screen = Screen::Main;
+        self.main = main_win::MainState::default();
+        self.dirty = true;
+    }
+
+    /// Asks the host to store the game under its name (after a round, on exit).
+    pub fn save_now(&mut self) {
+        if self.started && !self.game_name.is_empty() {
+            self.requests.push(Request::Save(self.game_name.clone()));
+        }
+    }
+
     /// Draws the whole screen (800x600) into `self.fb`.
     pub fn draw(&mut self) {
         self.hits.clear();
+        if !self.started {
+            main_win::desktop(&mut self.fb, &self.skin);
+        }
         match &self.screen {
+            Screen::Main if !self.started => {}
             Screen::Main => {
                 main_win::draw(self);
                 if let (Some((open, hl)), Some((_, club))) =
@@ -231,5 +348,78 @@ impl Classic {
     /// Shows a message box with an OK button.
     pub fn message(&mut self, caption: &str, text: &str) {
         self.open(dialogs::message(caption, text));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bare() -> Classic {
+        let mut sk = b"EFSK".to_vec();
+        sk.extend_from_slice(&0u16.to_le_bytes());
+        let mut gl = b"EFGL".to_vec();
+        gl.extend_from_slice(&0u16.to_le_bytes());
+        let skin = Skin::from_bytes(&sk, &gl).unwrap();
+        let forms = Forms::from_json("{}").unwrap();
+        Classic::start(skin, forms, Data::default(), Vec::new(), 7)
+    }
+
+    #[test]
+    fn the_game_starts_with_the_about_box_and_no_game() {
+        let c = bare();
+        assert!(!c.started);
+        assert_eq!(c.dialogs.len(), 1);
+        assert_eq!(c.dialogs[0].kind, dialog::Kind::About);
+    }
+
+    #[test]
+    fn a_saved_game_keeps_the_coach_and_options() {
+        let mut c = bare();
+        c.world = World::synthetic(3);
+        c.coach = "Zeca".into();
+        c.clock = "01/02/98 10:30".into();
+        c.opts.profile = 2;
+        c.opts.half_time_subs = false;
+        let text = c.save_text();
+        let mut d = Data::default();
+        d.set_saves(&format!("JOGO\t{}", text.lines().next().unwrap()));
+        assert_eq!(d.save_desc["JOGO"], "Zeca\n01/02/98 10:30");
+        let mut c2 = bare();
+        c2.loading = Some("JOGO".into());
+        c2.load_text(&text).unwrap();
+        assert!(c2.started && c2.dialogs.is_empty());
+        assert_eq!(c2.coach, "Zeca");
+        assert_eq!(c2.game_name, "JOGO");
+        assert_eq!(c2.opts, c.opts);
+        // an old save without the header still loads
+        let old = c.world.save();
+        let mut c3 = bare();
+        assert!(c3.load_text(&old).is_ok());
+        assert_eq!(c3.coach, "Treinador");
+    }
+
+    #[test]
+    fn a_bad_saved_game_returns_to_the_choice_with_a_message() {
+        let mut c = bare();
+        assert!(c.load_text("garbage").is_err());
+        assert!(!c.started);
+        assert_eq!(c.dialogs.len(), 2);
+        assert_eq!(c.dialogs[1].kind, dialog::Kind::Message);
+    }
+
+    #[test]
+    fn leaving_saves_only_with_a_game_name() {
+        let mut c = bare();
+        c.save_now();
+        assert!(c.requests.is_empty());
+        c.world = World::synthetic(3);
+        c.enter_game();
+        c.game_name = "X".into();
+        c.command("jogoSair");
+        assert_eq!(c.requests, vec![Request::Save("X".into()), Request::Quit]);
+        c.requests.clear();
+        c.command("Sairsemgravar1");
+        assert_eq!(c.requests, vec![Request::Quit]);
     }
 }

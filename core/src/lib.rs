@@ -9,6 +9,7 @@ pub mod economy;
 pub mod eft;
 pub mod evolution;
 pub mod finance;
+pub mod history;
 pub mod lineup;
 pub mod market;
 pub mod matchsim;

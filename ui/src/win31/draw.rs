@@ -427,6 +427,22 @@ fn control_node(fb: &mut Fb, cx: &Ctx, n: &Node, parent: &FontSpec) {
         }
     }
     let (x, y) = (cx.ox + left, cx.oy + top);
+    // the program resized the control at run time (`<name>.size=w,h`)
+    let resized;
+    let n = match cx.texts.get(&format!("{}.size", n.name)) {
+        Some(sz) => {
+            let v: Vec<f64> = sz.split(',').filter_map(|t| t.parse().ok()).collect();
+            let mut m = n.clone();
+            if v.len() == 2 {
+                m.props.insert("Width".into(), super::json::Json::Num(v[0]));
+                m.props
+                    .insert("Height".into(), super::json::Json::Num(v[1]));
+            }
+            resized = m;
+            &resized
+        }
+        None => n,
+    };
     cx.hits.borrow_mut().push(Hit {
         name: n.name.clone(),
         class: n.class.clone(),
@@ -492,7 +508,19 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
         return;
     };
-    let w = n.int("Width", 0);
+    let mut w = n.int("Width", 0);
+    if cx
+        .texts
+        .get(&format!("{}.autosize", n.name))
+        .is_some_and(|v| v == "1")
+    {
+        // an AutoSize label that got a new caption shrinks or grows to it
+        w = caption(cx, n)
+            .split('\n')
+            .map(|l| font.width(l))
+            .max()
+            .unwrap_or(0);
+    }
     if let Some(b) = cx.color_of(n, "bgcolor") {
         fb.fill(x, y, w, n.int("Height", 0), b);
     }
@@ -629,11 +657,13 @@ fn bevel(fb: &mut Fb, n: &Node, x: i32, y: i32) {
 /// `TPanel`: face colour, an optional bevel and a centred caption.
 fn panel(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    let color = if n.flag("ParentColor", false) {
-        cx.bg
-    } else {
-        n.color("Color").unwrap_or(SILVER)
-    };
+    let color = cx.color_of(n, "bgcolor").unwrap_or_else(|| {
+        if n.flag("ParentColor", false) {
+            cx.bg
+        } else {
+            n.color("Color").unwrap_or(SILVER)
+        }
+    });
     fb.fill(x, y, w, h, color);
     let bw = n.int("BevelWidth", 1);
     let (outer, inner) = (
@@ -1003,6 +1033,28 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         }
         return;
     }
+    if n.ident("Style") == Some("lbOwnerDrawFixed")
+        && matches!(
+            n.name.as_str(),
+            "listOfItems"
+                | "ListBoxDivision1"
+                | "ListBoxDivision2"
+                | "ListBoxDivision3"
+                | "ListBoxDivision4"
+                | "ListBoxOfCoaches"
+        )
+    {
+        // rows in the field encoding of the original's `DrawItem` routines (`printlist.rs`)
+        if let Some(rows) = cx.lists.get(&n.name) {
+            let bg = if flat {
+                cx.bg
+            } else {
+                cx.color_of(n, "bg").unwrap_or(WHITE)
+            };
+            super::printlist::draw_list(fb, cx, n, f, bg, x, y, w, h, rows);
+        }
+        return;
+    }
     if n.ident("Style") == Some("lbOwnerDrawVariable") {
         if let Some(rows) = cx.lists.get(&n.name) {
             roster(fb, cx, n, font, f.color, x, y, w, h, rows);
@@ -1241,9 +1293,15 @@ fn image(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
         return;
     };
     if let Some(b) = cx.skin.bitmap(form, name) {
-        for r in 0..b.h {
-            for c in 0..b.w {
-                let p = b.px[(r * b.w + c) as usize];
+        // `Stretch`: the bitmap is scaled to the control's size (nearest neighbour, as StretchBlt does for whole factors)
+        let (w, h) = if n.flag("Stretch", false) {
+            (n.int("Width", b.w), n.int("Height", b.h))
+        } else {
+            (b.w, b.h)
+        };
+        for r in 0..h {
+            for c in 0..w {
+                let p = b.px[((r * b.h / h) * b.w + c * b.w / w) as usize];
                 fb.set(x + c, y + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
             }
         }

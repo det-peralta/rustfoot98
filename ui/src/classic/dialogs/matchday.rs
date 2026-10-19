@@ -322,15 +322,15 @@ fn bind_squad(c: &Classic, d: &mut Dialog) {
     d.text("textReferee", referee_of(c, cup, &info));
     d.text(
         "checkViewRedCards.checked",
-        (c.md.opts.view_red as u8).to_string(),
+        (c.md.view_red as u8).to_string(),
     );
     d.text(
         "checkViewInjuries.checked",
-        (c.md.opts.view_injuries as u8).to_string(),
+        (c.md.view_injuries as u8).to_string(),
     );
     d.lists.insert(
         "ListBoxOfEvents".into(),
-        event_lines(&info, minute, c.md.opts.view_red, c.md.opts.view_injuries),
+        event_lines(&info, minute, c.md.view_red, c.md.view_injuries),
     );
     let me = human_side(c, cup, src) == Some(side);
     // the squads show only for the user's club (the original cuts the form short for the others)
@@ -628,7 +628,7 @@ pub fn cup_draw(c: &Classic) -> Option<Dialog> {
     let sess = c.md.session.as_ref()?;
     let me = sess.snapshot.human.as_ref()?.club.clone();
     let human_drawn = cup.matches.iter().any(|m| m.home == me || m.away == me);
-    let show = c.md.opts.cup_draw == 2 || (c.md.opts.cup_draw == 1 && human_drawn);
+    let show = c.opts.cup_draw == 2 || (c.opts.cup_draw == 1 && human_drawn);
     if !show || sess.snapshot.cup.len() <= 2 {
         return None;
     }
@@ -776,7 +776,7 @@ fn bind_lashes(_c: &Classic, d: &mut Dialog) {
 fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
     let sess = c.md.session.as_ref()?;
     let me = sess.snapshot.human.as_ref().map(|h| h.club.clone());
-    let all = c.md.opts.lashes == 2;
+    let all = c.opts.lashes == 2;
     let coach = |club: &str| {
         let n = sess.coaches.get(club).cloned().unwrap_or_default();
         if n.is_empty() {
@@ -794,7 +794,7 @@ fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
         .take(to.saturating_sub(from))
     {
         let human = me.as_deref() == Some(sacked.as_str()) || me.as_deref() == Some(gave.as_str());
-        if !(all || (c.md.opts.lashes == 1 && human)) {
+        if !(all || (c.opts.lashes == 1 && human)) {
             continue;
         }
         lines.push(format!("{} foi despedido do {sacked}", coach(sacked)));
@@ -891,8 +891,8 @@ fn click_squad(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         d.num("side") as usize,
     );
     match name {
-        "checkViewRedCards" => c.md.opts.view_red = !c.md.opts.view_red,
-        "checkViewInjuries" => c.md.opts.view_injuries = !c.md.opts.view_injuries,
+        "checkViewRedCards" => c.md.view_red = !c.md.view_red,
+        "checkViewInjuries" => c.md.view_injuries = !c.md.view_injuries,
         "textReferee" => {
             let mut r = Dialog::new(Kind::RefereeAid, "TREFEREEAIDDLG");
             r.set_num("cup", cup as i64);
@@ -1099,9 +1099,8 @@ pub fn end_of_round(c: &mut Classic) {
         c.md.todo.push_back(Step::Open(Box::new(d)));
     }
     if human_played || round == ROUNDS {
-        if let Some(d) = super::open_for_menu(c, "CampeonatoClassificao") {
-            c.md.todo.push_back(Step::Open(Box::new(d)));
-        }
+        let d = super::tables::standings_dialog(true);
+        c.md.todo.push_back(Step::Open(Box::new(d)));
     }
     if c.world
         .last_cup

@@ -2,7 +2,6 @@
 //! `cl_put(kind, len)`, starts with `cl_start(seed)`, forwards input with `cl_event` and `cl_tick`, and blits the RGBA frame at
 //! `cl_fb_ptr()` (800x600) whenever `cl_frame()` returns 1.
 use elifoot_core::eft;
-use elifoot_core::world::World;
 use elifoot_ui::classic::{Classic, Data, Ev, Key, Request};
 use elifoot_ui::win31::{Forms, Skin};
 use std::cell::RefCell;
@@ -18,7 +17,8 @@ struct Host {
     country: Vec<u8>,
     referee: Vec<u8>,
     teams: Vec<eft::EftTeam>,
-    saves: Vec<String>,
+    /// The host's list of saved games (see `Data::set_saves`).
+    saves: String,
     rgba: Vec<u8>,
     out: Vec<u8>,
     error: String,
@@ -61,13 +61,10 @@ pub extern "C" fn cl_put(kind: u32) -> i32 {
             },
             6 => h.teams.clear(),
             7 => {
-                h.saves = String::from_utf8_lossy(&data)
-                    .lines()
-                    .map(str::to_string)
-                    .collect();
+                h.saves = String::from_utf8_lossy(&data).to_string();
                 let saves = h.saves.clone();
                 if let Some(a) = h.app.as_mut() {
-                    a.data.saves = saves;
+                    a.data.set_saves(&saves);
                 }
             }
             _ => return 0,
@@ -76,25 +73,21 @@ pub extern "C" fn cl_put(kind: u32) -> i32 {
     })
 }
 
-fn build(world: World, h: &mut Host) -> Result<Classic, String> {
+fn build(seed: u32, h: &mut Host) -> Result<Classic, String> {
     let skin = Skin::from_bytes(&h.fonts, &h.glyphs)?;
     let forms = Forms::from_json(&String::from_utf8_lossy(&h.forms))?;
     let mut data = Data::from_txe(&h.country, &h.referee);
-    data.saves = h.saves.clone();
-    Ok(Classic::new(world, skin, forms, data))
+    data.set_saves(&h.saves);
+    Ok(Classic::start(skin, forms, data, h.teams.clone(), seed))
 }
 
-/// Starts a new game with the teams added (or invented clubs when none were); 1 on success, else read the message with `cl_out`.
+/// Starts the interface: the About box, then the choice of game, the names and the draw of the club (see `dialogs/newgame.rs`). The new
+/// game is made of the teams added (or invented clubs when none were) with `seed`; 1 on success, else read the message with `cl_out`.
 #[no_mangle]
 pub extern "C" fn cl_start(seed: u32) -> i32 {
     HOST.with(|h| {
         let mut h = h.borrow_mut();
-        let world = if h.teams.is_empty() {
-            Ok(World::synthetic(seed.max(1)))
-        } else {
-            World::from_teams(seed.max(1), &h.teams)
-        };
-        match world.and_then(|w| build(w, &mut h)) {
+        match build(seed.max(1), &mut h) {
             Ok(app) => {
                 h.app = Some(app);
                 1
@@ -108,21 +101,33 @@ pub extern "C" fn cl_start(seed: u32) -> i32 {
     })
 }
 
-/// Loads a game saved by `cl_save` (the text is in the input buffer); 1 on success.
+/// Hands the interface the text of the game it asked for with a load request (the text is in the input buffer); 1 on success. On a bad
+/// text the interface shows its own message.
 #[no_mangle]
 pub extern "C" fn cl_load() -> i32 {
     HOST.with(|h| {
         let mut h = h.borrow_mut();
         let text = String::from_utf8_lossy(&std::mem::take(&mut h.io)).to_string();
-        match World::load(&text).and_then(|w| build(w, &mut h)) {
-            Ok(app) => {
-                h.app = Some(app);
-                1
-            }
-            Err(e) => {
+        match h.app.as_mut().map(|a| a.load_text(&text)) {
+            Some(Ok(())) => 1,
+            Some(Err(e)) => {
                 h.out = e.into_bytes();
                 0
             }
+            None => 0,
+        }
+    })
+}
+
+/// The wall clock, for the description of saved games (`dd/mm/yy hh:mm`).
+#[no_mangle]
+pub extern "C" fn cl_clock(year: u32, month: u32, day: u32, hour: u32, minute: u32) {
+    HOST.with(|h| {
+        if let Some(a) = h.borrow_mut().app.as_mut() {
+            a.clock = format!(
+                "{day:02}/{month:02}/{:02} {hour:02}:{minute:02}",
+                year % 100
+            );
         }
     })
 }
@@ -132,7 +137,7 @@ pub extern "C" fn cl_load() -> i32 {
 pub extern "C" fn cl_save() {
     HOST.with(|h| {
         let mut h = h.borrow_mut();
-        let text = h.app.as_ref().map(|a| a.world.save()).unwrap_or_default();
+        let text = h.app.as_ref().map(|a| a.save_text()).unwrap_or_default();
         h.out = text.into_bytes();
     })
 }

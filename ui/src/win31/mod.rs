@@ -8,6 +8,7 @@ pub mod draw;
 pub mod fb;
 pub mod form;
 pub mod json;
+pub mod printlist;
 pub mod skin;
 mod widgets;
 

@@ -33,15 +33,17 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::Invitation
         | Kind::Lashes
         | Kind::RefereeAid => matchday::bind(c, d),
-        Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
-            tables::bind(c, d)
-        }
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::bind(c, d),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
         | Kind::Observed
-        | Kind::Transactions
-        | Kind::Acquisitions
         | Kind::Auction
         | Kind::Plantel => market::bind(c, d),
         Kind::CoachHistory
@@ -49,6 +51,7 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
         | Kind::CoachRanking
         | Kind::CoachProfile
         | Kind::TeamHistory => coach::bind(c, d),
+        Kind::Other(n) if n == market::ASK_MORE_SALARY => market::bind(c, d),
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan | Kind::Other(_) => {
             misc::bind(c, d)
         }
@@ -69,15 +72,17 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::Invitation
         | Kind::Lashes
         | Kind::RefereeAid => matchday::click(c, d, name),
-        Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
-            tables::click(c, d, name)
-        }
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::click(c, d, name),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
         | Kind::Observed
-        | Kind::Transactions
-        | Kind::Acquisitions
         | Kind::Auction
         | Kind::Plantel => market::click(c, d, name),
         Kind::CoachHistory
@@ -85,6 +90,7 @@ pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         | Kind::CoachRanking
         | Kind::CoachProfile
         | Kind::TeamHistory => coach::click(c, d, name),
+        Kind::Other(n) if n == market::ASK_MORE_SALARY => market::click(c, d, name),
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan | Kind::Other(_) => {
             misc::click(c, d, name)
         }
@@ -102,17 +108,36 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         | Kind::EndOfSeason
         | Kind::Invitation
         | Kind::Lashes => matchday::key(c, d, key),
-        Kind::Standings | Kind::Scorers | Kind::Calendar | Kind::Winners | Kind::AllTimeScorers => {
-            tables::key(c, d, key)
-        }
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::key(c, d, key),
         Kind::Sell
         | Kind::Contract
         | Kind::Search
         | Kind::Observed
         | Kind::Auction
         | Kind::Plantel => market::key(c, d, key),
+        Kind::Other(n) if n == market::ASK_MORE_SALARY => market::key(c, d, key),
         Kind::SelectGame | Kind::CoachName => newgame::key(c, d, key),
+        Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan => misc::key(c, d, key),
         _ => None,
+    }
+}
+
+/// Paints what a dialog draws itself under its controls (the stadium's `TPaintBox`); `(ox, oy)` is the origin of the client area.
+pub fn paint_under(
+    d: &Dialog,
+    fb: &mut crate::win31::Fb,
+    skin: &crate::win31::Skin,
+    ox: i32,
+    oy: i32,
+) {
+    if d.kind == Kind::Stadium {
+        misc::paint_stadium(d, fb, skin, ox, oy);
     }
 }
 
@@ -129,13 +154,23 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
         | Kind::EndOfSeason
         | Kind::Invitation
         | Kind::Lashes => matchday::tick(c, d, ms),
-        Kind::Standings | Kind::Calendar => tables::tick(c, d, ms),
+        Kind::Standings
+        | Kind::Scorers
+        | Kind::Calendar
+        | Kind::Winners
+        | Kind::AllTimeScorers
+        | Kind::Transactions
+        | Kind::Acquisitions => tables::tick(c, d, ms),
+        Kind::Auction | Kind::Plantel => market::tick(c, d, ms),
         _ => Outcome::Keep,
     }
 }
 
 /// The dialog a menu entry opens (`name` is the entry's control name in `TPREPAREGAMEDLG`).
 pub fn open_for_menu(c: &Classic, name: &str) -> Option<Dialog> {
+    if let Some(d) = market::open_for(c, name) {
+        return Some(d);
+    }
     let (kind, form) = match name {
         "Acerca1" => (Kind::About, "TABOUTDLG"),
         "opcoesElifoot" => (Kind::Options, "TOPTIONSDLG"),
@@ -163,11 +198,19 @@ pub fn open_for_menu(c: &Classic, name: &str) -> Option<Dialog> {
 
 /// The dialog a button of the main window opens.
 pub fn open_for_button(c: &Classic, name: &str) -> Option<Dialog> {
+    if let Some(d) = market::open_for(c, name) {
+        return Some(d);
+    }
     let (kind, form) = match name {
         "opponentCalendarBtn" => (Kind::Calendar, "TPRINTLISTDLG"),
         "opponentPlantelBtn" => (Kind::Plantel, "TPLANTELDLG"),
         _ => return None,
     };
     let _ = c;
-    Some(Dialog::new(kind, form))
+    let mut d = Dialog::new(kind, form);
+    if name == "opponentCalendarBtn" {
+        // the calendar of the next opponent, not of the user's club
+        d.st.insert("opponent".into(), "1".into());
+    }
+    Some(d)
 }

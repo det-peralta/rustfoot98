@@ -1,5 +1,5 @@
 //! Renders the classic interface from a saved game into a BMP: `classic_shot game.e98 out.bmp [key=value ...]`
-//! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`). Needs the skin pack in `analysis/out/skin`.
+//! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
 use elifoot_ui::classic::{Classic, Data, Ev, Key, Page};
 use elifoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
@@ -26,10 +26,26 @@ fn main() -> Result<(), String> {
         &std::fs::read(root.join("original/elifoot98/COUNTRY.TXE")).map_err(|e| e.to_string())?,
         &std::fs::read(root.join("original/elifoot98/REFEREE.TXE")).map_err(|e| e.to_string())?,
     );
-    let save = elifoot_core::e98::parse(&std::fs::read(&game).map_err(|e| e.to_string())?)?;
-    let world = elifoot_core::world::World::from_e98(1, &save)?;
-    let mut app = Classic::new(world, skin, forms, data);
-    app.coach = "joga1".into();
+    let mut app = if game == "-" {
+        // no game: the interface as it starts (About, choice of game...), with the teams of the original's EQUIPAS directory
+        let mut files: Vec<_> = std::fs::read_dir(root.join("original/elifoot98/EQUIPAS"))
+            .map_err(|e| e.to_string())?
+            .filter_map(|e| e.ok().map(|e| e.path()))
+            .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("eft")))
+            .collect();
+        files.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
+        let teams = files
+            .iter()
+            .filter_map(|p| elifoot_core::eft::parse(&std::fs::read(p).ok()?).ok())
+            .collect();
+        Classic::start(skin, forms, data, teams, 1)
+    } else {
+        let save = elifoot_core::e98::parse(&std::fs::read(&game).map_err(|e| e.to_string())?)?;
+        let world = elifoot_core::world::World::from_e98(1, &save)?;
+        let mut app = Classic::new(world, skin, forms, data);
+        app.coach = "joga1".into();
+        app
+    };
     for (k, v) in &kv {
         match k.as_str() {
             "human" => {
@@ -44,7 +60,12 @@ fn main() -> Result<(), String> {
             }
             "coach" => app.coach = v.clone(),
             "page" => {
-                app.main.page = Some(Page::ALL[v.parse::<usize>().map_err(|e| e.to_string())?])
+                app.main.page = Some(match v.as_str() {
+                    "sell" => Page::Sell,
+                    "contract" => Page::Contract,
+                    "message" => Page::Message,
+                    n => Page::ALL[n.parse::<usize>().map_err(|e| e.to_string())?],
+                })
             }
             "select" => app.main.selected = v.parse().ok(),
             "plan" => {
@@ -262,8 +283,26 @@ fn main() -> Result<(), String> {
                     app.frame();
                 }
             }
-            "open" => {
-                // a dialog of the match day with sample data: `open=invite`, `open=lashes`
+            "open" => elifoot_ui::classic::dialogs::market::open_by_name(&mut app, v)?,
+            "registered" => app.main.market.registered = v != "0",
+            "dialog" => {
+                // opens a dialog by the control name of its menu entry (`CampeonatoClassificao`, `menuCalendrio`...)
+                if let Some(d) = elifoot_ui::classic::dialogs::open_for_menu(&app, v)
+                    .or_else(|| elifoot_ui::classic::dialogs::open_for_button(&app, v))
+                {
+                    app.open(d);
+                } else {
+                    return Err(format!("no dialog {v}"));
+                }
+            }
+            "play" => {
+                // plays N rounds of the world without showing them (to have histories to look at)
+                for _ in 0..v.parse::<usize>().map_err(|e| e.to_string())? {
+                    app.world.play_round();
+                }
+            }
+            "mdopen" => {
+                // a dialog of the match day with sample data: `mdopen=invite`, `mdopen=lashes`
                 let d = match v.as_str() {
                     "invite" => {
                         elifoot_ui::classic::dialogs::matchday::invitation(&app, "PALMEIRAS")

@@ -16,6 +16,8 @@ pub struct MainState {
     pub selected: Option<usize>,
     /// The open menu: top-level index and the highlighted entry.
     pub menu: Option<(usize, Option<usize>)>,
+    /// The Vender, Contrato and Mensagem pages (see `dialogs/market.rs`).
+    pub market: super::dialogs::market::Pages,
 }
 
 /// The user's club as the main window shows it: with the line-up of the plan applied to the squad's statuses.
@@ -319,7 +321,6 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
             ((o.k * 10.0).round() as i32).clamp(0, 20).to_string(),
         );
         t("gaugeOpponentMoral.barcolor", "248,252,0".into());
-        t("opponentPlantelBtn.visible", "0".into());
     }
     if page == Page::Finances {
         let f = &club.fin;
@@ -358,32 +359,29 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         let price = c.world.money_ctx(d).price;
         t("textTicketPrice", format!("{price:.0} reais"));
     }
+    super::dialogs::market::page_texts(c, page, &mut texts);
     View { texts, lists }
 }
 
 /// Draws the desktop, the application's caption bar and the main window.
+/// The desktop with the hidden application window's silver caption bar across the screen: what shows behind every dialog.
+pub fn desktop(fb: &mut crate::win31::Fb, skin: &crate::win31::Skin) {
+    fb.fill(0, 0, 800, 600, DESKTOP);
+    fb.fill(0, 0, 800, 18, SILVER);
+    fb.fill(0, 18, 800, 1, BLACK);
+    if let Some(f) = skin.font("system", 13, false, false) {
+        let w = f.width("Elifoot 98");
+        draw_text(fb, f, (800 - w) / 2 + 1, 1, "Elifoot 98", BLACK, false);
+    }
+}
+
 pub fn draw(c: &mut Classic) {
     let Some(((_d, _i), club)) = human_club(c) else {
         return;
     };
     let page = c.main.page.unwrap_or(Page::Game);
     let v = view(c, &club, page);
-    c.fb.fill(0, 0, 800, 600, DESKTOP);
-    // the hidden application window: a silver caption bar across the screen
-    c.fb.fill(0, 0, 800, 18, SILVER);
-    c.fb.fill(0, 18, 800, 1, BLACK);
-    if let Some(f) = c.skin.font("system", 13, false, false) {
-        let w = f.width("Elifoot 98");
-        draw_text(
-            &mut c.fb,
-            f,
-            (800 - w) / 2 + 1,
-            1,
-            "Elifoot 98",
-            BLACK,
-            false,
-        );
-    }
+    desktop(&mut c.fb, &c.skin);
     let Some(form) = c.forms.get("TPREPAREGAMEDLG") else {
         return;
     };
@@ -405,7 +403,7 @@ pub fn draw(c: &mut Classic) {
         ox,
         oy,
         bg: bgc,
-        focus: "",
+        focus: v.texts.get("@focus").map_or("", String::as_str),
         lists: &v.lists,
         hits: &hits,
     };

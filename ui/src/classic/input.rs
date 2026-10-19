@@ -94,6 +94,8 @@ impl Classic {
                         }
                     }
                 }
+                // the standings close with a click anywhere on the form (`GoOn`)
+                _ if d.kind == dialog::Kind::Standings => dialogs::click(self, &mut d, "@form"),
                 _ => Outcome::Keep,
             },
             Ev::Key(k) => match dialog::generic_key(self, &mut d, k) {
@@ -186,6 +188,9 @@ impl Classic {
             }
             return;
         }
+        if dialogs::market::main_click(self, name) {
+            return;
+        }
         match name {
             "OKBtn" => self.play_round(),
             _ => {
@@ -197,6 +202,9 @@ impl Classic {
     }
 
     fn main_key(&mut self, k: Key, tops: &[menu::Top]) {
+        if self.main.menu.is_none() && dialogs::market::main_key(self, k) {
+            return;
+        }
         if let Some((open, hl)) = self.main.menu {
             let n = tops[open].entries.len();
             let step = |hl: Option<usize>, up: bool| {
@@ -299,12 +307,13 @@ impl Classic {
                     }
                 }
             }
-            "jogoSair" | "Sairsemgravar1" => self.requests.push(Request::Quit),
-            "Vender1" => {
-                if self.main.selected.is_some() {
-                    self.main.page = Some(Page::Sell);
-                }
+            // "Sair" saves the game first, "Sair sem gravar" does not (`1018:3146`, `1018:3f07`)
+            "jogoSair" => {
+                self.save_now();
+                self.requests.push(Request::Quit);
             }
+            "Sairsemgravar1" => self.requests.push(Request::Quit),
+            "Vender1" => dialogs::market::vender(self),
             _ => {
                 if let Some(d) = dialogs::open_for_menu(self, name) {
                     self.open(d);
