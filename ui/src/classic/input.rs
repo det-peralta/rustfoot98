@@ -64,6 +64,18 @@ impl Classic {
             Ev::Move(..) | Ev::Up(..) => Outcome::Keep,
             Ev::Down(x, y) => match d
                 .hit_at(x, y)
+                // a label whose form gives it an `OnClick` handler reacts too (the referee of the squad dialog)
+                .or_else(|| {
+                    d.hits.iter().rev().find(|h| {
+                        h.class == "TLabel"
+                            && h.contains(x, y)
+                            && self
+                                .forms
+                                .get(&d.form)
+                                .and_then(|f| f.find(&h.name))
+                                .is_some_and(|n| n.props.contains_key("OnClick"))
+                    })
+                })
                 .map(|h| (h.name.clone(), h.class.clone(), h.enabled))
             {
                 Some((name, class, true)) => {
