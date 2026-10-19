@@ -222,6 +222,10 @@ impl Classic {
     /// Shows the league round just played: the clock runs from -5 to 90.
     pub fn start_round_view(&mut self) {
         let mut v = RoundView::of_round(&self.world);
+        // (after round 14 the world is already in the next season)
+        if let Some(s) = &self.md.session {
+            v.title = format!("{}ª Jornada - {}", s.snapshot.round + 1, s.snapshot.year);
+        }
         v.interval = round_view::interval(self.md.opts.time_profile, v.humans());
         self.screen = Screen::Round(Box::new(v));
         self.dirty = true;
@@ -251,6 +255,7 @@ impl Classic {
                 Some(RoundView::of_round(&self.world))
             };
             if let Some(mut v) = fresh {
+                v.title = old.title.clone();
                 v.page = old.page;
                 v.minute = old.minute;
                 v.acc_ms = old.acc_ms;
@@ -770,5 +775,214 @@ mod tests {
         }
         // 16 rounds: a season and two rounds; the end of the season was shown once
         assert!(c.world.year > start);
+    }
+
+    #[test]
+    fn a_tie_in_extra_time_stays_on_the_screen_with_its_own_break_at_90() {
+        let mut found = 0;
+        for seed in 0..600 {
+            let mut w = World::synthetic(seed);
+            for _ in 0..7 {
+                w.play_round();
+            }
+            // only worlds in which the user's cup tie of the next round goes to extra time (the user's own decisions do not change
+            // that before the break: the league game is separate)
+            let mut probe = w.clone();
+            probe.play_round();
+            let me = probe.human.as_ref().unwrap().club.clone();
+            let in_et = probe.last_cup.as_ref().is_some_and(|r| {
+                r.matches
+                    .iter()
+                    .any(|m| (m.home == me || m.away == me) && m.extra_time)
+            });
+            if !in_et {
+                continue;
+            }
+            let mut c = Classic::new(w, Skin::default(), Forms::default(), Data::default());
+            c.play_round();
+            // the league round: answer everything until the cup view starts
+            let mut guard = 0;
+            loop {
+                run(&mut c);
+                match &c.screen {
+                    Screen::Round(rv) if rv.cup && rv.minute > -5 => break,
+                    Screen::Main => break,
+                    _ => {}
+                }
+                match top_kind(&c) {
+                    Some(Kind::ForcedSubstitution) => {
+                        press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                        press(&mut c, "OKBtn");
+                    }
+                    Some(Kind::Penalty) if c.dialogs.last().unwrap().num("attack") != 0 => {
+                        press(&mut c, "ListBoxOfPlayers#0");
+                        press(&mut c, "shootBtn");
+                        c.dialogs.clear();
+                    }
+                    Some(Kind::Halftime) => press(&mut c, "OKBtn"),
+                    Some(_) => {
+                        c.dialogs.pop();
+                    }
+                    None => c.tick(20),
+                }
+                guard += 1;
+                assert!(guard < 4000);
+            }
+            if !matches!(&c.screen, Screen::Round(rv) if rv.cup) {
+                continue;
+            }
+            let Screen::Round(rv) = &c.screen else {
+                continue;
+            };
+            let extra: Vec<bool> = rv.games.iter().map(|g| g.extra_time).collect();
+            if !rv.games.iter().any(|g| g.human && g.extra_time) {
+                continue;
+            }
+            // run the clock to minute 90 answering the questions of the user's tie
+            for _ in 0..4000 {
+                match top_kind(&c) {
+                    Some(Kind::ForcedSubstitution) => {
+                        press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                        press(&mut c, "OKBtn");
+                    }
+                    Some(Kind::Penalty) if c.dialogs.last().unwrap().num("attack") != 0 => {
+                        press(&mut c, "ListBoxOfPlayers#0");
+                        press(&mut c, "shootBtn");
+                        c.dialogs.clear();
+                    }
+                    Some(Kind::Halftime) if c.dialogs.last().unwrap().num("next") == 91 => break,
+                    Some(Kind::Halftime) => press(&mut c, "OKBtn"),
+                    Some(_) => {
+                        c.dialogs.pop();
+                    }
+                    None => c.tick(20),
+                }
+            }
+            let d = c.dialogs.last().expect("the break before the extra time");
+            assert_eq!(
+                (d.kind.clone(), d.num("next"), d.num("minute")),
+                (Kind::Halftime, 91, 90)
+            );
+            let Screen::Round(rv) = &c.screen else {
+                panic!("cup view")
+            };
+            assert!(rv.cut && rv.max == 120 && !rv.extra_seen);
+            assert_eq!(rv.shown().count(), extra.iter().filter(|&&e| e).count());
+            assert!(rv.shown().all(|g| g.extra_time));
+            press(&mut c, "OKBtn");
+            let Screen::Round(rv) = &c.screen else {
+                panic!("cup view")
+            };
+            assert!(rv.extra_seen, "the clock turns purple after the break");
+            // the view goes on to minute 120 and closes five ticks later
+            let mut ticks = 0;
+            while matches!(&c.screen, Screen::Round(r) if r.cup && !r.backdrop)
+                && c.dialogs.is_empty()
+            {
+                c.tick(20);
+                ticks += 1;
+                assert!(ticks < 100_000);
+            }
+            found += 1;
+            if found == 2 {
+                break;
+            }
+        }
+        assert!(found >= 1, "no seed had the user's tie in extra time");
+    }
+
+    /// A world in which the club (0, 0) is about to sack its coach and the user's coach is the one the game picks (a lot weaker and in
+    /// form), so that the round brings an invitation when the club loses or draws.
+    fn invitation_world(seed: u32) -> World {
+        let mut w = World::synthetic(seed);
+        {
+            let t = &mut w.divisions[0][0];
+            t.k = 0.4;
+            t.coach_games = 12;
+            t.coach_score = 7;
+            for s in t.slots.iter_mut() {
+                s.strength = 30;
+            }
+        }
+        let (d, i) = w.human_location().unwrap();
+        let h = &mut w.divisions[d][i];
+        h.k = 1.5;
+        for s in h.slots.iter_mut() {
+            s.strength = 15;
+        }
+        w
+    }
+
+    #[test]
+    fn declining_an_invitation_plays_the_round_again_without_it() {
+        let mut found = 0;
+        for seed in 0..200 {
+            let w = invitation_world(seed);
+            let mut probe = w.clone();
+            probe.accept_invitations = true;
+            probe.play_round();
+            let invited = probe.human_moved.is_some()
+                && probe.coach_changes.iter().any(|(sacked, _)| {
+                    probe
+                        .human_moved
+                        .as_ref()
+                        .is_some_and(|(_, to)| sacked == to)
+                });
+            if !invited {
+                continue;
+            }
+            let mut c = Classic::new(w, Skin::default(), Forms::default(), Data::default());
+            let mine = c.world.human.as_ref().unwrap().club.clone();
+            c.play_round();
+            let seen = play_until(&mut c, Kind::Invitation);
+            assert!(
+                seen,
+                "the invitation dialog shows after the round view (seed {seed})"
+            );
+            let d = c.dialogs.last().unwrap();
+            assert_eq!(d.kind, Kind::Invitation);
+            let (_, to) = c.world.human_moved.clone().unwrap();
+            assert_eq!(d.st.get("team"), Some(&to));
+            // the user accepted by default: he already manages the other club
+            assert_eq!(c.world.human.as_ref().unwrap().club, to);
+            press(&mut c, "noBtn");
+            assert_eq!(
+                c.world.human.as_ref().unwrap().club,
+                mine,
+                "declined: nothing moved"
+            );
+            assert!(c.world.human_moved.is_none());
+            found += 1;
+            if found == 2 {
+                break;
+            }
+        }
+        assert!(found >= 1, "no seed produced an invitation");
+    }
+
+    /// Plays the round view answering what comes, until a dialog of `kind` is open.
+    fn play_until(c: &mut Classic, kind: Kind) -> bool {
+        for _ in 0..6000 {
+            run(c);
+            match top_kind(c) {
+                Some(k) if k == kind => return true,
+                Some(Kind::ForcedSubstitution) => {
+                    press(c, "ListBoxOfSubstitutePlayers#0");
+                    press(c, "OKBtn");
+                }
+                Some(Kind::Penalty) if c.dialogs.last().unwrap().num("attack") != 0 => {
+                    press(c, "ListBoxOfPlayers#0");
+                    press(c, "shootBtn");
+                    c.dialogs.clear();
+                }
+                Some(Kind::Halftime) => press(c, "OKBtn"),
+                Some(_) => {
+                    c.dialogs.pop();
+                }
+                None if matches!(c.screen, Screen::Main) => return false,
+                None => c.tick(20),
+            }
+        }
+        false
     }
 }
