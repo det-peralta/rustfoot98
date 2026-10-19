@@ -40,8 +40,8 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | Options, Stadium, Loan, Message | TOPTIONSDLG, TSTADIUMDLG, TLOANDLG, message boxes | `dialogs/misc.rs` |
 | Standings, Scorers, Calendar, Winners, AllTimeScorers | TCLASSIFICATIONDLG, list dialogs | `dialogs/tables.rs` |
 | Sell, Contract, Search, Observed, Transactions, Acquisitions, Auction, Plantel | main window pages, TCHECKPLAYERDLG, TOBSERVEDPLAYERSDLG, TSELLPLAYERDLG, TPLANTELDLG | `dialogs/market.rs` |
-| CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory, Invitation | TCOACHMANAGERDLG, TCOACHOPTIONSDLG, TINVITECOACHDLG... | `dialogs/coach.rs` |
-| Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
+| CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory | TCOACHMANAGERDLG, TCOACHOPTIONSDLG... | `dialogs/coach.rs` |
+| Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid, Invitation, Lashes | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG, TINVITECOACHDLG, TPRINTLISTDLG (sacked coaches) | `dialogs/matchday.rs` |
 
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs. The match day (round view, break, injuries, penalties, cup, end of season) is described in `docs/matchday.md`.
 
