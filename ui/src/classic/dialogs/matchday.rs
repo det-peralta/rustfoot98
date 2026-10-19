@@ -89,6 +89,12 @@ fn squad_at(info: &Info, side: usize, at: At) -> Vec<Status> {
     st
 }
 
+/// The squad of `side` after everything of `minute` (for the tests of the session).
+#[cfg(test)]
+pub fn squad_after(info: &Info, side: usize, minute: u16) -> Vec<Status> {
+    squad_at(info, side, At::End(minute))
+}
+
 /// Slots with `status`, in the order of the lists (position, then name).
 fn listed(info: &Info, side: usize, st: &[Status], status: Status) -> Vec<usize> {
     let mut v: Vec<usize> = (0..st.len()).filter(|&i| st[i] == status).collect();
@@ -1169,4 +1175,168 @@ fn finish_steps(c: &mut Classic, round: usize) {
     }
     c.md.todo.push_back(Step::Auctions);
     c.md.todo.push_back(Step::Main);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use elifoot_core::matchsim::{Event, SubEvent};
+
+    fn slot(position: u8, strength: u16, status: Status) -> Slot {
+        Slot::new("x", position, strength, true, status)
+    }
+
+    /// Eleven starters (keeper first), three substitutes: a keeper, a defender and an attacker.
+    fn squad() -> Vec<Slot> {
+        let mut v = vec![slot(0, 5, Status::Starter)];
+        v.extend((0..4).map(|_| slot(1, 5, Status::Starter)));
+        v.extend((0..4).map(|_| slot(2, 5, Status::Starter)));
+        v.extend((0..2).map(|_| slot(3, 5, Status::Starter)));
+        v.extend([
+            slot(0, 4, Status::Sub),
+            slot(1, 4, Status::Sub),
+            slot(3, 4, Status::Sub),
+        ]);
+        v
+    }
+
+    fn ev(minute: u16, side: Side, kind: EventKind, player: usize) -> Event {
+        Event {
+            minute,
+            side,
+            kind,
+            player,
+            position: 1,
+            primary: false,
+        }
+    }
+
+    fn info<'a>(
+        start: &'a [Slot],
+        names: &'a [String],
+        events: &'a [Event],
+        subs: &'a [SubEvent],
+    ) -> Info<'a> {
+        Info {
+            clubs: ["Home".into(), "Away".into()],
+            names: [names, names],
+            start: [start, start],
+            events,
+            subs,
+            bonus: (7, 5),
+        }
+    }
+
+    #[test]
+    fn the_squad_at_a_minute_follows_injuries_and_substitutions() {
+        let (s, names) = (
+            squad(),
+            (0..14).map(|i| format!("P{i}")).collect::<Vec<_>>(),
+        );
+        let events = [ev(30, Side::Home, EventKind::Injury, 2)];
+        let subs = [SubEvent {
+            minute: 30,
+            side: Side::Home,
+            out: 2,
+            inn: 12,
+            auto: true,
+        }];
+        let i = info(&s, &names, &events, &subs);
+        // before the injury everybody started; the other side never changes
+        assert_eq!(squad_at(&i, 0, At::End(29))[2], Status::Starter);
+        assert_eq!(squad_at(&i, 1, At::End(60))[2], Status::Starter);
+        // while the user decides the injured player is off and the reply (a substitution) is not yet made
+        let reply = squad_at(&i, 0, At::Reply(30));
+        assert_eq!((reply[2], reply[12]), (Status::Out, Status::Sub));
+        // afterwards the substitute is on
+        let after = squad_at(&i, 0, At::End(30));
+        assert_eq!((after[2], after[12]), (Status::Out, Status::Starter));
+        // at the start of the minute of a planned substitution only the planned ones count
+        let planned = [SubEvent {
+            minute: 46,
+            side: Side::Home,
+            out: 3,
+            inn: 11,
+            auto: false,
+        }];
+        let i = info(&s, &names, &[], &planned);
+        assert_eq!(squad_at(&i, 0, At::End(45))[3], Status::Starter);
+        assert_eq!(squad_at(&i, 0, At::Start(46))[3], Status::Out);
+    }
+
+    #[test]
+    fn the_substitutions_left_count_the_ones_made() {
+        let (s, names) = (
+            squad(),
+            (0..14).map(|i| format!("P{i}")).collect::<Vec<_>>(),
+        );
+        let subs = [SubEvent {
+            minute: 20,
+            side: Side::Away,
+            out: 4,
+            inn: 13,
+            auto: true,
+        }];
+        let i = info(&s, &names, &[], &subs);
+        // three fit substitutes: three changes, minus the one the away side made
+        assert_eq!(i.subs_left(0, 60, true), 3);
+        assert_eq!(i.subs_left(1, 60, true), 2);
+        assert_eq!(
+            i.subs_left(1, 20, false),
+            3,
+            "the automatic reply of the minute is not counted yet"
+        );
+    }
+
+    #[test]
+    fn the_event_list_has_the_score_and_the_filters_of_the_check_boxes() {
+        let (s, names) = (
+            squad(),
+            (0..14).map(|i| format!("P{i}")).collect::<Vec<_>>(),
+        );
+        let mut pen = ev(40, Side::Away, EventKind::Goal, 9);
+        pen.primary = true;
+        let events = [
+            ev(10, Side::Home, EventKind::Goal, 10),
+            ev(20, Side::Home, EventKind::RedCard, 3),
+            ev(25, Side::Away, EventKind::Injury, 4),
+            pen,
+            ev(41, Side::Away, EventKind::Annulled, 9),
+        ];
+        let i = info(&s, &names, &events, &[]);
+        assert_eq!(
+            event_lines(&i, 90, false, false),
+            vec!["1:0 P10 10'", "1:1 P9 40' (pen.)", "P9 41' - Anulado"]
+        );
+        let all = event_lines(&i, 90, true, true);
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[1], "P3 expulso 20'");
+        assert_eq!(all[2], "P4 lesionou-se 25'");
+        // only what happened so far
+        assert_eq!(event_lines(&i, 15, true, true), vec!["1:0 P10 10'"]);
+        assert_eq!(goals(&i, 45), [1, 1]);
+    }
+
+    #[test]
+    fn the_squad_lists_are_sorted_by_position_and_then_by_name() {
+        let names: Vec<String> = ["Zed", "Bob", "Ann", "Cid"].map(String::from).to_vec();
+        let start = vec![
+            slot(2, 9, Status::Starter),
+            slot(0, 8, Status::Starter),
+            slot(2, 7, Status::Starter),
+            slot(1, 6, Status::Starter),
+        ];
+        let i = info(&start, &names, &[], &[]);
+        let st = vec![Status::Starter; 4];
+        let order = listed(&i, 0, &st, Status::Starter);
+        assert_eq!(order, vec![1, 3, 2, 0]);
+        assert_eq!(rows(&i, 0, &order)[0], "G|Bob|8");
+        assert_eq!(rows(&i, 0, &order)[2], "M|Ann|7");
+    }
+
+    #[test]
+    fn colours_are_read_from_the_texts() {
+        assert_eq!(parse_rgb("1,2,3"), Some(crate::win31::fb::Rgb(1, 2, 3)));
+        assert_eq!(parse_rgb("1,2"), None);
+    }
 }

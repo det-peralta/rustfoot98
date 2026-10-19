@@ -854,6 +854,17 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         return;
     }
     widgets::listbox_rows(fb, cx, n, f, x, y);
+    // `<name>.flat=1`: a list painted in the colours of a club has a plain black outline (no 3-D frame)
+    if cx
+        .texts
+        .get(&format!("{}.flat", n.name))
+        .is_some_and(|v| v == "1")
+    {
+        fb.fill(x, y, w, 1, BLACK);
+        fb.fill(x, y + h - 1, w, 1, BLACK);
+        fb.fill(x, y, 1, h, BLACK);
+        fb.fill(x + w - 1, y, 1, h, BLACK);
+    }
 }
 
 pub(super) const DITHER_PARITY: i32 = 0;

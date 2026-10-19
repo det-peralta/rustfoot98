@@ -138,6 +138,7 @@ impl Dialog {
             dialog_frame(fb, skin, caption, cw, ch, bg)
         };
         FRAME_ORIGIN.with(|o| o.set(None));
+        let (fx, fy) = (ox, oy);
         let (ox, oy) = (ox + self.num_text("@dx"), oy + self.num_text("@dy"));
         let hits = RefCell::new(Vec::new());
         let cx = Ctx {
@@ -155,7 +156,12 @@ impl Dialog {
             lists: &self.lists,
             hits: &hits,
         };
+        // the controls are clipped to the window's client area (the thick frame draws 4 pixels less than `cw` x `ch`)
+        let old_clip = fb.clip;
+        let (iw, ih) = if thick { (cw - 4, ch - 4) } else { (cw, ch) };
+        fb.clip = (fx, fy, fx + iw, fy + ih);
         controls(fb, &cx, form);
+        fb.clip = old_clip;
         self.hits = hits.into_inner();
     }
 

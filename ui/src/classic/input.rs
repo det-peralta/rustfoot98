@@ -30,6 +30,8 @@ impl Classic {
         }
         if matches!(self.screen, Screen::Round(_)) {
             self.round_tick(ms);
+            // dialogs queued by the end of a round (auctions...) show without waiting for an input event
+            self.next_queued();
         }
     }
 

@@ -131,41 +131,6 @@ pub fn find_club<'a>(world: &'a World, name: &str) -> Option<&'a Club> {
 }
 
 impl Info<'_> {
-    /// The squad of `side` at `minute`: for every slot `Starter` (on the pitch), `Sub` (still on the bench) or `Out`. Substitutions
-    /// of the minute itself count only when `with_auto` (the automatic reply to an injury or a red card is not yet made while the
-    /// user decides). The planned ones of the next minute (the break) are never in.
-    pub fn squad_at(&self, side: usize, minute: u16, with_auto: bool) -> Vec<Status> {
-        let mut st: Vec<Status> = self.start[side].iter().map(|s| s.status).collect();
-        // everything that happened by `minute` in order: the events take players off, the substitutions swap
-        let mut items: Vec<(u16, u8, usize)> = Vec::new();
-        for (i, e) in self.events.iter().enumerate() {
-            if (e.side == Side::Away) as usize == side
-                && e.minute <= minute
-                && matches!(e.kind, EventKind::RedCard | EventKind::Injury)
-            {
-                items.push((e.minute, 0, i));
-            }
-        }
-        for (i, s) in self.subs.iter().enumerate() {
-            if (s.side == Side::Away) as usize == side
-                && (s.minute < minute || (s.minute == minute && (with_auto || !s.auto)))
-            {
-                items.push((s.minute, 1, i));
-            }
-        }
-        items.sort();
-        for (_, kind, i) in items {
-            if kind == 0 {
-                st[self.events[i].player] = Status::Out;
-            } else {
-                let s = self.subs[i];
-                st[s.out] = Status::Out;
-                st[s.inn] = Status::Starter;
-            }
-        }
-        st
-    }
-
     /// Substitutions the club of `side` can still make at `minute` (before the user's own decisions): `min(3, fit bench)` at the
     /// kick-off minus the ones made.
     pub fn subs_left(&self, side: usize, minute: u16, with_auto: bool) -> usize {
@@ -750,7 +715,7 @@ mod tests {
             (dlg.num("src") as usize, dlg.num("side") as usize)
         };
         let info = info(&c.world, false, src).unwrap();
-        let st = dialog_status_for_test(&info, side, 45);
+        let st = dialogs::matchday::squad_after(&info, side, 45);
         let out = (0..st.len())
             .find(|&k| st[k] == Status::Starter && info.start[side][k].position == 3)
             .unwrap();
@@ -790,11 +755,6 @@ mod tests {
         }
         let _ = (d, i, before);
         play_through(&mut c);
-    }
-
-    /// The status of the squad at the break, for the tests.
-    fn dialog_status_for_test(info: &Info, side: usize, minute: u16) -> Vec<Status> {
-        info.squad_at(side, minute, true)
     }
 
     #[test]

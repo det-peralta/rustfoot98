@@ -43,7 +43,7 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory, Invitation | TCOACHMANAGERDLG, TCOACHOPTIONSDLG, TINVITECOACHDLG... | `dialogs/coach.rs` |
 | Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
 
-`dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs.
+`dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs. The match day (round view, break, injuries, penalties, cup, end of season) is described in `docs/matchday.md`.
 
 ## Widgets and their text keys (`win31/draw.rs`)
 All keys are in `Dialog::texts` (`<name>` is the control's name in the form). Anything not set keeps the form's design-time value.
