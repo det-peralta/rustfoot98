@@ -179,3 +179,10 @@ domestic league match):
 | 10 vs 3 | 1.85 | 0.51 | 74.9 % | 19.0 % | 6.1 % | 0.15 | 0.24 |
 
 Cup ties use their own morale update: advancing at home 1.5, advancing away 2.0, eliminated 0 (`K = 0.85K + 0.15r`); the cup winner gets +0.5 at the season end.
+
+## Decisions of the user during a game (replay)
+The original asks the user at the break, after an injury or a sent-off goalkeeper, and for every primary chance (`1038:328b`, shooter chosen
+from the starters). The port plays a game in one go; `matchsim::Decision` carries what the user decided (`Shooter`, `Substitute`,
+`NoSubstitution`, `Planned`), `Match::primaries` records every primary chance, and the front end replays the round with the decisions added
+(`season::Control`, `World::play_round_ctl`): see `docs/matchday.md`. A shooter chosen by the user changes the duel (`81ed` attacker force) but
+not the number of random numbers drawn; a substitution changes the sector strengths from its minute on.
