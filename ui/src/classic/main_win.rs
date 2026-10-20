@@ -18,6 +18,8 @@ pub struct MainState {
     pub menu: Option<(usize, Option<usize>)>,
     /// The Vender, Contrato and Mensagem pages (see `dialogs/market.rs`).
     pub market: super::dialogs::market::Pages,
+    /// The line-up marks (+ and -) in the squad list appear once the user has chosen a formation; a loaded game shows none.
+    pub lineup_shown: bool,
 }
 
 /// The user's club as the main window shows it: with the line-up of the plan applied to the squad's statuses.
@@ -151,6 +153,7 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         .map(|&i| {
             let s = &club.slots[i];
             let mark = match s.status {
+                _ if !c.main.lineup_shown => "",
                 Status::Starter => "+",
                 Status::Sub => "-",
                 Status::Out => "",

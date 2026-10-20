@@ -99,6 +99,10 @@ impl World {
         if let Some(c) = &self.cup_champion {
             out.push_str(&format!("cupchampion|{}\n", clean(c)));
         }
+        for (d, order) in self.tie_order.iter().enumerate() {
+            let list: Vec<String> = order.iter().map(|i| i.to_string()).collect();
+            out.push_str(&format!("tieorder|{d}|{}\n", list.join(",")));
+        }
         self.save_history(&mut out);
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
@@ -189,6 +193,7 @@ impl World {
         let mut observed: Vec<(String, String)> = Vec::new();
         let mut sell_tried: Vec<String> = Vec::new();
         let mut history = History::default();
+        let mut tie_order: Vec<Vec<usize>> = Vec::new();
         let mut transfers: Vec<Transfer> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
@@ -258,6 +263,18 @@ impl World {
                         round: num(n, &f, 4)? as usize,
                         best,
                     });
+                }
+                "tieorder" => {
+                    let d = num(n, &f, 1)? as usize;
+                    if d < 4 {
+                        tie_order.resize(4, Vec::new());
+                        tie_order[d] = f
+                            .get(2)
+                            .unwrap_or(&"")
+                            .split(',')
+                            .filter_map(|v| v.parse().ok())
+                            .collect();
+                    }
                 }
                 "winner" => history.winners.push(Winner {
                     year: num(n, &f, 1)? as u16,
@@ -492,6 +509,7 @@ impl World {
             coach_changes: Vec::new(),
             human_moved: None,
             history,
+            tie_order,
         };
         if !has_cup {
             w.reset_cup();

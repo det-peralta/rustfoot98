@@ -476,6 +476,28 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
 
 impl E98 {
     /// The four divisions as indices into `teams`, from the save's own division lists (sorted by club id).
+    /// The order of each division's clubs in the save's own lists (the table order of the last sort), as positions in
+    /// [`E98::divisions`] (which is sorted by club id).
+    pub fn division_order(&self) -> [Vec<usize>; 4] {
+        let by_key: HashMap<u16, usize> = self
+            .teams
+            .iter()
+            .enumerate()
+            .map(|(i, t)| (t.id, i))
+            .collect();
+        let mut out: [Vec<usize>; 4] = Default::default();
+        for (k, (_, ids)) in self.divisions.iter().take(4).enumerate() {
+            let mut sorted: Vec<u16> = ids.iter().filter(|i| by_key.contains_key(i)).copied().collect();
+            sorted.sort_unstable();
+            out[k] = ids
+                .iter()
+                .filter(|i| by_key.contains_key(i))
+                .filter_map(|id| sorted.iter().position(|s| s == id))
+                .collect();
+        }
+        out
+    }
+
     pub fn divisions(&self) -> Result<[Vec<usize>; 4], String> {
         let by_key: HashMap<u16, usize> = self
             .teams
@@ -703,6 +725,7 @@ impl World {
         w.history = history_of(save, &club_names);
         w.transfers = transfers_of(save, &club_names);
         w.refresh_cash_ref();
+        w.tie_order = save.division_order().into_iter().collect();
         let human = divs.iter().enumerate().find_map(|(d, idx)| {
             idx.iter()
                 .position(|&i| save.teams[i].id == save.human_id)

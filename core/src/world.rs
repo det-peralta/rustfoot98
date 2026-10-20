@@ -227,6 +227,10 @@ pub struct World {
     pub human_moved: Option<(String, String)>,
     /// Calendars, champions, club and coach histories, the user's coach profile (`history.rs`, `docs/season.md`).
     pub history: History,
+    /// The order the clubs of each division were last sorted in (indices into `divisions[d]`; empty = the division's own
+    /// order). The original sorts its division lists in place after every round, so clubs level on points, goal difference
+    /// and goals keep the order of the table before.
+    pub tie_order: Vec<Vec<usize>>,
 }
 
 /// A player the user could buy straight away (`Procurar jogadores`).
@@ -447,6 +451,7 @@ impl World {
             coach_changes: Vec::new(),
             human_moved: None,
             history: History::default(),
+            tie_order: Vec::new(),
         };
         w.reset_cup();
         w.log_new_game();
@@ -487,6 +492,7 @@ impl World {
             coach_changes: Vec::new(),
             human_moved: None,
             history: History::default(),
+            tie_order: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -536,6 +542,7 @@ impl World {
             coach_changes: Vec::new(),
             human_moved: None,
             history: History::default(),
+            tie_order: Vec::new(),
         };
         w.reset_cup();
         w.log_new_game();
@@ -1652,6 +1659,21 @@ impl World {
         }
     }
 
+    /// The clubs of division `d` (indices) in league-table order: points, goal difference, goals scored; clubs level on all three
+    /// keep their order of the last sort (`SortDivisionLists`, `1050:1ab6`).
+    pub fn table_order(&self, d: usize) -> Vec<usize> {
+        let clubs = &self.divisions[d];
+        let mut idx: Vec<usize> = match self.tie_order.get(d) {
+            Some(o) if o.len() == clubs.len() => o.clone(),
+            _ => (0..clubs.len()).collect(),
+        };
+        idx.sort_by_key(|&i| {
+            let c = &clubs[i];
+            std::cmp::Reverse((c.points, c.goals_for - c.goals_against, c.goals_for))
+        });
+        idx
+    }
+
     /// The ticket price of division `d` and the constants a round needs to book money (`1040:35e1` via `1010:0875`).
     pub fn money_ctx(&self, d: usize) -> MoneyCtx {
         let clubs = &self.divisions[d];
@@ -1730,6 +1752,7 @@ impl World {
         }
         self.economy = walk_index(&mut self.rng, self.economy, self.year);
         self.round = round;
+        self.tie_order = (0..4).map(|d| self.table_order(d)).collect();
         self.last_cup = None;
         if round.is_multiple_of(2) {
             self.play_cup_round(round, ctl);
@@ -1896,6 +1919,7 @@ impl World {
         });
         self.year += 1;
         self.round = 0;
+        self.tie_order.clear();
         self.history.calendars.clear(); // the new season's calendars are generated from the new divisions
         self.reset_cup();
         self.refresh_cash_ref();

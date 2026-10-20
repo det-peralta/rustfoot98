@@ -305,7 +305,7 @@ pub fn standing_row(c: &Club) -> String {
     r += &field("\u{7}", 0x0f, &c.goals_against.to_string());
     r += &field("\u{7}", 0x1e, &c.points.to_string());
     let rgb = |c: [u8; 3]| Rgb(c[0], c[1], c[2]);
-    with_colors(Some(rgb(c.colors.1)), Some(rgb(c.colors.0)), &r)
+    with_colors(Some(rgb(c.colors.0)), Some(rgb(c.colors.1)), &r)
 }
 
 /// `1050:1ab6` (`SortDivisionLists`): points, goal difference, goals scored; ties keep the order of the division.
@@ -516,6 +516,8 @@ fn bind_standings(c: &Classic, d: &mut Dialog) {
     }
     let w = &c.world;
     d.bg = Some(Rgb(0, 128, 0));
+    // the form's own size (without it the window comes out four pixels larger; measured on the capture of the original)
+    d.text("@client", "592x375");
     // after round 14 the world is already in the next season: the dialog shows the final tables of the last one
     if let (0, Some(s)) = (w.round, w.last_season.as_ref()) {
         d.text("@caption", "Classificação - 14ª jornada");
@@ -543,7 +545,6 @@ fn bind_standings(c: &Classic, d: &mut Dialog) {
             d.lists.insert(format!("ListBoxDivision{}", k + 1), rows);
         }
         d.focus = "ListBoxDivision1".into();
-        d.text("ListBoxDivision1.focus", "0");
         d.st.insert("built".into(), "1".into());
         return;
     }
@@ -556,14 +557,14 @@ fn bind_standings(c: &Classic, d: &mut Dialog) {
         },
     );
     for (k, div) in w.divisions.iter().enumerate() {
-        let rows = table_order(div)
+        let rows = w
+            .table_order(k)
             .into_iter()
             .map(|i| standing_row(&div[i]))
             .collect();
         d.lists.insert(format!("ListBoxDivision{}", k + 1), rows);
     }
     d.focus = "ListBoxDivision1".into();
-    d.text("ListBoxDivision1.focus", "0");
     d.st.insert("built".into(), "1".into());
 }
 

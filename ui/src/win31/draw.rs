@@ -194,6 +194,20 @@ thread_local! {
     pub static FRAME_ORIGIN: std::cell::Cell<Option<(i32, i32)>> = const { std::cell::Cell::new(None) };
 }
 
+thread_local! {
+    /// Set while a window below the active one is drawn: its caption bar and frame are silver with black lettering.
+    pub static INACTIVE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// `(caption bar and thick frame, caption lettering)` colours of the window being drawn.
+fn caption_colors() -> (Rgb, Rgb) {
+    if INACTIVE.with(|i| i.get()) {
+        (SILVER, BLACK)
+    } else {
+        (NAVY, WHITE)
+    }
+}
+
 fn frame_origin(centre: (i32, i32)) -> (i32, i32) {
     FRAME_ORIGIN.with(|o| o.get()).unwrap_or(centre)
 }
@@ -210,12 +224,13 @@ pub fn dialog_frame(
 ) -> (i32, i32) {
     let (ow, oh) = (cw + 2, ch + 21);
     let (x, y) = frame_origin(((super::fb::W - ow) / 2, (super::fb::H - oh) / 2));
+    let (bar, ink) = caption_colors();
     fb.fill(x, y, ow, oh, BLACK);
-    fb.fill(x + 1, y + 1, cw, 18, NAVY);
+    fb.fill(x + 1, y + 1, cw, 18, bar);
     fb.fill(x + 1, y + 20, cw, ch, bg);
     if let Some(f) = skin.font("system", 13, false, false) {
         let w = f.width(caption);
-        text(fb, f, x + 1 + (cw - w) / 2, y + 2, caption, WHITE, false);
+        text(fb, f, x + 1 + (cw - w) / 2, y + 2, caption, ink, false);
     }
     (x + 1, y + 20)
 }
@@ -233,13 +248,14 @@ pub fn dialog_frame_menu(
 ) -> (i32, i32) {
     let (ow, oh) = (cw + 2, ch + 40);
     let (x, y) = ((super::fb::W - ow) / 2, (super::fb::H - oh) / 2);
+    let (bar, ink) = caption_colors();
     fb.fill(x, y, ow, oh, BLACK);
-    fb.fill(x + 1, y + 1, cw, 18, NAVY);
+    fb.fill(x + 1, y + 1, cw, 18, bar);
     fb.fill(x + 1, y + 20, cw, 18, WHITE);
     fb.fill(x + 1, y + 39, cw, ch, bg);
     if let Some(f) = skin.font("system", 13, false, false) {
         let w = f.width(caption);
-        text(fb, f, x + 1 + (cw - w) / 2, y + 2, caption, WHITE, false);
+        text(fb, f, x + 1 + (cw - w) / 2, y + 2, caption, ink, false);
     }
     if let Some(f) = skin.font("system", 13, false, false) {
         let mut pen = x + 1 + 8;
@@ -279,8 +295,9 @@ pub fn dialog_frame_thick_sys(
 ) -> (i32, i32) {
     let (w, h) = (cw + 6, ch + 25);
     let (x, y) = frame_origin(((super::fb::W - w) / 2, (super::fb::H - h) / 2));
+    let (bar, ink) = caption_colors();
     fb.fill(x, y, w, h, BLACK);
-    fb.fill(x + 1, y + 1, w - 2, h - 2, NAVY);
+    fb.fill(x + 1, y + 1, w - 2, h - 2, bar);
     fb.fill(x + 5, y + 24, w - 10, h - 29, bg);
     fb.fill(x + 5, y + 4, w - 10, 1, WHITE);
     fb.fill(x + 5, y + 4, 1, 20, WHITE);
@@ -306,7 +323,7 @@ pub fn dialog_frame_thick_sys(
             left + (right - left - tw) / 2,
             y + 6,
             caption,
-            WHITE,
+            ink,
             false,
         );
     }
@@ -1052,6 +1069,12 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
                 cx.color_of(n, "bg").unwrap_or(WHITE)
             };
             super::printlist::draw_list(fb, cx, n, f, bg, x, y, w, h, rows);
+            if n.name.starts_with("ListBoxDivision") {
+                // a flat list has a plain black outline over the rows' edges
+                for (rx, ry, rw, rh) in [(x, y, w, 1), (x, y + h - 1, w, 1), (x, y, 1, h), (x + w - 1, y, 1, h)] {
+                    fb.fill(rx, ry, rw, rh, BLACK);
+                }
+            }
         }
         return;
     }

@@ -248,8 +248,11 @@ pub enum KeyAct {
 /// Enter presses the default button, Escape the cancel button, Tab moves the focus and typing edits the focused `TEdit` (its text is
 /// `texts[name]`, at most `MaxLength` characters).
 pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
-    let focusable = |h: &Hit| {
+    // a radio button is a tab stop only while it is the chosen one (Delphi sets `TabStop` with `Checked`)
+    let focusable = |h: &Hit, texts: &std::collections::BTreeMap<String, String>| {
         h.enabled
+            && (h.class != "TRadioButton"
+                || texts.get(&format!("{}.checked", h.name)).is_some_and(|v| v == "1"))
             && matches!(
                 h.class.as_str(),
                 "TBitBtn"
@@ -292,7 +295,7 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
             None => KeyAct::None,
         },
         Key::Tab | Key::BackTab => {
-            let names: Vec<&Hit> = d.hits.iter().filter(|h| focusable(h)).collect();
+            let names: Vec<&Hit> = d.hits.iter().filter(|h| focusable(h, &d.texts)).collect();
             if names.is_empty() {
                 return KeyAct::Done;
             }

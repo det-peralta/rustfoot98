@@ -27,6 +27,13 @@ while (true) {
       else if (c.op === 'move') { await p.mouse.move(c.x, c.y); out('move'); }
       else if (c.op === 'key') { await p.keyboard.press(c.key, { delay: 150 }); await p.waitForTimeout(700); out('key ' + c.key); }
       else if (c.op === 'type') { await p.keyboard.type(c.text, { delay: 200 }); out('type'); }
+      else if (c.op === 'gclick') { // click at guest pixel (x, y) through the emulator's own absolute mouse API (n = 2: double click)
+        await p.evaluate(async ({ x, y, n }) => {
+          const ci = await window.dosInstance.ciPromise; const sl = (ms) => new Promise((r) => setTimeout(r, ms));
+          ci.sendMouseMotion(((x - 33) / 1.6) / 800, ((y - 99.7) / 0.6633) / 600); await sl(250);
+          for (let i = 0; i < (n || 1); i++) { ci.sendMouseButton(0, true); await sl(120); ci.sendMouseButton(0, false); await sl(150); }
+        }, { x: c.x, y: c.y, n: c.n }); await p.waitForTimeout(500); out('gclick'); }
+      else if (c.op === 'gmove') { await p.evaluate(async ({ x, y }) => { const ci = await window.dosInstance.ciPromise; ci.sendMouseMotion(((x - 33) / 1.6) / 800, ((y - 99.7) / 0.6633) / 600); }, { x: c.x, y: c.y }); await p.waitForTimeout(300); out('gmove'); }
       else if (c.op === 'wait') { await p.waitForTimeout(c.ms); out('waited'); }
       else if (c.op === 'eval') { out('eval ' + JSON.stringify(await p.evaluate(c.js))); }
       else if (c.op === 'quit') { out('bye'); await b.close(); process.exit(0); }

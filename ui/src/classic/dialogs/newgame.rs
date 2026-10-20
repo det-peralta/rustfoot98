@@ -64,7 +64,7 @@ fn select_bind(c: &Classic, d: &mut Dialog) {
     if d.texts.get("textGameName") != Some(&typed) {
         d.text("textGameName", typed.clone());
     }
-    if d.st.get("last_name") != Some(&typed) || (d.focus == "textGameName" && mode(d) != "new") {
+    if d.st.get("last_name").map_or("", String::as_str) != typed {
         d.st.insert("last_name".into(), typed.clone());
         d.st.insert("mode".into(), "new".into());
         d.st.remove("warn");
@@ -169,6 +169,11 @@ fn select_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         "RadioContinueGame" => {
             d.st.insert("mode".into(), "continue".into());
             d.focus = "ListBoxGames".into();
+        }
+        // a click in the file name field chooses a new game (`textGameNameClick`); getting there with Tab does not
+        "textGameName" => {
+            d.st.insert("mode".into(), "new".into());
+            d.st.remove("warn");
         }
         n if n == "ListBoxGames" || n.starts_with("ListBoxGames#") => {
             if let Some(i) = list_row(c, d, n).filter(|&i| i < saves.len()) {

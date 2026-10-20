@@ -86,7 +86,7 @@ impl Classic {
                             if class != "ListRow" && class != "TabSetTab" {
                                 d.focus = name.clone();
                             }
-                            if class == "TEdit" {
+                            if class == "TEdit" && d.kind != dialog::Kind::SelectGame {
                                 Outcome::Keep
                             } else {
                                 dialogs::click(self, &mut d, &name)
@@ -294,6 +294,7 @@ impl Classic {
         {
             if let Some(k) = menu::formation_of(&label) {
                 self.world.set_formation(k);
+                self.main.lineup_shown = true;
                 return;
             }
         }
@@ -304,6 +305,7 @@ impl Classic {
                         rustfoot_core::season::best_formation(&self.world.divisions[d][i].slots)
                     {
                         self.world.set_formation(k);
+                        self.main.lineup_shown = true;
                     }
                 }
             }

@@ -303,6 +303,9 @@ impl Classic {
         if !self.started {
             main_win::desktop(&mut self.fb, &self.skin);
         }
+        // the windows below the topmost dialog have the inactive caption
+        let inactive = |on: bool| crate::win31::draw::INACTIVE.with(|i| i.set(on));
+        inactive(!self.dialogs.is_empty());
         match &self.screen {
             Screen::Main if !self.started => {}
             Screen::Main => {
@@ -323,9 +326,12 @@ impl Classic {
             }
         }
         let mut dialogs = std::mem::take(&mut self.dialogs);
-        for d in dialogs.iter_mut() {
+        let n = dialogs.len();
+        for (i, d) in dialogs.iter_mut().enumerate() {
+            inactive(i + 1 < n);
             d.draw(self);
         }
+        inactive(false);
         self.dialogs = dialogs;
         self.dirty = false;
     }
