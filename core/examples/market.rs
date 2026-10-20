@@ -1,5 +1,5 @@
-//! Transfer market over several seasons: `cargo run -p elifoot-core --release --example market`.
-use elifoot_core::world::World;
+//! Transfer market over several seasons: `cargo run -p rustfoot-core --release --example market`.
+use rustfoot_core::world::World;
 
 fn main() {
     let mut w = World::synthetic(1998);

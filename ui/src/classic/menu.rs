@@ -2,7 +2,7 @@
 use super::Classic;
 use crate::win31::draw::{text, text_dithered};
 use crate::win31::fb::{Rgb, BLACK, GRAY, NAVY, SILVER, WHITE};
-use elifoot_core::season::{plan_for_formation, Club, FORMATIONS};
+use rustfoot_core::season::{plan_for_formation, Club, FORMATIONS};
 
 pub struct Entry {
     pub name: String,

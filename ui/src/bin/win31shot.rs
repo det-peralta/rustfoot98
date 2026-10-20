@@ -1,7 +1,7 @@
 //! Renders one of the original forms with the pixel-exact Windows 3.1 renderer into a BMP file.
 //! `win31shot TABOUTDLG out.bmp [Control=text ...]`; reads `analysis/out/forms` and `analysis/out/skin` (see `tools/ui/skin.py`).
-use elifoot_ui::win31::draw::{controls, dialog_frame_menu, form_client, form_frame, Ctx, DESKTOP};
-use elifoot_ui::win31::{Fb, Node, Skin};
+use rustfoot_ui::win31::draw::{controls, dialog_frame_menu, form_client, form_frame, Ctx, DESKTOP};
+use rustfoot_ui::win31::{Fb, Node, Skin};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
@@ -33,11 +33,11 @@ fn main() -> Result<(), String> {
         cw = a.parse().unwrap_or(cw);
         ch = b.parse().unwrap_or(ch);
     }
-    let mut bg = node.color("Color").unwrap_or(elifoot_ui::win31::fb::SILVER);
+    let mut bg = node.color("Color").unwrap_or(rustfoot_ui::win31::fb::SILVER);
     if let Some(c) = texts.get("@color") {
         let v: Vec<u8> = c.split(',').filter_map(|p| p.parse().ok()).collect();
         if v.len() == 3 {
-            bg = elifoot_ui::win31::fb::Rgb(v[0], v[1], v[2]);
+            bg = rustfoot_ui::win31::fb::Rgb(v[0], v[1], v[2]);
         }
     }
     let menu: Vec<String> = node

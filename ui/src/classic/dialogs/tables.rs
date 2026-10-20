@@ -9,9 +9,9 @@ use crate::classic::text;
 use crate::classic::{main_win, Classic, Key};
 use crate::win31::fb::Rgb;
 use crate::win31::printlist::{visible_rows, with_colors};
-use elifoot_core::history::Fixture;
-use elifoot_core::season::{standings, Club};
-use elifoot_core::world::World;
+use rustfoot_core::history::Fixture;
+use rustfoot_core::season::{standings, Club};
+use rustfoot_core::world::World;
 
 /// The flags of `TPrintListDlg.Execute`.
 pub const AUTOCLOSE: u32 = 1;
@@ -232,7 +232,7 @@ pub fn human_coach(w: &World) -> String {
 }
 
 /// `1010:d0e0`: a transfer of the list of the last ones (a transfer of the user's club is drawn in blue).
-pub fn transfer_row(w: &World, t: &elifoot_core::world::Transfer) -> String {
+pub fn transfer_row(w: &World, t: &rustfoot_core::world::Transfer) -> String {
     let human = w.human.as_ref().map(|h| h.club.as_str());
     let mut r = String::new();
     if human == Some(t.from.as_str()) || human == Some(t.to.as_str()) {

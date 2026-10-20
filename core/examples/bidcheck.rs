@@ -1,7 +1,7 @@
-use elifoot_core::e98;
-use elifoot_core::market::*;
-use elifoot_core::season::Club;
-use elifoot_core::sector::{Slot, Status};
+use rustfoot_core::e98;
+use rustfoot_core::market::*;
+use rustfoot_core::season::Club;
+use rustfoot_core::sector::{Slot, Status};
 
 fn club(t: &e98::E98Team, skip: Option<&str>) -> Club {
     let mut slots = Vec::new();
@@ -53,7 +53,7 @@ fn main() {
             .unwrap();
         let mut slot = Slot::new(&pl.name, pl.position, pl.strength, false, Status::Out);
         slot.nat = code(&pl.nationality);
-        let v = elifoot_core::economy::player_value(pl.strength, 1.0, e, g);
+        let v = rustfoot_core::economy::player_value(pl.strength, 1.0, e, g);
         println!(
             "== {} ({} -> {}) fee {} ask {}",
             pl.name,

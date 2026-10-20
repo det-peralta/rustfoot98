@@ -4,8 +4,8 @@ use super::{text, Classic, Page};
 use crate::win31::draw::{controls, dialog_frame_menu, text as draw_text, Ctx, Hit, DESKTOP};
 use crate::win31::fb::{Rgb, BLACK, SILVER};
 use crate::win31::Node;
-use elifoot_core::season::{fixtures, Club};
-use elifoot_core::sector::Status;
+use rustfoot_core::season::{fixtures, Club};
+use rustfoot_core::sector::Status;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
@@ -25,7 +25,7 @@ pub fn human_club(c: &Classic) -> Option<((usize, usize), Club)> {
     let (d, i) = c.world.human_location()?;
     let mut club = c.world.divisions[d][i].clone();
     if let Some(h) = &c.world.human {
-        elifoot_core::season::apply_plan(&mut club.slots, &h.plan);
+        rustfoot_core::season::apply_plan(&mut club.slots, &h.plan);
     }
     Some(((d, i), club))
 }
@@ -353,7 +353,7 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         t("textTotalSalaries", text::int(wages));
         t(
             "textLoanInterest",
-            text::int(elifoot_core::finance::loan_interest(f.loan)),
+            text::int(rustfoot_core::finance::loan_interest(f.loan)),
         );
         t("textMoney", text::int(f.cash));
         let price = c.world.money_ctx(d).price;

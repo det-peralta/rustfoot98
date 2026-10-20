@@ -27,7 +27,7 @@ forwards events (`Classic::event`, `Classic::tick`) and blits `Classic::fb` afte
 * Game actions call the same `World` methods the other front ends use (`human_buy`, `human_sell`, `human_borrow`, ...); never duplicate rules in the UI.
 
 ## Verifying
-`cargo run --release -p elifoot-ui --bin classic_shot -- original/saves/snap2.e98 out.bmp 'ev=click:190,90;key:F5;tick:500'` replays events
+`cargo run --release -p rustfoot-ui --bin classic_shot -- original/saves/snap2.e98 out.bmp 'ev=click:190,90;key:F5;tick:500'` replays events
 (`click:x,y move:x,y key:Name tick:ms`, separated by `;`) on a saved game and writes the screen; `win31shot FORM out.bmp Control=text ...` renders a
 bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing regions against a capture of the original
 (`analysis/shots/`, local); `tools/capture/classic_web.mjs` drives the browser build in headless Chromium.

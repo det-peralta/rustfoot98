@@ -1,9 +1,9 @@
 //! Plain C-ABI bindings: `world_new(seed)`, `world_play_round()`, `world_play_season()`, then read the state with
 //! `world_json_ptr()` / `world_json_len()` (UTF-8 JSON in WebAssembly memory, valid until the next call).
-use elifoot_core::eft::{self, EftTeam};
-use elifoot_core::matchsim::{Event, EventKind, Side};
-use elifoot_core::season::{standings, Club, MatchRecord, Plan, PlannedSub, FORMATIONS};
-use elifoot_core::world::{World, DIVISION_BASE, DIVISION_NAMES, ROUNDS};
+use rustfoot_core::eft::{self, EftTeam};
+use rustfoot_core::matchsim::{Event, EventKind, Side};
+use rustfoot_core::season::{standings, Club, MatchRecord, Plan, PlannedSub, FORMATIONS};
+use rustfoot_core::world::{World, DIVISION_BASE, DIVISION_NAMES, ROUNDS};
 use std::cell::RefCell;
 use std::fmt::Write;
 
@@ -12,7 +12,7 @@ thread_local! {
     static OUT: RefCell<String> = const { RefCell::new(String::new()) };
     static BUF: RefCell<Vec<u8>> = const { RefCell::new(Vec::new()) };
     static SAVE: RefCell<String> = const { RefCell::new(String::new()) };
-    static OFFERS: RefCell<Vec<elifoot_core::world::Offer>> = const { RefCell::new(Vec::new()) };
+    static OFFERS: RefCell<Vec<rustfoot_core::world::Offer>> = const { RefCell::new(Vec::new()) };
     static MSG: RefCell<String> = const { RefCell::new(String::new()) };
     static TEAMS: RefCell<Vec<EftTeam>> = const { RefCell::new(Vec::new()) };
 }
@@ -114,8 +114,8 @@ fn human_json(w: &World) -> String {
                 p.ban,
                 p.injured,
                 p.wage,
-                elifoot_core::market::floor_1000(elifoot_core::market::market_value(p, w.economy, w.scale)),
-                elifoot_core::market::sale_blocker(club, k) == 0
+                rustfoot_core::market::floor_1000(rustfoot_core::market::market_value(p, w.economy, w.scale)),
+                rustfoot_core::market::sale_blocker(club, k) == 0
             )
         })
         .collect();
@@ -137,7 +137,7 @@ fn human_json(w: &World) -> String {
         .collect();
     let fin = &club.fin;
     let money = w.money_ctx(d);
-    let wage = elifoot_core::finance::wage_bill(&club.slots);
+    let wage = rustfoot_core::finance::wage_bill(&club.slots);
     let finance = format!(
         "{{\"cash\":{},\"loan\":{},\"f\":{:.4},\"stadium\":{},\"capacity\":{},\"gate\":{},\"sales\":{},\"purchases\":{},\"wages\":{},\"interest\":{},\"wageBill\":{},\"price\":{},\"scale\":{},\"step\":{},\"maxLoan\":{},\"fill\":{:.3},\"canExpand\":{},\"expandCost\":{}}}",
         fin.cash,
@@ -153,11 +153,11 @@ fn human_json(w: &World) -> String {
         wage,
         money.price,
         w.scale,
-        elifoot_core::finance::loan_step(w.scale),
-        elifoot_core::finance::max_loan(elifoot_core::finance::rating(&club.slots), club.k, w.economy, w.scale),
+        rustfoot_core::finance::loan_step(w.scale),
+        rustfoot_core::finance::max_loan(rustfoot_core::finance::rating(&club.slots), club.k, w.economy, w.scale),
         fin.fill,
-        elifoot_core::finance::wants_expansion(fin),
-        elifoot_core::finance::expansion_cost(fin, w.economy, w.scale)
+        rustfoot_core::finance::wants_expansion(fin),
+        rustfoot_core::finance::expansion_cost(fin, w.economy, w.scale)
     );
     format!(
         "{{\"club\":{},\"finance\":{},\"div\":{},\"idx\":{},\"formation\":{},\"formations\":[{}],\"squad\":[{}],\"plan\":{{\"starters\":[{}],\"bench\":[{}],\"subs\":[{}]}},\"subsLeft\":3}}",
@@ -232,7 +232,7 @@ fn cup_json(w: &World) -> String {
                                 k.side,
                                 pname(side, k.player),
                                 k.outcome.text(),
-                                k.outcome == elifoot_core::outcome::Outcome::Goal
+                                k.outcome == rustfoot_core::outcome::Outcome::Goal
                             )
                         })
                         .collect();
@@ -549,7 +549,7 @@ pub extern "C" fn world_load(len: usize) -> i32 {
 #[no_mangle]
 pub extern "C" fn world_import_e98(len: usize, seed: u32) -> i32 {
     let bytes = BUF.with(|b| b.borrow()[..len.min(b.borrow().len())].to_vec());
-    match elifoot_core::e98::parse(&bytes).and_then(|s| World::from_e98(seed, &s)) {
+    match rustfoot_core::e98::parse(&bytes).and_then(|s| World::from_e98(seed, &s)) {
         Ok(w) => {
             WORLD.with(|cell| *cell.borrow_mut() = Some(w));
             publish();
@@ -604,7 +604,7 @@ pub extern "C" fn buy_search(
     let name = BUF.with(|b| {
         String::from_utf8_lossy(&b.borrow()[..name_len.min(b.borrow().len())]).to_string()
     });
-    let q = elifoot_core::world::Search {
+    let q = rustfoot_core::world::Search {
         name,
         nationality: (nat != 0).then_some([(nat >> 16) as u8, (nat >> 8) as u8, nat as u8]),
         min_strength: min_strength as u16,
@@ -844,7 +844,7 @@ mod tests {
     }
 
     fn eft_bytes(i: usize) -> Vec<u8> {
-        use elifoot_core::cipher::encode;
+        use rustfoot_core::cipher::encode;
         let mut d = vec![0u8; 0x32];
         d[..3].copy_from_slice(b"EFa");
         d.extend(encode(format!("CLUBE NUMERO {i}").as_bytes()));

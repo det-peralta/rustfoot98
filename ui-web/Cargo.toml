@@ -1,5 +1,5 @@
 [package]
-name = "elifoot-ui-web"
+name = "rustfoot-ui-web"
 version = "0.1.0"
 edition = "2021"
 description = "WebAssembly build of the shared UI: frames come out as a command list that web/canvas.js replays on a <canvas>"
@@ -8,5 +8,5 @@ description = "WebAssembly build of the shared UI: frames come out as a command 
 crate-type = ["cdylib"]
 
 [dependencies]
-elifoot-ui = { path = "../ui" }
-elifoot-core = { path = "../core" }
+rustfoot-ui = { path = "../ui" }
+rustfoot-core = { path = "../core" }

@@ -1,7 +1,7 @@
-//! Desktop front end: `cargo run -p elifoot-ui --features sdl --release`.
-//! Headless screenshot (CI, docs): `SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=out.bmp [ELIFOOT_KEYS=space,space,tab] elifoot-sdl`.
-use elifoot_ui::sdl::{find_font, map_event, Backend};
-use elifoot_ui::{App, Event, Key, Request, HEIGHT, SLOTS, WIDTH};
+//! Desktop front end: `cargo run -p rustfoot-ui --features sdl --release`.
+//! Headless screenshot (CI, docs): `SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=out.bmp [ELIFOOT_KEYS=space,space,tab] rustfoot-sdl`.
+use rustfoot_ui::sdl::{find_font, map_event, Backend};
+use rustfoot_ui::{App, Event, Key, Request, HEIGHT, SLOTS, WIDTH};
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::surface::Surface;
 use std::path::PathBuf;
@@ -19,12 +19,12 @@ fn key_by_name(n: &str) -> Option<Key> {
     })
 }
 
-/// Save directory: `$ELIFOOT_SAVES` or `~/.local/share/elifoot98-rea`. Slot `n` is `slotN.sav` plus a one-line `slotN.label`.
+/// Save directory: `$ELIFOOT_SAVES` or `~/.local/share/rustfoot98`. Slot `n` is `slotN.sav` plus a one-line `slotN.label`.
 fn save_dir() -> PathBuf {
     std::env::var_os("ELIFOOT_SAVES")
         .map(PathBuf::from)
         .or_else(|| {
-            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share/elifoot98-rea"))
+            std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share/rustfoot98"))
         })
         .unwrap_or_else(|| PathBuf::from("."))
 }
@@ -97,7 +97,7 @@ fn main() -> Result<(), String> {
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1998);
-    elifoot_ui::set_classic(std::env::var("ELIFOOT_THEME").is_ok_and(|t| t == "classic"));
+    rustfoot_ui::set_classic(std::env::var("ELIFOOT_THEME").is_ok_and(|t| t == "classic"));
     let mut app = App::new(seed);
     scan_slots(&mut app);
     if let Some(p) = std::env::var_os("ELIFOOT_LOAD") {

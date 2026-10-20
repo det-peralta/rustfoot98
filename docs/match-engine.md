@@ -168,7 +168,7 @@ Implemented: bonus rolls, main goal generator, weighted scorer roulette, red car
 substitutions, penalties after red cards, goal annulment (30 unit tests, clippy clean).
 Not yet: half-time/extra time, interactive (human) paths, foul roulette of the UI path, and
 the identity of the two `c95c` strings (the formula itself is implemented as `fixture_value`).
-100k games per pairing (`cargo run --release -p elifoot-core --example sim`, 4-4-2, bench of 5, `c95c` with random strings,
+100k games per pairing (`cargo run --release -p rustfoot-core --example sim`, 4-4-2, bench of 5, `c95c` with random strings,
 domestic league match):
 
 | home/away strength | home goals | away goals | home W | draw | away W | reds | injuries |

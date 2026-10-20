@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Renders every case of tools/ui/cases.json with win31shot and reports how many pixels differ from the capture of the original.
 Captures live in analysis/shots (git-ignored); cases whose capture is missing are skipped. Run from the repository root:
-  cargo build -p elifoot-ui --release --bin win31shot && python3 tools/ui/check.py"""
+  cargo build -p rustfoot-ui --release --bin win31shot && python3 tools/ui/check.py"""
 import json, os, subprocess, sys
 import numpy as np
 from PIL import Image

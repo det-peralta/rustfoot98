@@ -10,11 +10,11 @@
 use super::dialog::{Dialog, Kind};
 use super::round_view::{self, RoundView};
 use super::{dialogs, main_win, Classic, Screen};
-use elifoot_core::matchsim::{Decision, Event, EventKind, Side, SubEvent};
-use elifoot_core::rng::DelphiRng;
-use elifoot_core::season::{Club, Control};
-use elifoot_core::sector::{Slot, Status};
-use elifoot_core::world::World;
+use rustfoot_core::matchsim::{Decision, Event, EventKind, Side, SubEvent};
+use rustfoot_core::rng::DelphiRng;
+use rustfoot_core::season::{Club, Control};
+use rustfoot_core::sector::{Slot, Status};
+use rustfoot_core::world::World;
 use std::collections::{HashMap, VecDeque};
 
 /// What happens next at the end of a round, once the dialogs open are closed.
@@ -669,7 +669,7 @@ mod tests {
 
     #[test]
     fn a_substitution_made_at_the_break_is_played_in_the_second_half_only() {
-        use elifoot_core::sector::Status;
+        use rustfoot_core::sector::Status;
         let mut c = classic(11);
         let (d, i) = c.world.human_location().unwrap();
         let before = c.world.clone();

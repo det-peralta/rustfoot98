@@ -1,5 +1,5 @@
 [package]
-name = "elifoot-core"
+name = "rustfoot-core"
 version = "0.1.0"
 edition = "2021"
 description = "Clean-room Elifoot 98 core: file formats and match rules (verified against the original binary)"

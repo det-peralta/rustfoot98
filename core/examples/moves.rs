@@ -1,4 +1,4 @@
-use elifoot_core::e98;
+use rustfoot_core::e98;
 use std::collections::HashMap;
 fn main() {
     let a = e98::parse(&std::fs::read(std::env::args().nth(1).unwrap()).unwrap()).unwrap();

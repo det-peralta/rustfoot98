@@ -9,7 +9,7 @@ const SAVE_PREFIX = "elifoot98-classic:";
 const say = (html) => { msg.innerHTML = html; msg.style.display = "block"; canvas.style.display = "none"; };
 
 async function wasmInstance() {
-  const res = await fetch("elifoot_ui.wasm");
+  const res = await fetch("rustfoot_ui.wasm");
   const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), {});
   return instance.exports;
 }

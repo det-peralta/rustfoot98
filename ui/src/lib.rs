@@ -1,6 +1,6 @@
 //! Immediate-mode UI of the Elifoot 98 port, independent of the window system (see `docs/ui-strategy.md`).
 //!
-//! [`App`] owns the game ([`elifoot_core::world::World`]), receives [`Event`]s and draws the current [`Screen`] through a
+//! [`App`] owns the game ([`rustfoot_core::world::World`]), receives [`Event`]s and draws the current [`Screen`] through a
 //! [`canvas::Canvas`]. Buttons are immediate: a screen calls [`App::button`] while drawing and gets `true` on the frame in which the
 //! user releases the mouse over it. No retained widget tree, no callbacks: a screen is one function from state to pixels, which keeps
 //! the front ends (SDL2, web canvas) trivial to maintain.
@@ -11,7 +11,7 @@ mod screens;
 pub mod win31;
 
 use canvas::{Canvas, Rect, Rgb};
-use elifoot_core::world::{Offer, Search, World};
+use rustfoot_core::world::{Offer, Search, World};
 use std::collections::HashMap;
 
 pub const WIDTH: i32 = 800;
@@ -298,7 +298,7 @@ impl App {
 
     /// Replaces the game with one saved by [`App::save_text`].
     pub fn load_text(&mut self, text: &str) -> Result<(), String> {
-        match elifoot_core::world::World::load(text) {
+        match rustfoot_core::world::World::load(text) {
             Ok(w) => {
                 self.world = w;
                 self.after_load("Jogo carregado.");
@@ -313,7 +313,7 @@ impl App {
 
     /// Starts from an original `.e98` save (`seed` drives the random numbers from here on).
     pub fn import_e98(&mut self, bytes: &[u8], seed: u32) -> Result<(), String> {
-        match elifoot_core::e98::parse(bytes).and_then(|s| World::from_e98(seed, &s)) {
+        match rustfoot_core::e98::parse(bytes).and_then(|s| World::from_e98(seed, &s)) {
             Ok(w) => {
                 self.world = w;
                 self.after_load("Jogo original importado.");
@@ -685,7 +685,7 @@ mod tests {
 
     #[test]
     fn swapping_roles_keeps_the_plan_consistent() {
-        use elifoot_core::season::{Plan, PlannedSub};
+        use rustfoot_core::season::{Plan, PlannedSub};
         let mut p = Plan {
             starters: vec![0, 1, 2],
             bench: vec![3, 4],

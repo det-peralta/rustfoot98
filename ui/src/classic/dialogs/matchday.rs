@@ -6,11 +6,11 @@
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::session::{find_club, info, Info, Step};
 use crate::classic::{main_win, text, Classic, Key, Screen};
-use elifoot_core::matchsim::{Decision, EventKind, Side};
-use elifoot_core::outcome::Outcome as Shot;
-use elifoot_core::season::Club;
-use elifoot_core::sector::{Slot, Status};
-use elifoot_core::world::ROUNDS;
+use rustfoot_core::matchsim::{Decision, EventKind, Side};
+use rustfoot_core::outcome::Outcome as Shot;
+use rustfoot_core::season::Club;
+use rustfoot_core::sector::{Slot, Status};
+use rustfoot_core::world::ROUNDS;
 
 fn rgb(c: [u8; 3]) -> String {
     format!("{},{},{}", c[0], c[1], c[2])
@@ -451,7 +451,7 @@ pub fn penalty(c: &Classic, cup: bool, src: usize, minute: u16, attack: bool) ->
 }
 
 /// The primary chance of the dialog as the game has it now.
-fn primary_of(c: &Classic, d: &Dialog) -> Option<elifoot_core::matchsim::Primary> {
+fn primary_of(c: &Classic, d: &Dialog) -> Option<rustfoot_core::matchsim::Primary> {
     let (cup, src, minute) = (
         d.num("cup") != 0,
         d.num("src") as usize,
@@ -1179,7 +1179,7 @@ fn finish_steps(c: &mut Classic, round: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use elifoot_core::matchsim::{Event, SubEvent};
+    use rustfoot_core::matchsim::{Event, SubEvent};
 
     fn slot(position: u8, strength: u16, status: Status) -> Slot {
         Slot::new("x", position, strength, true, status)

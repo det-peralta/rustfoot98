@@ -1,6 +1,6 @@
 {
-  "name": "Elifoot 98 — núcleo nativo",
-  "short_name": "Elifoot 98",
+  "name": "Rustfoot 98",
+  "short_name": "Rustfoot 98",
   "description": "Gestor de futebol Elifoot 98 reimplementado em Rust/WebAssembly, sem emulador.",
   "lang": "pt-PT",
   "start_url": "./",

@@ -8,9 +8,9 @@
 use crate::win31::draw::text;
 use crate::win31::fb::{Fb, Rgb, BLACK, GREEN, NAVY, SILVER, WHITE, YELLOW};
 use crate::win31::Skin;
-use elifoot_core::matchsim::{EventKind, Side};
-use elifoot_core::season::MatchRecord;
-use elifoot_core::world::{CupMatch, World};
+use rustfoot_core::matchsim::{EventKind, Side};
+use rustfoot_core::season::MatchRecord;
+use rustfoot_core::world::{CupMatch, World};
 
 const BLUE: Rgb = Rgb(0, 0, 255);
 const RED: Rgb = Rgb(255, 0, 0);
@@ -116,7 +116,7 @@ pub struct RoundView {
 }
 
 /// Players' short names of a record.
-fn ev_of(e: &elifoot_core::matchsim::Event, names: &[Vec<String>; 2]) -> Ev {
+fn ev_of(e: &rustfoot_core::matchsim::Event, names: &[Vec<String>; 2]) -> Ev {
     let side = (e.side == Side::Away) as usize;
     Ev {
         minute: e.minute,

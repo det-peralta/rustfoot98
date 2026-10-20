@@ -1,7 +1,7 @@
-//! `cargo run --release -p elifoot-core --example sim` — match statistics for a few strength pairings.
-use elifoot_core::matchsim::{fixture_value, EventKind, Match};
-use elifoot_core::rng::DelphiRng;
-use elifoot_core::sector::{Slot, Status};
+//! `cargo run --release -p rustfoot-core --example sim` — match statistics for a few strength pairings.
+use rustfoot_core::matchsim::{fixture_value, EventKind, Match};
+use rustfoot_core::rng::DelphiRng;
+use rustfoot_core::sector::{Slot, Status};
 
 fn name(rng: &mut DelphiRng) -> String {
     (0..5 + rng.random(8))

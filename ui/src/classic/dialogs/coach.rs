@@ -8,8 +8,8 @@ use super::tables::{
 };
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::{Classic, Key};
-use elifoot_core::history::CoachOptions;
-use elifoot_core::world::World;
+use rustfoot_core::history::CoachOptions;
+use rustfoot_core::world::World;
 
 fn coach_kind(k: &Kind) -> bool {
     matches!(

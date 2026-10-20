@@ -1,5 +1,5 @@
 //! The game with the original's own user interface: the Delphi forms rendered pixel for pixel by [`crate::win31`] and bound to the
-//! rules of `elifoot-core`. Needs the skin pack (`tools/ui/skin.py`); see `docs/pixel-exact-ui.md`.
+//! rules of `rustfoot-core`. Needs the skin pack (`tools/ui/skin.py`); see `docs/pixel-exact-ui.md`.
 pub mod dialog;
 pub mod dialogs;
 pub mod input;
@@ -13,7 +13,7 @@ pub mod widget_input;
 
 use crate::win31::draw::Hit;
 use crate::win31::{Fb, Forms, Skin};
-use elifoot_core::world::World;
+use rustfoot_core::world::World;
 use std::collections::HashMap;
 
 /// The files of the user's own game the interface needs besides the skin: country and referee names.
@@ -36,12 +36,12 @@ impl Data {
                 .map(|(a, b)| (a.to_string(), b.to_string()))
         };
         Data {
-            countries: elifoot_core::txe::parse(country)
+            countries: rustfoot_core::txe::parse(country)
                 .iter()
                 .skip(1)
                 .filter_map(split)
                 .collect(),
-            referees: elifoot_core::txe::parse(referee)
+            referees: rustfoot_core::txe::parse(referee)
                 .iter()
                 .skip(1)
                 .filter_map(split)
@@ -180,7 +180,7 @@ pub struct Classic {
     /// False until a game was started or loaded: only the start dialogs show over the empty desktop.
     pub started: bool,
     /// The teams a new game is made of (empty: invented clubs) and the seed for it.
-    pub teams: Vec<elifoot_core::eft::EftTeam>,
+    pub teams: Vec<rustfoot_core::eft::EftTeam>,
     pub seed: u32,
     /// Name the current game is saved under (empty before the first game starts).
     pub game_name: String,
@@ -228,7 +228,7 @@ impl Classic {
         skin: Skin,
         forms: Forms,
         data: Data,
-        teams: Vec<elifoot_core::eft::EftTeam>,
+        teams: Vec<rustfoot_core::eft::EftTeam>,
         seed: u32,
     ) -> Classic {
         let blank = World::empty(1, Default::default(), Vec::new(), 1998, 0);

@@ -1,9 +1,9 @@
 //! C ABI of the pixel-exact classic interface for the browser: the page loads the skin pack and the game's data files with
 //! `cl_put(kind, len)`, starts with `cl_start(seed)`, forwards input with `cl_event` and `cl_tick`, and blits the RGBA frame at
 //! `cl_fb_ptr()` (800x600) whenever `cl_frame()` returns 1.
-use elifoot_core::eft;
-use elifoot_ui::classic::{Classic, Data, Ev, Key, Request};
-use elifoot_ui::win31::{Forms, Skin};
+use rustfoot_core::eft;
+use rustfoot_ui::classic::{Classic, Data, Ev, Key, Request};
+use rustfoot_ui::win31::{Forms, Skin};
 use std::cell::RefCell;
 
 #[derive(Default)]

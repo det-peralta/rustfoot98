@@ -12,7 +12,7 @@ drew comes from **data we can read**, so it can be reproduced by a renderer, not
 | widget drawing (buttons, frames, focus rectangle) | Windows 3.1 USER/Delphi VCL code | measured on captures and reimplemented in `ui/src/win31/draw.rs` |
 
 **None of these files may be committed** (they are the game's and Microsoft's): `tools/ui/skin.py` writes `analysis/out/skin/` from the user's own
-copies, and the renderer (`ui/src/win31/`, `cargo run -p elifoot-ui --release --bin win31shot -- TABOUTDLG out.bmp`) reads it at run time.
+copies, and the renderer (`ui/src/win31/`, `cargo run -p rustfoot-ui --release --bin win31shot -- TABOUTDLG out.bmp`) reads it at run time.
 
 ## The reference: frames of the real thing
 `tools/capture/driver.mjs` drives the reference web build in headless Chromium; its `guest` command saves the **emulator's own 800x600 frame**

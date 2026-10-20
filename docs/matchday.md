@@ -28,7 +28,7 @@ Super-rápido (125, 400), Rapidíssimo (50, 250), Ultrassónico (0, 50).
 The core computes a round in one go. The interface plays it on a copy of the world and shows it; when the user decides something at a
 minute of his own game (a substitution at the break, the replacement of an injured player, the shooter of a primary chance, declining an
 invitation) the round is played again from the world before it with the decision added, and the view goes on from the same minute.
-* `elifoot_core::matchsim::Decision` (`Shooter`, `Substitute` (reply to an injury or a sent-off goalkeeper, replacing the automatic one),
+* `rustfoot_core::matchsim::Decision` (`Shooter`, `Substitute` (reply to an injury or a sent-off goalkeeper, replacing the automatic one),
   `NoSubstitution`, `Planned` (a substitution made at the break, for this game only)) and `Match::{decisions, primaries}`.
 * `season::Control { league, cup, log, frozen }` and `World::play_round_ctl(&mut Control)`; `World::play_round()` is `play_round_ctl` with
   the default control, so a round nobody touches is unchanged (the golden tests of the core still hold). `Control::checkpoint` records the

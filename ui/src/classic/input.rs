@@ -1,7 +1,7 @@
 //! Input: mouse and keyboard events and the passing of time, routed to the dialogs, the menus and the main window.
 use super::dialog::{self, Dialog, KeyAct, Outcome};
 use super::{dialogs, main_win, menu, Classic, Ev, Key, Page, Request, Screen};
-use elifoot_core::season::FORMATIONS;
+use rustfoot_core::season::FORMATIONS;
 
 impl Classic {
     pub fn event(&mut self, ev: Ev) {
@@ -301,7 +301,7 @@ impl Classic {
             "Melhores1" | "Automtico1" => {
                 if let Some((d, i)) = self.world.human_location() {
                     if let Some(k) =
-                        elifoot_core::season::best_formation(&self.world.divisions[d][i].slots)
+                        rustfoot_core::season::best_formation(&self.world.divisions[d][i].slots)
                     {
                         self.world.set_formation(k);
                     }

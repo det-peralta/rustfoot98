@@ -32,7 +32,7 @@ async function setupOffline() {
 
 async function boot() {
   setupOffline();
-  const res = await fetch("elifoot_wasm.wasm");
+  const res = await fetch("rustfoot_wasm.wasm");
   const bytes = await res.arrayBuffer();
   $("wasm-size").textContent = (bytes.byteLength / 1024).toFixed(0) + " KB";
   const { instance } = await WebAssembly.instantiate(bytes, {});
@@ -52,7 +52,7 @@ function read() {
 
 // Numbered save slots, the same keys and format as the shared canvas UI (web/canvas.js): {label, text}.
 const SLOTS = 8;
-const slotKey = (n) => `elifoot98-rea.slot.${n}`;
+const slotKey = (n) => `rustfoot98.slot.${n}`;
 function readSlot(n) { try { return JSON.parse(localStorage.getItem(slotKey(n))); } catch { return null; } }
 function slotLabel() {
   return `Época ${state.year} · J${state.round}/14 · ${state.human ? state.human.club : "-"}`;

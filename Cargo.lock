@@ -15,33 +15,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
-name = "elifoot-core"
-version = "0.1.0"
-
-[[package]]
-name = "elifoot-ui"
-version = "0.1.0"
-dependencies = [
- "elifoot-core",
- "sdl2",
-]
-
-[[package]]
-name = "elifoot-ui-web"
-version = "0.1.0"
-dependencies = [
- "elifoot-core",
- "elifoot-ui",
-]
-
-[[package]]
-name = "elifoot-wasm"
-version = "0.1.0"
-dependencies = [
- "elifoot-core",
-]
-
-[[package]]
 name = "lazy_static"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -52,6 +25,33 @@ name = "libc"
 version = "0.2.191"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "65cd87c9a6d60536580b316ad985726104730a5151c99845f2490428ef91240a"
+
+[[package]]
+name = "rustfoot-core"
+version = "0.1.0"
+
+[[package]]
+name = "rustfoot-ui"
+version = "0.1.0"
+dependencies = [
+ "rustfoot-core",
+ "sdl2",
+]
+
+[[package]]
+name = "rustfoot-ui-web"
+version = "0.1.0"
+dependencies = [
+ "rustfoot-core",
+ "rustfoot-ui",
+]
+
+[[package]]
+name = "rustfoot-wasm"
+version = "0.1.0"
+dependencies = [
+ "rustfoot-core",
+]
 
 [[package]]
 name = "sdl2"

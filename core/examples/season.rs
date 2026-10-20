@@ -1,9 +1,9 @@
-//! `cargo run --release -p elifoot-core --example season -- [base] [seasons]`
+//! `cargo run --release -p rustfoot-core --example season -- [base] [seasons]`
 //! Plays whole 8-team seasons (14 rounds, evolution after each round). `base` is the division base level
 //! (`division+4`, source not decoded yet; default 12). Points are 3-1-0 and morale follows the original rules (both verified); the line-up is a plain 4-4-2 (assumed).
-use elifoot_core::rng::DelphiRng;
-use elifoot_core::season::{end_of_round, play_round, standings, Club};
-use elifoot_core::sector::{Slot, Status};
+use rustfoot_core::rng::DelphiRng;
+use rustfoot_core::season::{end_of_round, play_round, standings, Club};
+use rustfoot_core::sector::{Slot, Status};
 
 fn name(rng: &mut DelphiRng) -> String {
     (0..5 + rng.random(8))

@@ -1,11 +1,11 @@
 // Replays the command list produced by the shared UI (ui-web) on a canvas and forwards input to it.
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
-const bytes = await (await fetch("elifoot_ui.wasm")).arrayBuffer();
+const bytes = await (await fetch("rustfoot_ui.wasm")).arrayBuffer();
 const { instance } = await WebAssembly.instantiate(bytes, {});
 const w = instance.exports;
 w.ui_new(1998);
-const THEME = "elifoot98-rea.classic";
+const THEME = "rustfoot98.classic";
 try { w.ui_set_classic(localStorage.getItem(THEME) === "1" ? 1 : 0); } catch {}
 
 const dec = new TextDecoder();
@@ -25,7 +25,7 @@ function frame() {
 }
 
 // host requests of the shared UI: save / load in localStorage, import an original .e98 through a file picker
-const KEY = (n) => `elifoot98-rea.slot.${n}`;
+const KEY = (n) => `rustfoot98.slot.${n}`;
 const picker = Object.assign(document.createElement("input"), { type: "file", accept: ".e98,.sav,.txt" });
 const put = (bytes) => { const p = w.ui_alloc(bytes.length); new Uint8Array(w.memory.buffer, p, bytes.length).set(bytes); };
 const take = () => dec.decode(new Uint8Array(w.memory.buffer, w.io_ptr(), w.io_len()));

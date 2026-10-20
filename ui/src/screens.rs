@@ -1,8 +1,8 @@
 //! The screens: league, squad, finance and cup. Each one is a plain function from the game state to drawing commands.
 use crate::canvas::{Canvas, Rect, Rgb};
 use crate::{theme, App, HEIGHT, WIDTH};
-use elifoot_core::season::standings;
-use elifoot_core::sector::Status;
+use rustfoot_core::season::standings;
+use rustfoot_core::sector::Status;
 
 pub const PLAY_ROUND: Rect = Rect::new(560, 548, 110, 34);
 pub const PLAY_SEASON: Rect = Rect::new(676, 548, 112, 34);
@@ -192,7 +192,7 @@ fn referee_aid(app: &mut App, c: &mut dyn Canvas) {
         return;
     };
     let fixture = (next <= 14)
-        .then(|| elifoot_core::season::fixtures(next))
+        .then(|| rustfoot_core::season::fixtures(next))
         .and_then(|f| f.into_iter().find(|&(h, a)| h == i || a == i));
     let Some((h, a)) = fixture else {
         c.text(
@@ -204,11 +204,11 @@ fn referee_aid(app: &mut App, c: &mut dyn Canvas) {
         );
         return;
     };
-    let division = elifoot_core::world::DIVISION_NAMES[d].as_bytes();
+    let division = rustfoot_core::world::DIVISION_NAMES[d].as_bytes();
     let clubs = &app.world.divisions[d];
     let bonus_h =
-        elifoot_core::matchsim::fixture_value(division, clubs[h].name.as_bytes(), true) + 2;
-    let bonus_a = elifoot_core::matchsim::fixture_value(division, clubs[a].name.as_bytes(), true);
+        rustfoot_core::matchsim::fixture_value(division, clubs[h].name.as_bytes(), true) + 2;
+    let bonus_a = rustfoot_core::matchsim::fixture_value(division, clubs[a].name.as_bytes(), true);
     for (n, (club, bonus)) in [(&clubs[h].name, bonus_h), (&clubs[a].name, bonus_a)]
         .into_iter()
         .enumerate()
@@ -305,7 +305,7 @@ pub fn finance(app: &mut App, c: &mut dyn Canvas) {
         return;
     };
     let f = &app.world.divisions[d][i].fin;
-    let wage = elifoot_core::finance::wage_bill(&app.world.divisions[d][i].slots);
+    let wage = rustfoot_core::finance::wage_bill(&app.world.divisions[d][i].slots);
     let rows: Vec<(&str, String, Rgb)> = vec![
         ("Caixa", money(f.cash), theme::text()),
         ("Bilhetes (época)", money(f.gate), theme::good()),

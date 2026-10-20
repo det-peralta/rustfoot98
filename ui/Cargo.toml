@@ -1,11 +1,11 @@
 [package]
-name = "elifoot-ui"
+name = "rustfoot-ui"
 version = "0.1.0"
 edition = "2021"
 description = "Backend-independent immediate-mode UI for the Elifoot 98 port, with an optional SDL2 front end"
 
 [dependencies]
-elifoot-core = { path = "../core" }
+rustfoot-core = { path = "../core" }
 sdl2 = { version = "0.38", optional = true, features = ["ttf"] }
 
 [features]
@@ -13,8 +13,8 @@ default = []
 sdl = ["dep:sdl2"]
 
 [[bin]]
-name = "elifoot-sdl"
-path = "src/bin/elifoot_sdl.rs"
+name = "rustfoot-sdl"
+path = "src/bin/rustfoot_sdl.rs"
 required-features = ["sdl"]
 
 [[bin]]

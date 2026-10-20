@@ -45,7 +45,7 @@
 - **Auto line-up**: decoded and ported (`lineup.rs`, see `match-engine.md`); the user's *default* plan uses the same rule, formations stay selectable.
 - Ranks for evolution are taken after the round's results (the original sorts at `0c41` start; order not confirmed).
 
-## What the simulation shows (`cargo run --release -p elifoot-core --example season -- 12 2000`)
+## What the simulation shows (`cargo run --release -p rustfoot-core --example season -- 12 2000`)
 Eight clubs of mean strength 9, 8, 7, 6, 6, 5, 4, 3, 2000 seasons: the strongest wins the title in 37 % of seasons,
 the weakest in 0.9 %; mean squad strength falls by roughly 2 points over a season (starters drift down, reserves up,
 clamped by `base − 2·rank ± 5`). The drift magnitude depends on the unknown base level, so treat it as indicative only.
@@ -55,7 +55,7 @@ The per-round byte array at `team+0x21` that the sort compares (the points word 
 finances and transfers (`3e9c`, `6e48`, team `+0x71..+0x79`); cup details (round naming, ties, extra time/penalties);
 the global `Real` at `10c8:2b46`; what the new-season routine `2f3c` resets.
 
-## World dynamics (core/src/world.rs, `cargo run --release -p elifoot-core --example world -- 12`)
+## World dynamics (core/src/world.rs, `cargo run --release -p rustfoot-core --example world -- 12`)
 A new world starts, by the verified rule, with mean squad strength about **43 / 31 / 18 / 7** for divisions 1..4. With the
 decoded evolution (starters drift down, reserves up, clamped to `base − 2·rank ± 5`) the means then erode slowly, to about
 **34 / 20 / 11 / 2** after twelve seasons. AI clubs never trade players with each other (see `finance.md`), so this erosion

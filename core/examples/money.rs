@@ -1,5 +1,5 @@
-//! Prints the first rounds of money for a synthetic world: `cargo run -p elifoot-core --example money`.
-use elifoot_core::world::World;
+//! Prints the first rounds of money for a synthetic world: `cargo run -p rustfoot-core --example money`.
+use rustfoot_core::world::World;
 
 fn main() {
     let mut w = World::synthetic(1998);

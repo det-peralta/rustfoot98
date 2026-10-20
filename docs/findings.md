@@ -118,7 +118,7 @@ In the save, the tail field at `+23` (u16, values 1..9) is the hidden talent `g`
 The earlier guess that `+21` was "contract games" is wrong. Aggression, proneness and `g` are not stored
 independently of the name: they are recomputed from it by the game (`1010:7516`).
 
-## `.e98` layout used by the importer (`core/src/e98.rs`, `cargo run -p elifoot-core --example e98dump FILE`)
+## `.e98` layout used by the importer (`core/src/e98.rs`, `cargo run -p rustfoot-core --example e98dump FILE`)
 Verified on `snap1` (new game) and `snap2` (after 2 rounds); the standings are consistent (`points = 3W + D`, goals for = goals
 against over the whole league) and `K` matches the morale formula (e.g. `0.7225 = 0.85²` for two defeats).
 - Header: `u16` id of the human club at `0x1f` (= the team id), `u16` year at `0x24`.

@@ -37,10 +37,10 @@ core (rules)  <-  ui (screens as functions state -> draw commands, input events)
   trait (`fill`, `outline`, `text`, `text_width`). Buttons are immediate (`App::button` returns true on the frame of the click), so a screen is
   one function and there is no widget tree or callback to keep in sync.
 * **SDL2 back end** (`ui/src/sdl.rs`, feature `sdl`): `Backend<T: RenderTarget>` works on a window *or* an offscreen surface; text comes from
-  SDL2_ttf with a system font (`find_font`, override with `ELIFOOT_FONT`). `cargo run -p elifoot-ui --features sdl --release`.
+  SDL2_ttf with a system font (`find_font`, override with `ELIFOOT_FONT`). `cargo run -p rustfoot-ui --features sdl --release`.
 * **Web back end** (`ui-web/` + `web/canvas.js`): the same screens compiled to `wasm32-unknown-unknown` (205 KB); each frame is a JSON command
   list that the page replays with Canvas2D. `web/canvas.html`.
-* **Headless**: `SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=out.bmp ELIFOOT_KEYS=space,space,tab cargo run -p elifoot-ui --features sdl` renders one frame
+* **Headless**: `SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=out.bmp ELIFOOT_KEYS=space,space,tab cargo run -p rustfoot-ui --features sdl` renders one frame
   to a BMP for documentation and golden comparisons; the unit tests assert on `DrawList` (no window, no GPU).
 The existing DOM page stays as the accessible, most complete front end until the shared screens catch up; nothing in `core/` or `wasm/` changes.
 
@@ -85,16 +85,16 @@ the salary-demand dialog is not (wages are renegotiated by the computer, as the 
 The screens never touch files: `Opções` lists **8 save slots** (label, Gravar / Carregar / Apagar) and a "Importar .e98 original" button. A click sets
 `App::request` (`Save(n)`, `Load(n)`, `Delete(n)`, `Import`); the host serves it (`App::take_request`), then calls `App::save_text` / `load_text` /
 `import_e98` and reports what a slot holds with `App::set_slot(n, label)` (`App::slot_label` gives "Época 2026 · J2/14 · club").
-* SDL2: `$ELIFOOT_SAVES` (default `~/.local/share/elifoot98-rea/`) holds `slotN.sav` + `slotN.label`; slots are scanned at start-up; drop a `.e98`
+* SDL2: `$ELIFOOT_SAVES` (default `~/.local/share/rustfoot98/`) holds `slotN.sav` + `slotN.label`; slots are scanned at start-up; drop a `.e98`
   or a `.sav` on the window to open it; `ELIFOOT_LOAD=file` opens one at start-up (also in headless shots).
-* Web canvas: localStorage `elifoot98-rea.slot.N` = `{label, text}`; "Importar .e98" opens a file picker (`.e98` is parsed by `core/src/e98.rs`,
+* Web canvas: localStorage `rustfoot98.slot.N` = `{label, text}`; "Importar .e98" opens a file picker (`.e98` is parsed by `core/src/e98.rs`,
   anything else is read as our save text). ABI: `ui_take_request` (`1+n` save, `11+n` load, `21+n` delete, 30 import), `ui_alloc`/`io_ptr`/`io_len`,
   `ui_save`, `ui_slot_label`, `ui_set_slot`, `ui_load`, `ui_import_e98`, `ui_notice`.
 
 ## Commands
 ```bash
-cargo test -p elifoot-ui                                   # screens, clicks and keys without a window
-cargo run  -p elifoot-ui --features sdl --release          # desktop window
-SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=shot.bmp ELIFOOT_KEYS=space,tab cargo run -p elifoot-ui --features sdl --release
+cargo test -p rustfoot-ui                                   # screens, clicks and keys without a window
+cargo run  -p rustfoot-ui --features sdl --release          # desktop window
+SDL_VIDEODRIVER=dummy ELIFOOT_SHOT=shot.bmp ELIFOOT_KEYS=space,tab cargo run -p rustfoot-ui --features sdl --release
 web/build.sh serve    # then open http://localhost:8080/canvas.html (shared UI) or / (DOM UI)
 ```

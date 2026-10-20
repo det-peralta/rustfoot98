@@ -7,7 +7,7 @@
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::{Classic, Key, Request};
 use crate::win31::fb::{Rgb, WHITE};
-use elifoot_core::world::World;
+use rustfoot_core::world::World;
 
 const NAVY: &str = "0,0,128";
 const YELLOW: &str = "255,255,0";

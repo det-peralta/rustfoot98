@@ -1,9 +1,9 @@
 //! Renders the round view with the content of a capture of the original (`analysis/shots/match12.png`) for comparing the layout:
 //! `round_shot out.bmp [minute]`. Needs the skin pack in `analysis/out/skin`.
-use elifoot_core::matchsim::EventKind;
-use elifoot_ui::classic::round_view::{draw, Club, Ev, Game, RoundView};
-use elifoot_ui::win31::fb::Rgb;
-use elifoot_ui::win31::{Fb, Skin};
+use rustfoot_core::matchsim::EventKind;
+use rustfoot_ui::classic::round_view::{draw, Club, Ev, Game, RoundView};
+use rustfoot_ui::win31::fb::Rgb;
+use rustfoot_ui::win31::{Fb, Skin};
 
 type Row = (
     &'static str,

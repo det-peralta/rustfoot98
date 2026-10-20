@@ -7,7 +7,7 @@ use crate::classic::{text, Classic, Key};
 use crate::win31::draw::wrap;
 use crate::win31::fb::{Fb, Rgb, BLACK, GRAY, GREEN, WHITE, YELLOW};
 use crate::win31::Skin;
-use elifoot_core::finance;
+use rustfoot_core::finance;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Message boxes

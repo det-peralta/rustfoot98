@@ -1,6 +1,6 @@
-use elifoot_core::e98;
-use elifoot_core::lineup;
-use elifoot_core::sector::{Slot, Status};
+use rustfoot_core::e98;
+use rustfoot_core::lineup;
+use rustfoot_core::sector::{Slot, Status};
 
 fn main() {
     let save = e98::parse(&std::fs::read(std::env::args().nth(1).unwrap()).unwrap()).unwrap();

@@ -1,5 +1,5 @@
 [package]
-name = "elifoot-wasm"
+name = "rustfoot-wasm"
 version = "0.1.0"
 edition = "2021"
 description = "WebAssembly bindings (plain C ABI, no wasm-bindgen) for the Elifoot 98 core"
@@ -9,4 +9,4 @@ license = "MIT"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-elifoot-core = { path = "../core" }
+rustfoot-core = { path = "../core" }

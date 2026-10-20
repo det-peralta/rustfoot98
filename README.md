@@ -1,4 +1,4 @@
-# elifoot98-rea
+# rustfoot98
 
 Reverse-engineering notes and a clean-room native browser port of **Elifoot 98**
 (André Elias, 1998, shareware), using [REA](https://github.com/morluto/rea) + Ghidra.
@@ -42,11 +42,11 @@ text file (`ELIFOOT98-RS 1`, our own format: `core/src/save.rs`). A loaded game 
 morale, year and round carry over; injuries and the cup restart; cash, loans and the economic factor are read as well (see `docs/findings.md`).
 The computer-managed clubs trade players with each other (`core/src/market.rs`, shown in the "Transferências" card); you can bid in open auctions ("Mercado" card) and sell squad players for the best computer bid.
 Native checks:
-`cargo test`, `cargo run --release -p elifoot-core --example sim|season|world`, and the browser smoke test
+`cargo test`, `cargo run --release -p rustfoot-core --example sim|season|world`, and the browser smoke test
 `node tools/capture/web_test.mjs`.
 
 ## Front ends
-The DOM page (`web/index.html`) is the most complete; the shared UI (`ui/`) runs on SDL2 (`cargo run -p elifoot-ui --features sdl --release`) and in the browser (`web/canvas.html`). See [docs/ui-strategy.md](docs/ui-strategy.md).
+The DOM page (`web/index.html`) is the most complete; the shared UI (`ui/`) runs on SDL2 (`cargo run -p rustfoot-ui --features sdl --release`) and in the browser (`web/canvas.html`). See [docs/ui-strategy.md](docs/ui-strategy.md).
 
 ## Layout
 - `core/` pure Rust: formats, RNG, match engine, season, world.  `wasm/` C-ABI bindings.  `web/` the demo page.

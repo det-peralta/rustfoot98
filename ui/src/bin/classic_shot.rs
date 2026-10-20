@@ -1,7 +1,7 @@
 //! Renders the classic interface from a saved game into a BMP: `classic_shot game.e98 out.bmp [key=value ...]`
 //! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
-use elifoot_ui::classic::{Classic, Data, Ev, Key, Page};
-use elifoot_ui::win31::{Forms, Skin};
+use rustfoot_ui::classic::{Classic, Data, Ev, Key, Page};
+use rustfoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
 
 fn main() -> Result<(), String> {
@@ -36,12 +36,12 @@ fn main() -> Result<(), String> {
         files.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
         let teams = files
             .iter()
-            .filter_map(|p| elifoot_core::eft::parse(&std::fs::read(p).ok()?).ok())
+            .filter_map(|p| rustfoot_core::eft::parse(&std::fs::read(p).ok()?).ok())
             .collect();
         Classic::start(skin, forms, data, teams, 1)
     } else {
-        let save = elifoot_core::e98::parse(&std::fs::read(&game).map_err(|e| e.to_string())?)?;
-        let world = elifoot_core::world::World::from_e98(1, &save)?;
+        let save = rustfoot_core::e98::parse(&std::fs::read(&game).map_err(|e| e.to_string())?)?;
+        let world = rustfoot_core::world::World::from_e98(1, &save)?;
         let mut app = Classic::new(world, skin, forms, data);
         app.coach = "joga1".into();
         app
@@ -146,11 +146,11 @@ fn main() -> Result<(), String> {
                                     .last()
                                     .map(|d| format!("{:?}", d.kind))
                                     .unwrap_or_else(|| match &app.screen {
-                                        elifoot_ui::classic::Screen::Main => "main".into(),
-                                        elifoot_ui::classic::Screen::Round(r) if r.backdrop => {
+                                        rustfoot_ui::classic::Screen::Main => "main".into(),
+                                        rustfoot_ui::classic::Screen::Round(r) if r.backdrop => {
                                             "backdrop".into()
                                         }
-                                        elifoot_ui::classic::Screen::Round(r) if r.cup => {
+                                        rustfoot_ui::classic::Screen::Round(r) if r.cup => {
                                             "cup view".into()
                                         }
                                         _ => "round view".into(),
@@ -170,7 +170,7 @@ fn main() -> Result<(), String> {
                                                     && d.hits.iter().any(|h| h.name == "shootBtn")
                                             }))
                                         || (stop == "Cup"
-                                            && matches!(&app.screen, elifoot_ui::classic::Screen::Round(r) if r.cup && r.minute > 3)))
+                                            && matches!(&app.screen, rustfoot_ui::classic::Screen::Round(r) if r.cup && r.minute > 3)))
                                 {
                                     break;
                                 }
@@ -243,7 +243,7 @@ fn main() -> Result<(), String> {
                                 app.tick(20);
                                 if app.dialogs.is_empty()
                                     && app.queue.is_empty()
-                                    && matches!(app.screen, elifoot_ui::classic::Screen::Main)
+                                    && matches!(app.screen, rustfoot_ui::classic::Screen::Main)
                                 {
                                     break;
                                 }
@@ -254,7 +254,7 @@ fn main() -> Result<(), String> {
                             for _ in 0..arg.parse::<u32>().unwrap_or(0) / 20 {
                                 if app.dialogs.is_empty()
                                     && app.queue.is_empty()
-                                    && matches!(app.screen, elifoot_ui::classic::Screen::Main)
+                                    && matches!(app.screen, rustfoot_ui::classic::Screen::Main)
                                 {
                                     break;
                                 }
@@ -283,12 +283,12 @@ fn main() -> Result<(), String> {
                     app.frame();
                 }
             }
-            "open" => elifoot_ui::classic::dialogs::market::open_by_name(&mut app, v)?,
+            "open" => rustfoot_ui::classic::dialogs::market::open_by_name(&mut app, v)?,
             "registered" => app.main.market.registered = v != "0",
             "dialog" => {
                 // opens a dialog by the control name of its menu entry (`CampeonatoClassificao`, `menuCalendrio`...)
-                if let Some(d) = elifoot_ui::classic::dialogs::open_for_menu(&app, v)
-                    .or_else(|| elifoot_ui::classic::dialogs::open_for_button(&app, v))
+                if let Some(d) = rustfoot_ui::classic::dialogs::open_for_menu(&app, v)
+                    .or_else(|| rustfoot_ui::classic::dialogs::open_for_button(&app, v))
                 {
                     app.open(d);
                 } else {
@@ -305,9 +305,9 @@ fn main() -> Result<(), String> {
                 // a dialog of the match day with sample data: `mdopen=invite`, `mdopen=lashes`
                 let d = match v.as_str() {
                     "invite" => {
-                        elifoot_ui::classic::dialogs::matchday::invitation(&app, "PALMEIRAS")
+                        rustfoot_ui::classic::dialogs::matchday::invitation(&app, "PALMEIRAS")
                     }
-                    "lashes" => elifoot_ui::classic::dialogs::matchday::lashes_dialog(vec![
+                    "lashes" => rustfoot_ui::classic::dialogs::matchday::lashes_dialog(vec![
                         "Fulano foi despedido do SANTOS".into(),
                         "Troca com Beltrano (FLAMENGO)".into(),
                         String::new(),

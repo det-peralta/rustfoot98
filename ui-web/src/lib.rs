@@ -1,8 +1,8 @@
 //! C ABI of the shared UI for the browser: `ui_new(seed)`, `ui_event(kind, a, b)`, `ui_frame()` and then the JSON command list at
-//! `frame_ptr()` / `frame_len()` (valid until the next frame). The commands are the [`elifoot_ui::canvas::Cmd`] list of one frame.
+//! `frame_ptr()` / `frame_len()` (valid until the next frame). The commands are the [`rustfoot_ui::canvas::Cmd`] list of one frame.
 mod classic_host;
-use elifoot_ui::canvas::{Canvas, Cmd, DrawList};
-use elifoot_ui::{App, Event, Key};
+use rustfoot_ui::canvas::{Canvas, Cmd, DrawList};
+use rustfoot_ui::{App, Event, Key};
 use std::cell::RefCell;
 
 thread_local! {
@@ -26,7 +26,7 @@ fn esc(s: &str) -> String {
     o
 }
 
-fn rgb(c: elifoot_ui::canvas::Rgb) -> String {
+fn rgb(c: rustfoot_ui::canvas::Rgb) -> String {
     format!("#{:02x}{:02x}{:02x}", c.0, c.1, c.2)
 }
 
@@ -124,10 +124,10 @@ pub extern "C" fn ui_take_request() -> i32 {
     APP.with(
         |app| match app.borrow_mut().as_mut().and_then(App::take_request) {
             None => 0,
-            Some(elifoot_ui::Request::Save(n)) => 1 + n as i32,
-            Some(elifoot_ui::Request::Load(n)) => 11 + n as i32,
-            Some(elifoot_ui::Request::Delete(n)) => 21 + n as i32,
-            Some(elifoot_ui::Request::Import) => 30,
+            Some(rustfoot_ui::Request::Save(n)) => 1 + n as i32,
+            Some(rustfoot_ui::Request::Load(n)) => 11 + n as i32,
+            Some(rustfoot_ui::Request::Delete(n)) => 21 + n as i32,
+            Some(rustfoot_ui::Request::Import) => 30,
         },
     )
 }
@@ -229,7 +229,7 @@ pub extern "C" fn ui_set_slot(n: u32, len: usize) {
 /// Chooses the look (1 classic, 0 modern); `ui_classic()` reads it back so the page can remember it.
 #[no_mangle]
 pub extern "C" fn ui_set_classic(on: i32) {
-    elifoot_ui::set_classic(on != 0);
+    rustfoot_ui::set_classic(on != 0);
 }
 
 #[no_mangle]

@@ -3,8 +3,8 @@
 use crate::canvas::{Canvas, Rect};
 use crate::screens::{footer, money, panel, POS};
 use crate::{theme, App, Request};
-use elifoot_core::economy::player_value;
-use elifoot_core::season::{Plan, PlannedSub, FORMATIONS};
+use rustfoot_core::economy::player_value;
+use rustfoot_core::season::{Plan, PlannedSub, FORMATIONS};
 
 /// Where a player stands in a plan: 0 not selected, 1 starter, 2 bench.
 fn role(plan: &Plan, i: usize) -> u8 {

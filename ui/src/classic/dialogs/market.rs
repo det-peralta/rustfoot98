@@ -2,7 +2,7 @@
 //! (`TSellPlayerDlg`), the salary demand (`TAskMoreSalaryDlg`), the player search (`TCheckPlayerDlg`), the squad viewer
 //! (`TPlantelDlg`) and the list of watched players (`TObservedPlayersDlg`).
 //!
-//! The rules are `elifoot-core`'s (`World::human_sell`, `human_bid`, `human_buy`, `human_propose_wage`, `search_players`...); this
+//! The rules are `rustfoot-core`'s (`World::human_sell`, `human_bid`, `human_buy`, `human_propose_wage`, `search_players`...); this
 //! module only moves their data into the forms' texts and lists and answers clicks and keys. The behaviour of the original comes
 //! from the decompiled handlers (`1018:3cf0 Vender1Click`, `453c sellBtnClick`, `46ee newSalaryBtnClick`, `1008:2fec`
 //! `AuctionDialogInit`, `1048:29f0` / `34f5` / `3223` for the search, `1048:13fa` for the squad viewer); see the market section of
@@ -10,8 +10,8 @@
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::{main_win, text, Classic, Key, Page};
 use crate::win31::fb::Rgb;
-use elifoot_core::season::Club;
-use elifoot_core::world::{Offer, PlayerQuery, PriceFilter, WageReply, SEARCH_LIMIT};
+use rustfoot_core::season::Club;
+use rustfoot_core::world::{Offer, PlayerQuery, PriceFilter, WageReply, SEARCH_LIMIT};
 use std::collections::BTreeMap;
 
 /// Name of the `Kind::Other` dialog that asks whether the user accepts the salary a player demands.
@@ -424,7 +424,7 @@ pub fn auction_dialog(c: &Classic, club: &str, player: &str, base: i64) -> Optio
     let seller = c.world.club_of(loc);
     let idx = seller.names.iter().position(|n| n == player)?;
     let s = &seller.slots[idx];
-    let value = elifoot_core::economy::player_value(
+    let value = rustfoot_core::economy::player_value(
         s.strength,
         seller.fin.f,
         c.world.economy,
@@ -643,7 +643,7 @@ fn found_of(d: &Dialog) -> Vec<(String, String)> {
 fn query_of(c: &Classic, d: &Dialog) -> PlayerQuery {
     let nationality = sel_of(d, "comboCountry")
         .and_then(|i| countries(c).get(i).map(|(_, k)| k.clone()))
-        .map(|k| elifoot_core::market::code(&k));
+        .map(|k| rustfoot_core::market::code(&k));
     PlayerQuery {
         name: d.texts.get("textName").cloned().unwrap_or_default(),
         nationality,
@@ -1083,7 +1083,7 @@ fn plantel_bind(c: &Classic, d: &mut Dialog) {
                 .insert("textDesiredSalary.visible".into(), (buy as u8).to_string());
             if let (true, Some(me)) = (buy, mine.as_deref().and_then(|m| c.world.find_club(m))) {
                 let f = c.world.club_of(me).fin.f;
-                let v = elifoot_core::economy::player_value(
+                let v = rustfoot_core::economy::player_value(
                     s.strength,
                     f,
                     c.world.economy,
@@ -1553,9 +1553,9 @@ mod flows {
             &std::fs::read(root.join("original/elifoot98/REFEREE.TXE")).ok()?,
         );
         let save =
-            elifoot_core::e98::parse(&std::fs::read(root.join("original/saves/snap2.e98")).ok()?)
+            rustfoot_core::e98::parse(&std::fs::read(root.join("original/saves/snap2.e98")).ok()?)
                 .ok()?;
-        let world = elifoot_core::world::World::from_e98(1, &save).ok()?;
+        let world = rustfoot_core::world::World::from_e98(1, &save).ok()?;
         let mut c = Classic::new(world, skin, forms, data);
         c.coach = "joga1".into();
         c.draw();
@@ -1663,7 +1663,7 @@ mod flows {
             let cl = c.world.club_of(other);
             (cl.name.clone(), cl.names[1].clone())
         };
-        c.world.board.push(elifoot_core::world::Listing {
+        c.world.board.push(rustfoot_core::world::Listing {
             seller: club,
             player: player.clone(),
             ask: 1000,

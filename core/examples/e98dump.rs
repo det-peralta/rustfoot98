@@ -1,5 +1,5 @@
-//! Prints what the importer reads from an original `.e98` save: `cargo run -p elifoot-core --example e98dump FILE`.
-use elifoot_core::e98;
+//! Prints what the importer reads from an original `.e98` save: `cargo run -p rustfoot-core --example e98dump FILE`.
+use rustfoot_core::e98;
 
 fn main() {
     let path = std::env::args().nth(1).expect("usage: e98dump FILE.e98");

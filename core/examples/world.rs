@@ -1,5 +1,5 @@
-//! `cargo run --release -p elifoot-core --example world -- [seasons]`: mean strength per division over the years.
-use elifoot_core::world::{World, DIVISION_NAMES};
+//! `cargo run --release -p rustfoot-core --example world -- [seasons]`: mean strength per division over the years.
+use rustfoot_core::world::{World, DIVISION_NAMES};
 
 fn main() {
     let seasons: usize = std::env::args()
