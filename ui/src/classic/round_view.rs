@@ -37,10 +37,10 @@ pub struct Game {
     pub attendance: i64,
     pub clubs: [Club; 2],
     pub events: Vec<Ev>,
-    /// The user's club plays in this game.
+    /// A human's club plays in this game.
     pub human: bool,
-    /// Which side of the game the user's club is (0 home, 1 away).
-    pub human_side: Option<usize>,
+    /// Which sides of the game (0 home, 1 away) are humans' clubs: both when two humans play each other.
+    pub human_sides: [bool; 2],
     /// Index into `world.last_round` (league) or the matches of `world.last_cup`.
     pub src: usize,
     /// Cup only: the tie goes on after 90 minutes (extra time); the others leave the view at minute 90.
@@ -180,7 +180,7 @@ impl RoundView {
     /// The view of the round just played (`world.last_round`).
     pub fn of_round(world: &World) -> RoundView {
         let mut v = RoundView::blank(format!("{}ª Jornada - {}", world.round, world.year), false);
-        let human = world.human_location();
+        let humans = world.human_locations();
         for (k, (d, m)) in world.last_round.iter().enumerate() {
             let club = |i: usize| {
                 let c = &world.divisions[*d][i];
@@ -192,19 +192,13 @@ impl RoundView {
                     ),
                 }
             };
-            let human_side = if human == Some((*d, m.home)) {
-                Some(0)
-            } else if human == Some((*d, m.away)) {
-                Some(1)
-            } else {
-                None
-            };
+            let human_sides = [humans.contains(&(*d, m.home)), humans.contains(&(*d, m.away))];
             v.divisions[*d].push(Game {
                 attendance: m.attendance,
                 clubs: [club(m.home), club(m.away)],
                 events: m.events.iter().map(|e| ev_of(e, &m.names)).collect(),
-                human: human_side.is_some(),
-                human_side,
+                human: human_sides.iter().any(|&h| h),
+                human_sides,
                 src: k,
                 extra_time: false,
             });
@@ -223,16 +217,10 @@ impl RoundView {
             ),
             true,
         );
-        let me = world.human.as_ref().map(|h| h.club.as_str());
+        let humans = world.human_clubs();
         for (k, m) in cup.matches.iter().enumerate() {
             let names = [m.home_players.clone(), m.away_players.clone()];
-            let human_side = if me == Some(m.home.as_str()) {
-                Some(0)
-            } else if me == Some(m.away.as_str()) {
-                Some(1)
-            } else {
-                None
-            };
+            let human_sides = [humans.contains(&m.home), humans.contains(&m.away)];
             v.games.push(Game {
                 attendance: m.attendance,
                 clubs: [club_of(world, &m.home), club_of(world, &m.away)],
@@ -241,8 +229,8 @@ impl RoundView {
                     .iter()
                     .map(|e| ev_of(e, &[names[0].clone(), names[1].clone()]))
                     .collect(),
-                human: human_side.is_some(),
-                human_side,
+                human: human_sides.iter().any(|&h| h),
+                human_sides,
                 src: k,
                 extra_time: m.extra_time,
             });
@@ -267,7 +255,9 @@ impl RoundView {
 
     /// Number of human coaches in the games on the screen (the original counts both sides of every game).
     pub fn humans(&self) -> usize {
-        self.shown().filter(|g| g.human).count()
+        self.shown()
+            .map(|g| g.human_sides.iter().filter(|&&h| h).count())
+            .sum()
     }
 
     /// Pages of 20 rows of a cup view minus one.
@@ -686,7 +676,7 @@ mod tests {
             clubs: [club("A"), club("B")],
             events,
             human: false,
-            human_side: None,
+            human_sides: [false; 2],
             src: 0,
             extra_time: false,
         }

@@ -13,7 +13,7 @@ use crate::eft::{EftTeam, Position};
 use crate::finance::{self, Finance};
 use crate::history::History;
 use crate::market::{code, country_class};
-use crate::matchsim::{Decision, Event, Primary, SubEvent};
+use crate::matchsim::{Event, Primary, SubEvent};
 use crate::rng::DelphiRng;
 use crate::season::{apply_plan, auto_lineup, fixtures, play_game_with, play_round_ctl, Control};
 use crate::season::{
@@ -180,9 +180,38 @@ pub struct Honours {
 #[derive(Clone, Debug)]
 pub struct Human {
     pub club: String,
+    /// The human's own name (the original's player name), also the name of the club's coach while he manages it.
+    pub coach: String,
     /// Index into `FORMATIONS`.
     pub formation: usize,
     pub plan: Plan,
+}
+
+/// What belongs to one human coach besides the [`Human`] itself: the market lists of his club.
+#[derive(Clone, Debug)]
+pub struct Bench {
+    /// The seat (order of the players in the new-game dialog, 0 is the first).
+    pub seat: usize,
+    pub human: Human,
+    pub pending: Vec<Pending>,
+    pub observed: Vec<(String, String)>,
+    pub sell_tried: Vec<String>,
+}
+
+/// The hot seat: several human coaches share one computer. `World::human` (with `pending`, `observed` and `sell_tried`) is the
+/// *active* human, the one the interface shows and the `human_*` methods act for; the others wait here until
+/// [`World::switch_human`] swaps them in. The single-human game is the case of an empty `benched`.
+#[derive(Clone, Debug, Default)]
+pub struct Seats {
+    /// The seats that are not active.
+    pub benched: Vec<Bench>,
+    /// The seat of the active human.
+    pub active: usize,
+    /// Clubs of humans who declined the invitation of the round being played (the interface replays the round).
+    pub declined: Vec<String>,
+    /// Coach swaps of the round that took a human coach to another club, as `(from, to)` (see `World::human_moves`).
+    pub moves: Vec<(String, String)>,
+    applied: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -221,10 +250,10 @@ pub struct World {
     /// Whether the user accepts an invitation to take over a club whose coach was sacked (the original asks in a dialog).
     pub accept_invitations: bool,
     /// Coach changes of the last round played, as `(sacked club, club that gave its coach)`; the second is the club the
-    /// coach came from. The user's own moves are in `human_moved`.
+    /// coach came from. The humans' own moves are in `seats.moves`.
     pub coach_changes: Vec<(String, String)>,
-    /// Set when the user's coach was moved to another club by a swap (`(from, to)`).
-    pub human_moved: Option<(String, String)>,
+    /// The other human coaches of a hot-seat game and the coach swaps of the round (see [`Seats`]).
+    pub seats: Seats,
     /// Calendars, champions, club and coach histories, the user's coach profile (`history.rs`, `docs/season.md`).
     pub history: History,
     /// The order the clubs of each division were last sorted in (indices into `divisions[d]`; empty = the division's own
@@ -449,7 +478,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
-            human_moved: None,
+            seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
         };
@@ -490,7 +519,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
-            human_moved: None,
+            seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
         };
@@ -540,7 +569,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
-            human_moved: None,
+            seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
         };
@@ -590,11 +619,217 @@ impl World {
             subs: Vec::new(),
         };
         let name = c.name.clone();
+        let coach = self.human.take().map(|h| h.coach).unwrap_or_default();
         self.human = Some(Human {
             club: name,
+            coach,
             formation,
             plan,
         });
+    }
+
+    // ---- the hot seat: several human coaches (see [`Seats`]) ----
+
+    /// How many human coaches play.
+    pub fn human_count(&self) -> usize {
+        self.seats.benched.len() + self.human.is_some() as usize
+    }
+
+    /// The seat of the active human (0 is the first player).
+    pub fn active_seat(&self) -> usize {
+        self.seats.active
+    }
+
+    /// The clubs of the humans in seat order.
+    pub fn human_clubs(&self) -> Vec<String> {
+        self.humans().map(|h| h.club.clone()).collect()
+    }
+
+    /// Every human in seat order (the active one included).
+    pub fn humans(&self) -> impl Iterator<Item = &Human> {
+        let mut v: Vec<(usize, &Human)> = self
+            .seats
+            .benched
+            .iter()
+            .map(|b| (b.seat, &b.human))
+            .chain(self.human.as_ref().map(|h| (self.seats.active, h)))
+            .collect();
+        v.sort_by_key(|&(s, _)| s);
+        v.into_iter().map(|(_, h)| h)
+    }
+
+    /// The seat of the human who manages `club`.
+    pub fn seat_of(&self, club: &str) -> Option<usize> {
+        if self.human.as_ref().is_some_and(|h| h.club == club) {
+            return Some(self.seats.active);
+        }
+        self.seats
+            .benched
+            .iter()
+            .find(|b| b.human.club == club)
+            .map(|b| b.seat)
+    }
+
+    /// Whether `name` is the name of a human coach (the players' own names, or the coach of a club a human manages).
+    pub fn is_human_coach(&self, name: &str) -> bool {
+        !name.is_empty()
+            && self.humans().any(|h| {
+                h.coach == name
+                    || self
+                        .locate(&h.club)
+                        .is_some_and(|l| self.club_ref(l).coach_name == name)
+            })
+    }
+
+    /// Whether `club` is managed by a human (any seat).
+    pub fn is_human_club(&self, club: &str) -> bool {
+        self.seat_of(club).is_some()
+    }
+
+    /// The human of `seat`, active or not.
+    pub fn human_at(&self, seat: usize) -> Option<&Human> {
+        if seat == self.seats.active {
+            return self.human.as_ref();
+        }
+        self.seats
+            .benched
+            .iter()
+            .find(|b| b.seat == seat)
+            .map(|b| &b.human)
+    }
+
+    /// The market lists of the human of `seat`: purchases to arrive, watched players, refused sales.
+    #[allow(clippy::type_complexity)]
+    pub fn seat_lists(&self, seat: usize) -> (&[Pending], &[(String, String)], &[String]) {
+        if seat == self.seats.active {
+            return (&self.pending, &self.observed, &self.sell_tried);
+        }
+        match self.seats.benched.iter().find(|b| b.seat == seat) {
+            Some(b) => (&b.pending, &b.observed, &b.sell_tried),
+            None => (&[], &[], &[]),
+        }
+    }
+
+    /// Makes the human of `seat` the active one: the human, his purchases, watched players and refused sales swap with the
+    /// active human's. False when there is no such seat.
+    pub fn switch_human(&mut self, seat: usize) -> bool {
+        if seat == self.seats.active && self.human.is_some() {
+            return true;
+        }
+        let Some(k) = self.seats.benched.iter().position(|b| b.seat == seat) else {
+            return false;
+        };
+        let mut next = self.seats.benched.remove(k);
+        if let Some(h) = self.human.take() {
+            self.seats.benched.push(Bench {
+                seat: self.seats.active,
+                human: h,
+                pending: std::mem::take(&mut self.pending),
+                observed: std::mem::take(&mut self.observed),
+                sell_tried: std::mem::take(&mut self.sell_tried),
+            });
+        }
+        self.human = Some(next.human);
+        self.pending = std::mem::take(&mut next.pending);
+        self.observed = std::mem::take(&mut next.observed);
+        self.sell_tried = std::mem::take(&mut next.sell_tried);
+        self.seats.active = seat;
+        true
+    }
+
+    /// Hands the main window to the next human (the round starts after the last one): false when the active human is the last.
+    pub fn next_human(&mut self) -> bool {
+        let next = self.seats.active + 1;
+        next < self.human_count() && self.switch_human(next)
+    }
+
+    /// Adds a human coach named `coach` who manages club `club` of `division`; he becomes the active human.
+    pub fn add_human(&mut self, division: usize, club: usize, coach: &str) -> usize {
+        let seat = self.human_count();
+        if let Some(h) = self.human.take() {
+            self.seats.benched.push(Bench {
+                seat: self.seats.active,
+                human: h,
+                pending: std::mem::take(&mut self.pending),
+                observed: std::mem::take(&mut self.observed),
+                sell_tried: std::mem::take(&mut self.sell_tried),
+            });
+        }
+        self.seats.active = seat;
+        self.set_human(division, club);
+        if let Some(h) = self.human.as_mut() {
+            h.coach = coach.to_string();
+        }
+        if !coach.is_empty() {
+            self.divisions[division][club].coach_name = coach.to_string();
+        }
+        seat
+    }
+
+    /// A new game for `names` (one per human): the first takes the club `pick_human` chose, the others get another random one
+    /// of the bottom six of the 4th division each (`1028:0b26`). Every club's coach is renamed after its human. The first
+    /// human is the active one afterwards.
+    pub fn name_humans(&mut self, names: &[String]) {
+        if names.is_empty() {
+            return;
+        }
+        let first = self
+            .human
+            .take()
+            .and_then(|h| self.divisions[3].iter().position(|c| c.name == h.club));
+        let mut chosen: Vec<usize> = first.into_iter().collect();
+        self.seats = Seats::default();
+        self.pending.clear();
+        self.observed.clear();
+        self.sell_tried.clear();
+        for (k, name) in names.iter().enumerate() {
+            let club = match first.filter(|_| k == 0) {
+                Some(c) => c,
+                None => loop {
+                    let c = 7 - self.rng.random(6) as usize;
+                    if !chosen.contains(&c) {
+                        chosen.push(c);
+                        break c;
+                    }
+                },
+            };
+            self.add_human(3, club, name);
+        }
+        self.switch_human(0);
+    }
+
+    /// Runs `f` once with each human active in turn (seat order); the active human is the same afterwards.
+    pub fn for_each_human(&mut self, mut f: impl FnMut(&mut World)) {
+        let back = self.seats.active;
+        for seat in 0..self.human_count() {
+            self.switch_human(seat);
+            f(self);
+        }
+        self.switch_human(back);
+    }
+
+    /// Where the clubs of all humans are (seat order, those outside the divisions left out).
+    pub fn human_locations(&self) -> Vec<(usize, usize)> {
+        self.humans().filter_map(|h| self.locate_in_divisions(&h.club)).collect()
+    }
+
+    fn locate_in_divisions(&self, name: &str) -> Option<(usize, usize)> {
+        self.divisions
+            .iter()
+            .enumerate()
+            .find_map(|(d, v)| v.iter().position(|c| c.name == name).map(|i| (d, i)))
+    }
+
+    /// The coach swaps of the last round that took a human coach to another club, as `(from, to)`.
+    pub fn human_moves(&self) -> &[(String, String)] {
+        &self.seats.moves
+    }
+
+    /// Whether the human who managed `club` declines the invitation to another one (the round is then replayed).
+    pub fn decline_invitation(&mut self, club: &str) {
+        if !self.seats.declined.iter().any(|c| c == club) {
+            self.seats.declined.push(club.to_string());
+        }
     }
 
     /// Starts a new cup: every club of the world is in.
@@ -639,9 +874,7 @@ impl World {
     }
 
     fn is_human(&self, loc: (usize, usize)) -> bool {
-        self.human
-            .as_ref()
-            .is_some_and(|h| h.club == self.club_ref(loc).name)
+        self.is_human_club(&self.club_ref(loc).name)
     }
 
     /// Puts `slot_idx` of the club at `seller` up for sale at `ask` (`1010:5b37`) and settles the auction (`1008:3600`,
@@ -719,9 +952,14 @@ impl World {
     }
 
     fn human_may_bid(&self, seller: (usize, usize), slot_idx: usize, ask: i64) -> bool {
-        let Some(h) = self.human_location() else {
-            return false;
-        };
+        // some human may still outbid the computer
+        self.human_locations()
+            .into_iter()
+            .any(|h| self.may_bid_for(h, seller, slot_idx, ask))
+    }
+
+    /// Whether the human whose club is at `h` can take part in the auction of `slot_idx` of the club at `seller`.
+    fn may_bid_for(&self, h: (usize, usize), seller: (usize, usize), slot_idx: usize, ask: i64) -> bool {
         let c = self.club_ref(h);
         h != seller
             && self.history.options.auction != 2 // the coach profile: no buying in auctions
@@ -770,9 +1008,7 @@ impl World {
             c.fin.book(-fee, finance::Category::Purchases);
             (c.name.clone(), self.year)
         };
-        if self.is_human(seller) {
-            self.remap_plan_after_removal(slot_idx);
-        }
+        self.remap_plan_after_removal(&from, slot_idx);
         if self.transfers.len() >= 200 {
             self.transfers.remove(0);
         }
@@ -786,14 +1022,26 @@ impl World {
             to,
             fee,
         });
-        if self.is_human(seller) || self.is_human(buyer_loc) {
-            self.refresh_plan();
-        }
+        let (a, b) = (
+            self.club_ref(seller).name.clone(),
+            self.club_ref(buyer_loc).name.clone(),
+        );
+        self.for_each_human(|w| {
+            if w.human.as_ref().is_some_and(|h| h.club == a || h.club == b) {
+                w.refresh_plan();
+            }
+        });
     }
 
-    /// Keeps the user's plan consistent after the player at `removed` left the squad.
-    fn remap_plan_after_removal(&mut self, removed: usize) {
-        let Some(h) = self.human.as_mut() else { return };
+    /// Keeps the plan of the human who manages `club` consistent after the player at `removed` left the squad.
+    fn remap_plan_after_removal(&mut self, club: &str, removed: usize) {
+        let h = match self.human.as_mut() {
+            Some(h) if h.club == club => h,
+            _ => match self.seats.benched.iter_mut().find(|b| b.human.club == club) {
+                Some(b) => &mut b.human,
+                None => return,
+            },
+        };
         let fix = |v: &mut Vec<usize>| {
             v.retain(|&i| i != removed);
             for i in v.iter_mut() {
@@ -903,6 +1151,7 @@ impl World {
         if self
             .pending
             .iter()
+            .chain(self.seats.benched.iter().flat_map(|b| b.pending.iter()))
             .any(|p| p.seller == club && p.player == player)
         {
             return Err("esse jogador já está comprado".into());
@@ -955,6 +1204,10 @@ impl World {
 
     /// `1020:0aae`: the user's purchases join the club (wage from the player's value in the new club's economy).
     fn deliver_purchases(&mut self) {
+        self.for_each_human(|w| w.deliver_own_purchases());
+    }
+
+    fn deliver_own_purchases(&mut self) {
         let pending = std::mem::take(&mut self.pending);
         let Some(human) = self.human_location() else {
             return;
@@ -999,9 +1252,8 @@ impl World {
             if slot.foreign == 2 {
                 c.bought_foreign = c.bought_foreign.saturating_sub(1);
             }
-            if self.is_human(seller) {
-                self.remap_plan_after_removal(idx);
-            }
+            let seller_club = self.club_ref(seller).name.clone();
+            self.remap_plan_after_removal(&seller_club, idx);
         }
         self.refresh_plan();
     }
@@ -1258,11 +1510,11 @@ impl World {
     /// division total remembered earlier (floor 0.1). The reference total is refreshed afterwards. (How the original
     /// times the total and the human exclusion could not be reproduced exactly; see `docs/finance.md`.)
     fn update_factors(&mut self) {
-        let human = self.human.as_ref().map(|h| h.club.clone());
+        let humans = self.human_clubs();
         for d in 0..4 {
             let ai: i64 = self.divisions[d]
                 .iter()
-                .filter(|c| Some(&c.name) != human.as_ref())
+                .filter(|c| !humans.contains(&c.name))
                 .map(|c| c.fin.cash)
                 .sum();
             let reference = self.cash_ref[d].max(1) as f64;
@@ -1311,8 +1563,9 @@ impl World {
         let me = (d, i);
         let t = cur[i].clone();
         let rating_t = crate::cup::team_rating(&t.slots) as i32;
-        let human_name = self.human.as_ref().map(|h| h.club.clone());
-        let is_human = |c: &Club| human_name.as_deref() == Some(c.name.as_str());
+        let human_names = self.human_clubs();
+        let declined = self.seats.declined.clone();
+        let is_human = |c: &Club| human_names.contains(&c.name);
         let exclude_humans = no_humans;
         // coach list order: computer coaches by club order, the user's coach last
         let mut cands: Vec<((usize, usize), Club)> = Vec::new();
@@ -1349,7 +1602,10 @@ impl World {
         }
         let Some(&pick) = v
             .iter()
-            .find(|&&k| !is_human(&cands[k].1) || self.accept_invitations)
+            .find(|&&k| {
+                !is_human(&cands[k].1)
+                    || (self.accept_invitations && !declined.contains(&cands[k].1.name))
+            })
         else {
             return;
         };
@@ -1376,9 +1632,10 @@ impl World {
         self.log_coach_swap(&t, &p);
         self.coach_changes.push((t.name.clone(), p.name.clone()));
         if t_human {
-            self.human_moved = Some((t.name.clone(), p.name.clone()));
-        } else if p_human {
-            self.human_moved = Some((p.name.clone(), t.name.clone()));
+            self.seats.moves.push((t.name.clone(), p.name.clone()));
+        }
+        if p_human {
+            self.seats.moves.push((p.name.clone(), t.name.clone()));
         }
         if t_human && !p_human {
             // `1010:6a08`: the club the user leaves gets wages no higher than the players' values and no overdraft
@@ -1394,14 +1651,21 @@ impl World {
 
     /// The user's coach was swapped to another club: the user manages that club from now on.
     fn apply_human_move(&mut self) {
-        let Some((_, to)) = self.human_moved.clone() else {
-            return;
-        };
-        if self.human.as_ref().is_some_and(|h| h.club != to) {
+        let new: Vec<(String, String)> = self.seats.moves[self.seats.applied..].to_vec();
+        self.seats.applied = self.seats.moves.len();
+        // the seats first, then the moves: two humans may swap clubs
+        let moves: Vec<(usize, String)> = new
+            .into_iter()
+            .filter_map(|(from, to)| Some((self.seat_of(&from)?, to)))
+            .collect();
+        let back = self.seats.active;
+        for (seat, to) in moves {
             if let Some((d, i)) = self.locate(&to).filter(|l| l.0 < 4) {
+                self.switch_human(seat);
                 self.set_human(d, i);
             }
         }
+        self.switch_human(back);
     }
 
     /// A cup loser's coach is sacked (flag `0x400`: the user's coach is never a candidate).
@@ -1447,10 +1711,10 @@ impl World {
         let n = self.cup.len();
         let (k, pairs) = cup::round_size(n);
         let entrants: Vec<String> = self.cup.iter().take(pairs * 2).cloned().collect();
-        let plan = self
-            .human
-            .as_ref()
-            .map(|h| (h.club.clone(), h.plan.clone()));
+        let plans: Vec<(String, Plan)> = self
+            .humans()
+            .map(|h| (h.club.clone(), h.plan.clone()))
+            .collect();
         let mut matches = Vec::new();
         let mut losers = Vec::new();
         for pair in entrants.chunks(2) {
@@ -1465,12 +1729,12 @@ impl World {
             let mut away = std::mem::replace(self.club_at(al), placeholder());
             let rng = &mut self.rng;
             let mut plan_of = |c: &mut Club| -> Option<Plan> {
-                match &plan {
-                    Some((club, p)) if *club == c.name => {
+                match plans.iter().find(|(club, _)| *club == c.name) {
+                    Some((_, p)) => {
                         apply_plan(&mut c.slots, p);
                         Some(p.clone())
                     }
-                    _ => {
+                    None => {
                         auto_lineup(rng, &mut c.slots, &mut c.names);
                         None
                     }
@@ -1489,11 +1753,12 @@ impl World {
             );
             let hb = crate::matchsim::fixture_value(b"TACA", home.name.as_bytes(), true) + 2;
             let ab = crate::matchsim::fixture_value(b"TACA", away.name.as_bytes(), true);
-            let human_in_tie = self
-                .human
-                .as_ref()
-                .is_some_and(|h| h.club == home.name || h.club == away.name);
-            let decisions: &[Decision] = if human_in_tie { &ctl.cup } else { &[] };
+            let human_in_tie = hp.is_some() || ap.is_some();
+            let decisions = if human_in_tie {
+                ctl.decisions(true, &home.name)
+            } else {
+                Vec::new()
+            };
             let g = play_game_with(
                 &mut self.rng,
                 &mut home,
@@ -1503,7 +1768,7 @@ impl World {
                 hp.as_ref(),
                 ap.as_ref(),
                 true,
-                decisions,
+                &decisions,
             );
             let shootout = g.home_goals == g.away_goals;
             let mut pens = None;
@@ -1596,9 +1861,17 @@ impl World {
     }
 
     /// The original's start rule (`1028:0b26`): a random one of the bottom six clubs of the 4th division (`7 - Random(6)`).
+    /// With several humans the club is one no other human manages.
     pub fn pick_human(&mut self) {
-        let club = 7 - self.rng.random(6) as usize;
-        self.set_human(3, club);
+        let taken = self.human_clubs();
+        loop {
+            let club = 7 - self.rng.random(6) as usize;
+            if taken.contains(&self.divisions[3][club].name) {
+                continue;
+            }
+            self.set_human(3, club);
+            return;
+        }
     }
 
     /// Writes the line-up the game would actually field next round back into the user's plan (injured, suspended or
@@ -1699,9 +1972,13 @@ impl World {
     pub fn play_round_ctl(&mut self, ctl: &mut Control) {
         self.close_board();
         self.sell_tried.clear();
+        for b in &mut self.seats.benched {
+            b.sell_tried.clear();
+        }
         self.last_round.clear();
         self.coach_changes.clear();
-        self.human_moved = None;
+        self.seats.moves.clear();
+        self.seats.applied = 0;
         let round = self.round + 1;
         #[allow(clippy::needless_range_loop)]
         for d in 0..4 {
@@ -1718,9 +1995,11 @@ impl World {
                 )
             };
             let mut plans = HashMap::new();
-            if let (Some((hd, hi)), Some(h)) = (self.human_location(), self.human.as_ref()) {
-                if hd == d && !self.history.holiday {
-                    plans.insert(hi, h.plan.clone());
+            for h in self.humans() {
+                if let Some((hd, hi)) = self.locate_in_divisions(&h.club) {
+                    if hd == d && !self.history.holiday {
+                        plans.insert(hi, h.plan.clone());
+                    }
                 }
             }
             let money = self.money_ctx(d);
@@ -1759,10 +2038,12 @@ impl World {
             self.record_cup_fixtures(round);
             self.apply_human_move();
         }
-        if let Some(h) = self.human.as_mut() {
-            h.plan.subs.clear(); // planned substitutions are for one round only (league game and cup tie)
-        }
-        self.refresh_plan();
+        self.for_each_human(|w| {
+            if let Some(h) = w.human.as_mut() {
+                h.plan.subs.clear(); // planned substitutions are for one round only (league game and cup tie)
+            }
+            w.refresh_plan();
+        });
         if round == ROUNDS {
             self.finish_season();
         }
@@ -1888,10 +2169,13 @@ impl World {
             &mut self.pool,
             cup_winner.as_deref(),
         );
-        if self.human_location().is_none() {
-            self.pick_human(); // the user's club left the league: the game hands them another one (`4f40`)
-        }
-        self.refresh_plan();
+        // a human whose club left the league gets another one (`4f40`)
+        self.for_each_human(|w| {
+            if w.human_location().is_none() {
+                w.pick_human();
+            }
+            w.refresh_plan();
+        });
         let after: Vec<(String, usize)> = self
             .divisions
             .iter()
@@ -2070,7 +2354,10 @@ impl World {
             .names
             .iter()
             .position(|n| *n == l.player)
-            .is_some_and(|idx| self.human_may_bid(seller, idx, l.ask))
+            .is_some_and(|idx| {
+                self.human_location()
+                    .is_some_and(|h| self.may_bid_for(h, seller, idx, l.ask))
+            })
     }
 
     /// Every club as `(division, index)` in master-list order (the outside pool is division 4).
@@ -2964,13 +3251,28 @@ mod tests {
                 .unwrap();
             // the user substitutes at the break: restore the world, add the decision and replay
             let mut second = w0.clone();
-            let sub = Decision::Planned {
+            let sub = crate::matchsim::Decision::Planned {
                 side,
                 minute: 46,
                 out,
                 inn,
             };
-            second.play_round_ctl(&mut Control::replay(ctl.log.clone(), vec![sub], vec![]));
+            let home = w0.divisions[d][i].name.clone();
+            let home = if side == Side::Home {
+                home
+            } else {
+                let m = first
+                    .last_round
+                    .iter()
+                    .find(|(dd, m)| *dd == d && m.away == i)
+                    .unwrap();
+                w0.divisions[d][m.1.home].name.clone()
+            };
+            second.play_round_ctl(&mut Control::replay(
+                ctl.log.clone(),
+                vec![(home, sub)],
+                vec![],
+            ));
             let (a, b) = (round_text(&first), round_text(&second));
             assert_eq!(a.len(), b.len());
             for (k, ((da, ma), (db, mb))) in
@@ -3249,5 +3551,234 @@ mod tests {
             ..PlayerQuery::default()
         });
         assert!(not_mine.iter().all(|o| o.club != me));
+    }
+
+    // ---- hot seat ----
+
+    fn hot_seat_world(n: usize) -> World {
+        let mut w = World::synthetic(7);
+        let names: Vec<String> = (1..=n).map(|k| format!("joga{k}")).collect();
+        w.name_humans(&names);
+        w
+    }
+
+    #[test]
+    fn naming_players_gives_each_one_a_different_club_of_the_bottom_six() {
+        let w = hot_seat_world(6);
+        assert_eq!(w.human_count(), 6);
+        let clubs = w.human_clubs();
+        let mut sorted = clubs.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 6, "{clubs:?}");
+        for (seat, club) in clubs.iter().enumerate() {
+            let (d, i) = w.locate(club).unwrap();
+            assert_eq!(d, 3);
+            assert!(i >= 2, "bottom six");
+            assert_eq!(w.human_at(seat).unwrap().coach, format!("joga{}", seat + 1));
+            assert_eq!(w.divisions[d][i].coach_name, format!("joga{}", seat + 1));
+        }
+        assert_eq!(w.active_seat(), 0);
+        // a single name draws no more random numbers than the single-human start
+        let mut one = World::synthetic(7);
+        let mut named = World::synthetic(7);
+        named.name_humans(&["a".into()]);
+        assert_eq!(named.human_clubs(), one.human_clubs());
+        assert_eq!(named.rng.seed(), one.rng.seed());
+        one.name_humans(&[]);
+        assert_eq!(one.human_count(), 1);
+    }
+
+    #[test]
+    fn switching_swaps_the_active_human_and_his_market_lists() {
+        let mut w = hot_seat_world(3);
+        let clubs = w.human_clubs();
+        w.observed.push(("X".into(), "p0".into()));
+        assert!(w.switch_human(2));
+        assert_eq!(w.human.as_ref().unwrap().club, clubs[2]);
+        assert!(w.observed.is_empty(), "seat 2 watches nobody yet");
+        w.sell_tried.push("p2".into());
+        assert!(w.switch_human(0));
+        assert_eq!(w.observed.len(), 1);
+        assert!(w.sell_tried.is_empty());
+        assert_eq!(w.seat_lists(2).2, ["p2".to_string()]);
+        assert!(!w.switch_human(3));
+        // next_human walks the seats and stops after the last
+        assert!(w.next_human() && w.next_human());
+        assert_eq!(w.active_seat(), 2);
+        assert!(!w.next_human());
+        assert_eq!(w.human_clubs(), clubs, "the order of the seats is kept");
+        // for_each_human visits every seat once and restores the active one
+        let mut seen = Vec::new();
+        w.for_each_human(|x| seen.push(x.human.as_ref().unwrap().club.clone()));
+        assert_eq!(seen, clubs);
+        assert_eq!(w.active_seat(), 2);
+    }
+
+    #[test]
+    fn every_human_plays_with_his_own_plan() {
+        let mut w = hot_seat_world(2);
+        // a formation for each human; the games are played with the plans of both
+        let forms: Vec<usize> = (0..2)
+            .map(|seat| {
+                w.switch_human(seat);
+                let f = (0..FORMATIONS.len())
+                    .rev()
+                    .find(|&f| w.set_formation(f))
+                    .unwrap();
+                f
+            })
+            .collect();
+        let plans: Vec<Plan> = w.humans().map(|h| h.plan.clone()).collect();
+        let clubs = w.human_clubs();
+        w.play_round();
+        for seat in 0..2 {
+            let (d, i) = w.locate(&clubs[seat]).unwrap();
+            let rec = w
+                .last_round
+                .iter()
+                .find(|(dd, m)| *dd == d && (m.home == i || m.away == i))
+                .expect("the human club played");
+            let side = (rec.1.away == i) as usize;
+            let started: Vec<usize> = (0..rec.1.start[side].len())
+                .filter(|&k| rec.1.start[side][k].status == Status::Starter)
+                .collect();
+            let mut want = plans[seat].starters.clone();
+            want.sort();
+            assert_eq!(started, want, "seat {seat} (formation {})", forms[seat]);
+        }
+    }
+
+    #[test]
+    fn decisions_belong_to_the_game_they_were_made_in() {
+        let mut w = hot_seat_world(2);
+        let mut ctl = Control::default();
+        ctl.league = vec![
+                ("A".into(), crate::matchsim::Decision::NoSubstitution { side: crate::matchsim::Side::Home, minute: 10 }),
+                ("B".into(), crate::matchsim::Decision::NoSubstitution { side: crate::matchsim::Side::Away, minute: 20 }),
+            ];
+        assert_eq!(ctl.decisions(false, "A").len(), 1);
+        assert_eq!(ctl.decisions(false, "B")[0], crate::matchsim::Decision::NoSubstitution { side: crate::matchsim::Side::Away, minute: 20 });
+        assert!(ctl.decisions(true, "A").is_empty());
+        w.play_round();
+    }
+
+    #[test]
+    fn the_purchases_of_each_human_arrive_at_his_own_club() {
+        let mut w = hot_seat_world(2);
+        w.play_round();
+        for seat in 0..2 {
+            w.switch_human(seat);
+            set_human_cash(&mut w, 900_000_000);
+        }
+        w.switch_human(0);
+        let mut bought = Vec::new();
+        for seat in 0..2 {
+            w.switch_human(seat);
+            let offers = w.search_offers(&Search::default());
+            let o = offers
+                .iter()
+                .find(|o| !w.is_human_club(&o.club) && !bought.contains(&o.player))
+                .unwrap()
+                .clone();
+            w.human_buy(&o.club, o.index, &o.player).unwrap();
+            bought.push(o.player.clone());
+            assert_eq!(w.pending.len(), 1);
+        }
+        // the other human cannot buy the same player
+        w.switch_human(0);
+        let p = w.pending[0].clone();
+        w.switch_human(1);
+        let idx = w
+            .club_ref(w.locate(&p.seller).unwrap())
+            .names
+            .iter()
+            .position(|n| *n == p.player)
+            .unwrap();
+        assert!(w.human_buy(&p.seller, idx, &p.player).is_err());
+        let squads: Vec<usize> = (0..2)
+            .map(|s| {
+                let c = w.human_at(s).unwrap().club.clone();
+                w.club_ref(w.locate(&c).unwrap()).slots.len()
+            })
+            .collect();
+        w.play_round();
+        for (seat, name) in bought.iter().enumerate() {
+            let c = w.human_at(seat).unwrap().club.clone();
+            let club = w.club_ref(w.locate(&c).unwrap());
+            assert!(club.names.contains(name), "seat {seat} got {name}");
+            assert!(club.slots.len() >= squads[seat]);
+        }
+        assert!(w.seat_lists(0).0.is_empty() && w.seat_lists(1).0.is_empty());
+    }
+
+    #[test]
+    fn hot_seat_saves_round_trip_and_old_saves_still_load() {
+        let mut w = hot_seat_world(3);
+        w.play_round();
+        w.switch_human(1);
+        w.observed.push(("CLUBX".into(), "Zed".into()));
+        w.switch_human(2);
+        w.sell_tried.push("Quim".into());
+        w.pending.push(Pending { seller: "S".into(), player: "P".into() });
+        w.set_formation(3);
+        let text = w.save();
+        let back = World::load(&text).unwrap();
+        assert_eq!(back.human_clubs(), w.human_clubs());
+        assert_eq!(back.active_seat(), 2);
+        for seat in 0..3 {
+            assert_eq!(back.human_at(seat).unwrap().coach, format!("joga{}", seat + 1));
+            assert_eq!(back.human_at(seat).unwrap().plan, w.human_at(seat).unwrap().plan);
+            assert_eq!(back.seat_lists(seat), w.seat_lists(seat));
+        }
+        assert_eq!(back.save(), text);
+        // a single-human save (no coach field, no seats) loads as before
+        let one = hot_seat_world(1);
+        let old: String = one
+            .save()
+            .lines()
+            .map(|l| {
+                if l.starts_with("human|") {
+                    l.rsplit_once('|').unwrap().0.to_string()
+                } else {
+                    l.to_string()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        let loaded = World::load(&old).unwrap();
+        assert_eq!(loaded.human_count(), 1);
+        assert_eq!(loaded.human.as_ref().unwrap().club, one.human.as_ref().unwrap().club);
+        assert_eq!(loaded.human.as_ref().unwrap().coach, "");
+    }
+
+    #[test]
+    fn a_moved_human_coach_takes_the_new_club_of_his_own_seat() {
+        let mut w = hot_seat_world(2);
+        let clubs = w.human_clubs();
+        // the second human is invited to a club of the 3rd division
+        w.seats.moves.push((clubs[1].clone(), w.divisions[2][0].name.clone()));
+        w.apply_human_move();
+        assert_eq!(w.human_at(1).unwrap().club, w.divisions[2][0].name);
+        assert_eq!(w.human_at(1).unwrap().coach, "joga2");
+        assert_eq!(w.human_at(0).unwrap().club, clubs[0]);
+        assert_eq!(w.active_seat(), 0);
+        // applying twice changes nothing
+        w.apply_human_move();
+        assert_eq!(w.human_count(), 2);
+    }
+
+    #[test]
+    fn many_rounds_with_several_humans_keep_every_seat_in_the_league() {
+        let mut w = hot_seat_world(4);
+        for _ in 0..30 {
+            w.play_round();
+            assert_eq!(w.human_count(), 4);
+            let mut clubs = w.human_clubs();
+            assert!(clubs.iter().all(|c| w.locate(c).is_some_and(|l| l.0 < 4)));
+            clubs.sort();
+            clubs.dedup();
+            assert_eq!(clubs.len(), 4, "two humans never share a club");
+        }
     }
 }

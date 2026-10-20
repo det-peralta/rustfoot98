@@ -139,3 +139,10 @@ edit, Left/Right change the notebook page. Dragging the thumb and the mouse whee
 in those units (e.g. the scorers list: `@client=378x286`). `form_frame` draws the system menu box (the dash box at the left of the
 caption) unless the form's `BorderIcons` leave it out (the list dialogs of the game have it, the options and profile dialogs do not).
 
+
+## Hot seat in the dialogs
+`TGetTeamsDlg` takes up to six names: "Sortear equipas" (`World::name_humans`) gives every named coach a different club of the bottom six of the
+4th division, `playerTeam1..6` show them, OK starts the game on the first human's main window. Everything that acts on "my team" (menus,
+shortcuts, buttons, market, finances) acts on the active human (`Classic::switch_human` swaps the window, resets the page and keeps the line-up
+marks per human). Bold in the coach ranking, the winners list and the club history marks every human coach; transfers of any human club are blue.
+`classic_shot` opens `snap2.e98` with both humans (`seat=N` or `human=CLUB` select the active one; `season:N` presses F5/Enter once per human).

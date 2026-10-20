@@ -382,7 +382,7 @@ fn world_json(w: &World) -> String {
             .map(|(a, b)| format!("[{},{}]", esc(a), esc(b)))
             .collect::<Vec<_>>()
             .join(","),
-        match &w.human_moved {
+        match w.human_moves().first() {
             Some((a, b)) => format!("[{},{}]", esc(a), esc(b)),
             None => "null".into(),
         },

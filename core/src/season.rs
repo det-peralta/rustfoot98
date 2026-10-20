@@ -520,10 +520,10 @@ pub fn play_round_with(
 /// a different number of random numbers.
 #[derive(Clone, Debug, Default)]
 pub struct Control {
-    /// Decisions in the user's league game.
-    pub league: Vec<Decision>,
-    /// Decisions in the user's cup tie of the same round.
-    pub cup: Vec<Decision>,
+    /// Decisions in the humans' league games, each with the home club of the game it belongs to.
+    pub league: Vec<(String, Decision)>,
+    /// Decisions in the humans' cup ties of the same round, tagged the same way.
+    pub cup: Vec<(String, Decision)>,
     /// Random state at every checkpoint of the round, recorded by a run with `frozen == None`.
     pub log: Vec<DelphiRng>,
     /// When set, every checkpoint restores the recorded state of the same index.
@@ -533,7 +533,11 @@ pub struct Control {
 
 impl Control {
     /// A replay of the round that recorded `log`, with the user's decisions of the league game and the cup tie.
-    pub fn replay(log: Vec<DelphiRng>, league: Vec<Decision>, cup: Vec<Decision>) -> Control {
+    pub fn replay(
+        log: Vec<DelphiRng>,
+        league: Vec<(String, Decision)>,
+        cup: Vec<(String, Decision)>,
+    ) -> Control {
         Control {
             league,
             cup,
@@ -541,6 +545,15 @@ impl Control {
             frozen: Some(log),
             cursor: 0,
         }
+    }
+
+    /// The decisions of the game (league or `cup`) whose home club is `home`.
+    pub fn decisions(&self, cup: bool, home: &str) -> Vec<Decision> {
+        let all = if cup { &self.cup } else { &self.league };
+        all.iter()
+            .filter(|(h, _)| h == home)
+            .map(|&(_, d)| d)
+            .collect()
     }
 
     /// Records the random state (a first run) or restores the recorded one (a replay). Called at the start of the league
@@ -599,10 +612,10 @@ pub fn play_round_ctl(
             }
             None => (0, 0),
         };
-        let decisions: &[Decision] = if plans.contains_key(&h) || plans.contains_key(&a) {
-            &ctl.league
+        let decisions = if plans.contains_key(&h) || plans.contains_key(&a) {
+            ctl.decisions(false, &hc.name)
         } else {
-            &[]
+            Vec::new()
         };
         let g = play_game_with(
             rng,
@@ -613,7 +626,7 @@ pub fn play_round_ctl(
             plans.get(&h),
             plans.get(&a),
             false,
-            decisions,
+            &decisions,
         );
         let (x, y) = (g.home_goals, g.away_goals);
         hc.goals_for += x;

@@ -23,6 +23,9 @@ pub enum Step {
     /// The draw of the cup (if the options say so), then the cup round.
     CupDraw,
     CupView,
+    /// The invitations to other clubs that humans have not answered yet, one dialog at a time (a refusal replays the round, so
+    /// what is still to come is looked up when its turn comes).
+    Invitations,
     Auctions,
     Main,
 }
@@ -33,14 +36,17 @@ pub struct Session {
     pub snapshot: Box<World>,
     /// The random state at the checkpoints of the first run.
     pub log: Vec<DelphiRng>,
-    pub league: Vec<Decision>,
-    pub cup: Vec<Decision>,
-    /// Things already asked or shown: `(cup, minute, kind)`.
-    pub handled: Vec<(bool, u16, u8)>,
-    /// The referee of the user's league game, chosen before the round (as the main window showed it).
-    pub referee: String,
-    /// The user's coach took an invitation or not (see `World::accept_invitations`).
-    pub accept: bool,
+    /// The decisions of the humans in their league games and cup ties, each with the home club of the game.
+    pub league: Vec<(String, Decision)>,
+    pub cup: Vec<(String, Decision)>,
+    /// Things already asked or shown: `(cup, game, minute, kind)`; the side of a question is in the high bits of `kind`.
+    pub handled: Vec<(bool, usize, u16, u8)>,
+    /// The referee of each human's league game, chosen before the round (as the main window showed it), by his club.
+    pub referees: HashMap<String, String>,
+    /// Clubs of the humans who declined the invitation they got (see `World::decline_invitation`).
+    pub declined: Vec<String>,
+    /// Clubs of the humans whose invitation was answered (yes or no).
+    pub answered: Vec<String>,
     /// The user's club and the coaches of all clubs before the round (names for the sacking list).
     pub coaches: HashMap<String, String>,
 }
@@ -132,18 +138,27 @@ const INJURY: u8 = 5;
 /// What a tick of the round view came to.
 enum Tick {
     Run,
-    Ask(Dialog),
+    /// Dialogs to show one after the other (the break of a game with two humans asks both).
+    Ask(Vec<Dialog>),
     Over,
 }
 
 /// What stops the clock at a minute of the user's game.
 enum Pending {
-    /// A primary chance: the user's side attacks (`true`: he picks the shooter) or defends.
-    Primary { attack: bool, minute: u16 },
-    /// The user's goalkeeper was sent off.
-    RedKeeper { minute: u16 },
-    /// A player of the user was injured.
-    Injury { minute: u16, player: usize },
+    /// A primary chance: the human's side `side` attacks (`true`: he picks the shooter) or defends.
+    Primary {
+        attack: bool,
+        minute: u16,
+        side: usize,
+    },
+    /// The goalkeeper of the human's side `side` was sent off.
+    RedKeeper { minute: u16, side: usize },
+    /// A player of the human's side `side` was injured.
+    Injury {
+        minute: u16,
+        side: usize,
+        player: usize,
+    },
 }
 
 impl Classic {
@@ -162,12 +177,44 @@ impl Classic {
         }
     }
 
+    /// The referee of the next league game of every human, by his club (as the main window of each shows it).
+    fn referees_of_next_games(&mut self) -> HashMap<String, String> {
+        let mut out = HashMap::new();
+        let back = self.world.active_seat();
+        for seat in 0..self.world.human_count() {
+            self.world.switch_human(seat);
+            if let Some(h) = self.world.human.as_ref() {
+                out.insert(h.club.clone(), self.referee_of_next_game());
+            }
+        }
+        self.world.switch_human(back);
+        out
+    }
+
+    /// The round button (hot seat): the main window goes to the next human; when every human has pressed it since the last
+    /// round, the round is played. The turn does not go back to the first player afterwards: the human who has the main
+    /// window when the round ends keeps it (observed in the original: after the auctions the next round opened on the last
+    /// human's window), and the others follow in seat order.
+    pub fn round_button(&mut self) {
+        self.turns += 1;
+        let n = self.world.human_count();
+        if self.turns < n {
+            self.main.menu = None;
+            let next = (self.world.active_seat() + 1) % n;
+            self.switch_human(next);
+            return;
+        }
+        self.turns = 0;
+        self.play_round();
+    }
+
     /// Plays the next round of the league (and cup) and shows it.
     pub fn play_round(&mut self) {
         self.main.menu = None;
         self.md.todo.clear();
-        let referee = self.referee_of_next_game();
+        let referees = self.referees_of_next_games();
         self.world.accept_invitations = true;
+        self.world.seats.declined.clear();
         let snapshot = Box::new(self.world.clone());
         let coaches = self
             .world
@@ -185,8 +232,9 @@ impl Classic {
             league: Vec::new(),
             cup: Vec::new(),
             handled: Vec::new(),
-            referee,
-            accept: true,
+            referees,
+            declined: Vec::new(),
+            answered: Vec::new(),
             coaches,
         });
         self.start_round_view();
@@ -205,14 +253,15 @@ impl Classic {
     }
 
     /// Plays the round again from the world before it with the user's decisions and shows the result from the same minute.
-    pub fn replay_round(&mut self, league: Vec<Decision>, cup: Vec<Decision>) {
+    pub fn replay_round(&mut self, league: Vec<(String, Decision)>, cup: Vec<(String, Decision)>) {
         let Some(sess) = self.md.session.as_mut() else {
             return;
         };
         sess.league = league;
         sess.cup = cup;
         let mut w = (*sess.snapshot).clone();
-        w.accept_invitations = sess.accept;
+        w.accept_invitations = true;
+        w.seats.declined = sess.declined.clone();
         let mut ctl = Control::replay(sess.log.clone(), sess.league.clone(), sess.cup.clone());
         w.play_round_ctl(&mut ctl);
         self.world = w;
@@ -244,83 +293,93 @@ impl Classic {
         self.dirty = true;
     }
 
-    /// The user decided something at a minute of his game (`cup`: the cup tie, otherwise the league game).
-    pub fn decide(&mut self, cup: bool, ds: Vec<Decision>) {
+    /// A human decided something at a minute of his game `src` (`cup`: the cup tie, otherwise the league game).
+    pub fn decide(&mut self, cup: bool, src: usize, ds: Vec<Decision>) {
         let Some(sess) = self.md.session.as_ref() else {
             return;
         };
+        let Some(home) = info(&self.world, cup, src).map(|i| i.clubs[0].clone()) else {
+            return;
+        };
         let (mut league, mut cups) = (sess.league.clone(), sess.cup.clone());
-        if cup {
-            cups.extend(ds);
-        } else {
-            league.extend(ds);
-        }
+        let list = if cup { &mut cups } else { &mut league };
+        list.extend(ds.into_iter().map(|d| (home.clone(), d)));
         self.replay_round(league, cups);
     }
 
-    fn mark(&mut self, cup: bool, minute: u16, kind: u8) {
+    fn mark(&mut self, cup: bool, src: usize, minute: u16, kind: u8) {
         if let Some(s) = self.md.session.as_mut() {
-            s.handled.push((cup, minute, kind));
+            s.handled.push((cup, src, minute, kind));
         }
     }
 
-    fn was_asked(&self, cup: bool, minute: u16, kind: u8) -> bool {
+    fn was_asked(&self, cup: bool, src: usize, minute: u16, kind: u8) -> bool {
         self.md
             .session
             .as_ref()
-            .is_some_and(|s| s.handled.contains(&(cup, minute, kind)))
+            .is_some_and(|s| s.handled.contains(&(cup, src, minute, kind)))
     }
 
-    /// The first thing the original would ask at `minute` of the user's game that was not asked yet (the engine's order: primary
-    /// chance, red card, injury).
+    /// The first thing the original would ask at `minute` of the games of the humans that was not asked yet (the engine's order:
+    /// primary chance, red card, injury), game after game.
     fn pending_at(&self, rv: &RoundView, minute: u16) -> Option<(usize, Pending)> {
-        let g = rv.shown().find(|g| g.human)?;
-        let side = g.human_side?;
-        let info = info(&self.world, rv.cup, g.src)?;
-        // primary chances
-        let prim = if rv.cup {
-            self.world
-                .last_cup
-                .as_ref()?
-                .matches
-                .get(g.src)?
-                .primaries
-                .clone()
-        } else {
-            self.world.last_round.get(g.src)?.1.primaries.clone()
-        };
-        for p in prim.iter().filter(|p| p.minute == minute) {
-            if !self.was_asked(rv.cup, minute, PRIMARY) {
-                return Some((
-                    g.src,
-                    Pending::Primary {
-                        attack: (p.side == Side::Away) as usize == side,
-                        minute,
-                    },
-                ));
-            }
-        }
-        for e in info.events.iter().filter(|e| e.minute == minute) {
-            if (e.side == Side::Away) as usize != side {
+        for g in rv.shown().filter(|g| g.human) {
+            let Some(info) = info(&self.world, rv.cup, g.src) else {
                 continue;
-            }
-            match e.kind {
-                EventKind::RedCard if e.position == 0 && !self.was_asked(rv.cup, minute, RED) => {
-                    return Some((g.src, Pending::RedKeeper { minute }));
-                }
-                EventKind::Injury
-                    if !self.was_asked(rv.cup, minute, INJURY)
-                        && info.subs_left(side, minute, false) > 0 =>
-                {
+            };
+            let prim = if rv.cup {
+                self.world
+                    .last_cup
+                    .as_ref()?
+                    .matches
+                    .get(g.src)?
+                    .primaries
+                    .clone()
+            } else {
+                self.world.last_round.get(g.src)?.1.primaries.clone()
+            };
+            // primary chances: the attacker decides when he is a human, otherwise the defender is told
+            for p in prim.iter().filter(|p| p.minute == minute) {
+                let att = (p.side == Side::Away) as usize;
+                let me = if g.human_sides[att] { att } else { 1 - att };
+                if !self.was_asked(rv.cup, g.src, minute, PRIMARY) {
                     return Some((
                         g.src,
-                        Pending::Injury {
+                        Pending::Primary {
+                            attack: me == att,
                             minute,
-                            player: e.player,
+                            side: me,
                         },
                     ));
                 }
-                _ => {}
+            }
+            for e in info.events.iter().filter(|e| e.minute == minute) {
+                let side = (e.side == Side::Away) as usize;
+                if !g.human_sides[side] {
+                    continue;
+                }
+                let key = |kind: u8| kind | (side as u8) << 4;
+                match e.kind {
+                    EventKind::RedCard
+                        if e.position == 0 && !self.was_asked(rv.cup, g.src, minute, key(RED)) =>
+                    {
+                        return Some((g.src, Pending::RedKeeper { minute, side }));
+                    }
+                    EventKind::Injury
+                        if !self.was_asked(rv.cup, g.src, minute, key(INJURY))
+                            && info.subs_left(side, minute, false) > 0 =>
+                    {
+                        return Some((
+                            g.src,
+                            Pending::Injury {
+                                minute,
+                                side,
+                                player: e.player,
+                            },
+                        ));
+                    }
+                    _ => {}
+                }
             }
         }
         None
@@ -341,7 +400,13 @@ impl Classic {
         self.screen = Screen::Round(rv);
         match out {
             Tick::Run => {}
-            Tick::Ask(d) => self.open(d),
+            Tick::Ask(ds) => {
+                let mut ds = ds.into_iter();
+                if let Some(d) = ds.next() {
+                    self.open(d);
+                }
+                self.queue.extend(ds);
+            }
             Tick::Over => self.finish_view(),
         }
     }
@@ -352,25 +417,34 @@ impl Classic {
             if let Some((src, p)) = self.pending_at(rv, rv.minute as u16) {
                 let cup = rv.cup;
                 let d = match p {
-                    Pending::Primary { attack, minute } => {
-                        self.mark(cup, minute, PRIMARY);
-                        dialogs::matchday::penalty(self, cup, src, minute, attack)
+                    Pending::Primary {
+                        attack,
+                        minute,
+                        side,
+                    } => {
+                        self.mark(cup, src, minute, PRIMARY);
+                        dialogs::matchday::penalty(self, cup, src, minute, side, attack)
                     }
-                    Pending::RedKeeper { minute } => {
-                        self.mark(cup, minute, RED);
-                        dialogs::matchday::substitution(self, cup, src, minute, 3)
+                    Pending::RedKeeper { minute, side } => {
+                        self.mark(cup, src, minute, RED | (side as u8) << 4);
+                        dialogs::matchday::substitution(self, cup, src, minute, side, 3)
                     }
-                    Pending::Injury { minute, player } => {
-                        self.mark(cup, minute, INJURY);
-                        dialogs::matchday::forced(self, cup, src, minute, player)
+                    Pending::Injury {
+                        minute,
+                        side,
+                        player,
+                    } => {
+                        self.mark(cup, src, minute, INJURY | (side as u8) << 4);
+                        dialogs::matchday::forced(self, cup, src, minute, side, player)
                     }
                 };
-                return Tick::Ask(d);
+                return Tick::Ask(vec![d]);
             }
             rv.checked = rv.minute;
             if rv.minute == 45 && !rv.halftime_seen {
-                if let Some(d) = self.halftime_dialog(rv, 46) {
-                    return Tick::Ask(d);
+                let ds = self.halftime_dialogs(rv, 46);
+                if !ds.is_empty() {
+                    return Tick::Ask(ds);
                 }
                 rv.halftime_seen = true;
             }
@@ -381,8 +455,9 @@ impl Classic {
                 if rv.shown().next().is_some() {
                     rv.max = 120;
                     rv.interval = round_view::interval(self.opts.profile as usize + 1, rv.humans());
-                    if let Some(d) = self.halftime_dialog(rv, 91) {
-                        return Tick::Ask(d);
+                    let ds = self.halftime_dialogs(rv, 91);
+                    if !ds.is_empty() {
+                        return Tick::Ask(ds);
                     }
                     rv.extra_seen = true;
                 }
@@ -396,14 +471,22 @@ impl Classic {
         }
     }
 
-    /// The dialog of the break for the user's game (`next`: the minute the substitutions made now take place, 46 or 91).
-    fn halftime_dialog(&self, rv: &RoundView, next: u16) -> Option<Dialog> {
+    /// The dialogs of the break, one for every human side of the games on the view (`next`: the minute the substitutions made now
+    /// take place, 46 or 91 before the extra time).
+    fn halftime_dialogs(&self, rv: &RoundView, next: u16) -> Vec<Dialog> {
         if !self.opts.half_time_subs {
-            return None;
+            return Vec::new();
         }
-        let g = rv.shown().find(|g| g.human)?;
-        let side = g.human_side?;
-        Some(dialogs::matchday::halftime(self, rv.cup, g.src, side, next))
+        let mut out: Vec<(usize, Dialog)> = Vec::new();
+        for g in rv.shown().filter(|g| g.human) {
+            for side in (0..2).filter(|&s| g.human_sides[s]) {
+                let seat = self.world.seat_of(&g.clubs[side].name).unwrap_or(usize::MAX);
+                out.push((seat, dialogs::matchday::halftime(self, rv.cup, g.src, side, next)));
+            }
+        }
+        // (the humans in turn, in the order of the players)
+        out.sort_by_key(|(seat, _)| *seat);
+        out.into_iter().map(|(_, d)| d).collect()
     }
 
     /// The last minute of the view is over: the window closes and the end-of-round dialogs follow.
@@ -455,6 +538,14 @@ impl Classic {
                     self.screen = Screen::Round(Box::new(v));
                 }
             }
+            Step::Invitations => {
+                if let Some((from, to)) = self.next_invitation() {
+                    // (the answer to the dialog marks it; the next human's invitation comes after it)
+                    self.md.todo.push_front(Step::Invitations);
+                    let d = dialogs::matchday::invitation(self, &from, &to);
+                    self.open(d);
+                }
+            }
             Step::Auctions => dialogs::market::queue_auctions(self),
             Step::Main => self.finish_round(),
         }
@@ -486,17 +577,22 @@ impl Classic {
         }
     }
 
-    pub fn is_invitation(&self) -> Option<(String, String)> {
-        let (from, to) = self.world.human_moved.clone()?;
+    /// The first invitation of this round that a human has not answered: `(his club before, the club that wants him)`.
+    pub fn next_invitation(&self) -> Option<(String, String)> {
         let sess = self.md.session.as_ref()?;
-        let mine = sess.snapshot.human.as_ref()?.club.clone();
-        let invited = from == mine
-            && self
-                .world
-                .coach_changes
-                .iter()
-                .any(|(sacked, gave)| *sacked == to && *gave == from);
-        invited.then_some((from, to))
+        self.world
+            .human_moves()
+            .iter()
+            .find(|(from, to)| {
+                !sess.answered.contains(from)
+                    && sess.snapshot.is_human_club(from)
+                    && self
+                        .world
+                        .coach_changes
+                        .iter()
+                        .any(|(sacked, gave)| sacked == to && gave == from)
+            })
+            .cloned()
     }
 }
 
@@ -898,13 +994,9 @@ mod tests {
             let mut probe = w.clone();
             probe.accept_invitations = true;
             probe.play_round();
-            let invited = probe.human_moved.is_some()
-                && probe.coach_changes.iter().any(|(sacked, _)| {
-                    probe
-                        .human_moved
-                        .as_ref()
-                        .is_some_and(|(_, to)| sacked == to)
-                });
+            let invited = probe.human_moves().first().is_some_and(|(_, to)| {
+                probe.coach_changes.iter().any(|(sacked, _)| sacked == to)
+            });
             if !invited {
                 continue;
             }
@@ -918,7 +1010,7 @@ mod tests {
             );
             let d = c.dialogs.last().unwrap();
             assert_eq!(d.kind, Kind::Invitation);
-            let (_, to) = c.world.human_moved.clone().unwrap();
+            let (_, to) = c.world.human_moves().first().cloned().unwrap();
             assert_eq!(d.st.get("team"), Some(&to));
             // the user accepted by default: he already manages the other club
             assert_eq!(c.world.human.as_ref().unwrap().club, to);
@@ -928,13 +1020,97 @@ mod tests {
                 mine,
                 "declined: nothing moved"
             );
-            assert!(c.world.human_moved.is_none());
+            assert!(c.world.human_moves().is_empty());
             found += 1;
             if found == 2 {
                 break;
             }
         }
         assert!(found >= 1, "no seed produced an invitation");
+    }
+
+    fn hot_seat(n: usize, seed: u32) -> Classic {
+        let mut w = World::synthetic(seed);
+        w.name_humans(&(1..=n).map(|k| format!("joga{k}")).collect::<Vec<_>>());
+        let mut c = Classic::new(w, Skin::default(), Forms::default(), Data::default());
+        c.enter_game();
+        c
+    }
+
+    #[test]
+    fn the_round_button_hands_the_window_to_each_human_and_the_last_one_starts_the_round() {
+        let mut c = hot_seat(3, 4);
+        assert_eq!((c.world.active_seat(), c.coach.as_str()), (0, "joga1"));
+        c.round_button();
+        assert_eq!((c.world.active_seat(), c.coach.as_str()), (1, "joga2"));
+        assert!(matches!(c.screen, Screen::Main) && c.md.session.is_none());
+        c.round_button();
+        assert_eq!((c.world.active_seat(), c.coach.as_str()), (2, "joga3"));
+        assert!(c.md.session.is_none());
+        c.round_button();
+        assert!(c.md.session.is_some(), "the third Enter plays the round");
+        assert!(matches!(c.screen, Screen::Round(_)));
+        play_through(&mut c);
+        assert!(matches!(c.screen, Screen::Main));
+        assert_eq!(c.world.round, 1);
+        // the window stays with the human who had it; the turns count again from zero
+        let seat = c.world.active_seat();
+        c.round_button();
+        assert_eq!(c.world.active_seat(), (seat + 1) % 3);
+    }
+
+    #[test]
+    fn every_human_gets_his_own_break_dialog_and_the_questions_of_his_game() {
+        let mut c = hot_seat(2, 6);
+        c.round_button();
+        c.round_button();
+        let humans = c.world.human_clubs();
+        let mut breaks = Vec::new();
+        for _ in 0..4000 {
+            run(&mut c);
+            match top_kind(&c) {
+                Some(Kind::Halftime) => {
+                    let d = c.dialogs.last().unwrap();
+                    if d.num("mode") == 4 {
+                        let info = info(&c.world, false, d.num("src") as usize).unwrap();
+                        breaks.push(info.clubs[d.num("side") as usize].clone());
+                    }
+                    press(&mut c, "OKBtn");
+                }
+                Some(Kind::ForcedSubstitution) => {
+                    press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                    press(&mut c, "OKBtn");
+                }
+                Some(Kind::Penalty) => {
+                    if c.dialogs.last().unwrap().num("attack") != 0 {
+                        press(&mut c, "ListBoxOfPlayers#0");
+                        press(&mut c, "shootBtn");
+                    }
+                    c.dialogs.clear();
+                }
+                Some(_) => {
+                    c.dialogs.pop();
+                }
+                None if matches!(c.screen, Screen::Main) => break,
+                None => c.tick(20),
+            }
+        }
+        assert_eq!(breaks, humans, "one break per human, in seat order");
+    }
+
+    #[test]
+    fn several_rounds_and_a_season_with_four_humans_stay_consistent() {
+        let mut c = hot_seat(4, 9);
+        for _ in 0..16 {
+            for _ in 0..4 {
+                c.round_button();
+            }
+            play_through(&mut c);
+            assert!(matches!(c.screen, Screen::Main));
+            assert!(c.md.todo.is_empty());
+            assert_eq!(c.world.human_count(), 4);
+        }
+        assert!(c.world.year > 1998);
     }
 
     /// Plays the round view answering what comes, until a dialog of `kind` is open.

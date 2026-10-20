@@ -15,6 +15,14 @@ use crate::world::{Human, Listing, Pending, Transfer, World};
 
 const MAGIC: &str = "ELIFOOT98-RS 1";
 
+fn seat_suffix(seat: usize) -> String {
+    if seat == 0 {
+        String::new()
+    } else {
+        format!("|{seat}")
+    }
+}
+
 fn clean(s: &str) -> String {
     s.replace(['|', '\n', '\r'], " ")
 }
@@ -48,7 +56,8 @@ impl World {
             self.cash_ref[2],
             self.cash_ref[3]
         ));
-        if let Some(h) = &self.human {
+        // the humans in seat order, then the seat of the active one (the single-human game writes one `human` line)
+        for h in self.humans() {
             let subs: Vec<String> = h
                 .plan
                 .subs
@@ -56,23 +65,32 @@ impl World {
                 .map(|s| format!("{}:{}:{}", s.minute, s.out, s.inn))
                 .collect();
             out.push_str(&format!(
-                "human|{}|{}|{}|{}|{}\n",
+                "human|{}|{}|{}|{}|{}|{}\n",
                 clean(&h.club),
                 h.formation,
                 list(&h.plan.starters),
                 list(&h.plan.bench),
-                subs.join(",")
+                subs.join(","),
+                clean(&h.coach)
             ));
+        }
+        if self.human_count() > 1 {
+            out.push_str(&format!("activeseat|{}\n", self.seats.active));
         }
         for name in &self.cup {
             out.push_str(&format!("cup|{}\n", clean(name)));
         }
-        for p in &self.pending {
-            out.push_str(&format!(
-                "pending|{}|{}\n",
-                clean(&p.seller),
-                clean(&p.player)
-            ));
+        // (the lists of the humans after the first carry their seat as a last field)
+        for seat in 0..self.human_count().max(1) {
+            let (pending, _, _) = self.seat_lists(seat);
+            for p in pending {
+                out.push_str(&format!(
+                    "pending|{}|{}{}\n",
+                    clean(&p.seller),
+                    clean(&p.player),
+                    seat_suffix(seat)
+                ));
+            }
         }
         for l in &self.board {
             let (b, fee) = l
@@ -90,11 +108,19 @@ impl World {
                 fee
             ));
         }
-        for (club, player) in &self.observed {
-            out.push_str(&format!("observed|{}|{}\n", clean(club), clean(player)));
-        }
-        for player in &self.sell_tried {
-            out.push_str(&format!("selltried|{}\n", clean(player)));
+        for seat in 0..self.human_count().max(1) {
+            let (_, observed, sell_tried) = self.seat_lists(seat);
+            for (club, player) in observed {
+                out.push_str(&format!(
+                    "observed|{}|{}{}\n",
+                    clean(club),
+                    clean(player),
+                    seat_suffix(seat)
+                ));
+            }
+            for player in sell_tried {
+                out.push_str(&format!("selltried|{}{}\n", clean(player), seat_suffix(seat)));
+            }
         }
         if let Some(c) = &self.cup_champion {
             out.push_str(&format!("cupchampion|{}\n", clean(c)));
@@ -183,15 +209,16 @@ impl World {
             _ => return Err("not an Elifoot 98 (Rust) save file".into()),
         }
         let (mut year, mut economy, mut round, mut seed) = (None, INITIAL_INDEX, 0usize, None);
-        let mut human: Option<Human> = None;
+        let mut humans: Vec<Human> = Vec::new();
+        let mut active_seat = 0usize;
+        type Lists = (Vec<Pending>, Vec<(String, String)>, Vec<String>);
+        let mut lists: Vec<Lists> = vec![Default::default()];
+        let seat_of = |f: &[&str], at: usize| f.get(at).and_then(|x| x.parse::<usize>().ok()).unwrap_or(0);
         let mut cup: Vec<String> = Vec::new();
         let mut cup_champion: Option<String> = None;
         let mut has_cup = false;
         let mut has_finance = false;
         let mut board: Vec<Listing> = Vec::new();
-        let mut pending: Vec<Pending> = Vec::new();
-        let mut observed: Vec<(String, String)> = Vec::new();
-        let mut sell_tried: Vec<String> = Vec::new();
         let mut history = History::default();
         let mut tie_order: Vec<Vec<usize>> = Vec::new();
         let mut transfers: Vec<Transfer> = Vec::new();
@@ -240,17 +267,28 @@ impl World {
                         .ok_or(format!("line {}: bad economy", n + 1))?
                 }
                 "round" => round = num(n, &f, 1)? as usize,
-                "pending" => pending.push(Pending {
-                    seller: f.get(1).ok_or("pending without seller")?.to_string(),
-                    player: f.get(2).ok_or("pending without player")?.to_string(),
-                }),
-                "observed" => observed.push((
-                    f.get(1).ok_or("observed without club")?.to_string(),
-                    f.get(2).ok_or("observed without player")?.to_string(),
-                )),
-                "selltried" => {
-                    sell_tried.push(f.get(1).ok_or("selltried without player")?.to_string())
+                "pending" | "observed" | "selltried" => {
+                    // the seat of the human they belong to is the last field (absent: the first human)
+                    let at = if f[0] == "selltried" { 2 } else { 3 };
+                    let seat = seat_of(&f, at);
+                    if lists.len() <= seat {
+                        lists.resize(seat + 1, Default::default());
+                    }
+                    let get = |i: usize, what: &str| {
+                        f.get(i)
+                            .map(|x| x.to_string())
+                            .ok_or(format!("{} without field {i} ({what})", f[0]))
+                    };
+                    match f[0] {
+                        "pending" => lists[seat].0.push(Pending {
+                            seller: get(1, "seller")?,
+                            player: get(2, "player")?,
+                        }),
+                        "observed" => lists[seat].1.push((get(1, "club")?, get(2, "player")?)),
+                        _ => lists[seat].2.push(get(1, "player")?),
+                    }
                 }
+                "activeseat" => active_seat = num(n, &f, 1)? as usize,
                 "listing" => {
                     let best = match (f.get(5), f.get(6).and_then(|x| x.parse::<i64>().ok())) {
                         (Some(b), Some(fee)) if !b.is_empty() => Some((b.to_string(), fee)),
@@ -372,8 +410,9 @@ impl World {
                                 .ok_or(format!("line {}: bad substitution", n + 1))
                         })
                         .collect::<Result<Vec<_>, _>>()?;
-                    human = Some(Human {
+                    humans.push(Human {
                         club: f.get(1).ok_or("human without club")?.to_string(),
+                        coach: f.get(6).unwrap_or(&"").to_string(),
                         formation: num(n, &f, 2)? as usize,
                         plan: Plan {
                             starters: nums(n, f.get(3).unwrap_or(&""))?,
@@ -496,18 +535,18 @@ impl World {
             rng: DelphiRng::new(seed.ok_or("missing seed")?),
             last_round: Vec::new(),
             last_season: None,
-            human,
+            human: None,
             cup,
             last_cup: None,
             cup_champion,
             transfers,
             board,
-            pending,
-            observed,
-            sell_tried,
+            pending: Vec::new(),
+            observed: Vec::new(),
+            sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
-            human_moved: None,
+            seats: Default::default(),
             history,
             tie_order,
         };
@@ -520,9 +559,33 @@ impl World {
         if !has_market {
             w.give_market_defaults();
         }
-        if w.human.is_none() || w.human_location().is_none() {
+        // the humans take their seats; the active one is installed last
+        let count = humans.len();
+        for (seat, h) in humans.into_iter().enumerate() {
+            let (pending, observed, sell_tried) = lists.get(seat).cloned().unwrap_or_default();
+            w.seats.benched.push(crate::world::Bench {
+                seat,
+                human: h,
+                pending,
+                observed,
+                sell_tried,
+            });
+        }
+        if count > 0 {
+            let active = if active_seat < count { active_seat } else { 0 };
+            w.seats.active = usize::MAX; // nobody is active yet: `switch_human` swaps nobody out
+            w.switch_human(active);
+        }
+        if w.human.is_none() {
             w.pick_human();
         }
+        for seat in 0..w.human_count() {
+            w.switch_human(seat);
+            if w.human_location().is_none() {
+                w.pick_human();
+            }
+        }
+        w.switch_human(if active_seat < w.human_count() { active_seat } else { 0 });
         Ok(w)
     }
 }

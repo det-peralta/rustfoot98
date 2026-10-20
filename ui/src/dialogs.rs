@@ -558,7 +558,7 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
         14,
     );
     let mut y = r.y + 332;
-    if let Some((from, to)) = &app.world.human_moved {
+    if let Some((from, to)) = app.world.human_moves().first() {
         c.text(
             r.x + 14,
             y,
@@ -576,7 +576,7 @@ pub fn options(app: &mut App, c: &mut dyn Canvas) {
         c.text(r.x + 14, y, &line, theme::text(), 12);
         y += 20;
     }
-    if app.world.coach_changes.is_empty() && app.world.human_moved.is_none() {
+    if app.world.coach_changes.is_empty() && app.world.human_moves().is_empty() {
         c.text(
             r.x + 14,
             y,

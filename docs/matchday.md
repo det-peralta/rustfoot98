@@ -56,6 +56,28 @@ invitation) the round is played again from the world before it with the decision
 Options acting on a match day live in `Classic::md.opts` (`session::Options`): `time_profile` 1..=6 (default 2), `halftime_subs`,
 `cup_draw` 0..=2 (default 1), `lashes` 0..=2 (default 1), `view_red`, `view_injuries`. The options dialog should write them.
 
+## Hot seat (several human coaches)
+`World::human` (with `pending`, `observed`, `sell_tried`) is the *active* human; the others sit in `World::seats` (`Bench`) and are swapped in
+by `World::switch_human(seat)`, so every `human_*` method acts for the active human and the single-human code is unchanged.
+`human_count`, `humans()`, `human_clubs()`, `seat_of`, `is_human_club`, `for_each_human`, `name_humans` (new game) and `human_moves()` (coach
+swaps of the round that moved a human, replacing `human_moved`) complete it. The round plays every human's plan (league and cup), the computer
+clubs never bid for / coach-swap with a human, a market sale by the computer lets any human bid, the purchases arrive per human.
+* Flow (observed on the original with joga1/joga2): the round button (Enter) on a human's main window shows the next human's window
+  (`Classic::round_button`, `turns`); when every human has pressed it the round is played. The Classic header coach follows the active human.
+* Decisions are tagged with the home club of their game (`Control::league/cup: Vec<(String, Decision)>`, `Control::decisions`), so each
+  human's break substitutions, injuries and shooters replay only his own game. Questions are asked per game and side
+  (`Session::handled` has the game and the side).
+* The break dialog (`TSubstitutionDlg` mode 4) opens for every human side of the view, in seat order (a game of two humans asks both);
+  an injury or a sent-off goalkeeper asks the human of that side; a primary chance asks the attacker if he is human, otherwise the human defender
+  is only told.
+* Invitations (`Step::Invitations`): one dialog per invited human, looked up when its turn comes; *Não* adds the club to
+  `World::seats.declined` and replays the round. Sackings: the lashes list shows a sacking when any human is involved.
+* Auctions: each open auction is offered to every human who can bid, human after human, before the next auction (the main window goes to the
+  human of each dialog: `Dialog::st["seat"]`).
+* Saves: `human|club|formation|starters|bench|subs|coach` once per human in seat order, `activeseat|N` (only with several humans) and a last
+  field with the seat on `pending`/`observed`/`selltried` lines; old saves (no seat, no coach) load as one human.
+* `.e98` import: the humans of the save (`coach_human`, order of the save's coach list) become the seats, `human_id` the active one.
+
 ## Measured against the captures
 * Pie clock: 6 degrees per minute; the gauge truncates the progress to whole per cent and GDI draws the pie from the integer end point
   `Round(22 * (1 - cos/sin(pi * (per cent / 50 + 0.5))))`; the radial lines are drawn by the pen (Bresenham, ties to the minor axis). 15 of 18
@@ -65,7 +87,9 @@ Options acting on a match day live in `Classic::md.opts` (`session::Options`): `
 * The application window behind the end-of-round dialogs (silver caption bar "Elifoot 98") is pixel-exact against `match35`.
 
 ## Not done / differences
-* One human only (`World::human`): the hot seat (two humans, the golden session) is not modelled; the dialogs are per game and would work.
+* Hot seat: see the section below. Approximations: the order of the turns after a round (the window stays with the human who had it
+  and the others follow in seat order; the original's rule was only observed, not decoded), one coach profile (`History::options`) shared by
+  all humans, the standings and the cup draw are the same for everybody.
 * Shootouts of ties without a human are shown only when the core played them with kicks (human tie or the final); the option *Ver os
   desempates por penalties nos jogos sem treinadores humanos* is not honoured by the core.
 * Mid-game substitutions by clicking on the user's club (mode 1 with `Substituir`) are applied from the next minute by a replay.

@@ -33,7 +33,6 @@ pub fn team_history(w: &World) -> Spec {
         .flatten()
         .chain(w.pool.iter())
         .find(|c| c.name == h.club);
-    let me = human_coach(w);
     let rows = w
         .history
         .club_events
@@ -42,7 +41,7 @@ pub fn team_history(w: &World) -> Spec {
             v.iter()
                 .map(|e| {
                     let mut r = field("", 0x1e, &e.year.to_string());
-                    let bold = !e.coach.is_empty() && e.coach == me;
+                    let bold = w.is_human_coach(&e.coach);
                     if bold {
                         r.push('\u{2}');
                     }
