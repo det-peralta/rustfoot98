@@ -264,6 +264,25 @@ pub fn key(c: &Classic, d: &mut Dialog, key: Key) -> Option<KeyAct> {
             reveal(d, &name, new, rows);
             Some(KeyAct::Press(format!("{name}#{new}")))
         }
+        // type-ahead: a letter selects the next row that starts with it (the Windows list box does this by itself)
+        ("TListBox", Key::Char(ch)) if ch.is_alphanumeric() => {
+            let list = items(c, d, &name);
+            let n = list.len();
+            let cur = get_i(d, &name, "sel").unwrap_or(-1);
+            let lower = |s: &str| s.chars().next().is_some_and(|f| f.to_lowercase().eq(ch.to_lowercase()));
+            let found = (1..=n)
+                .map(|k| ((cur + k as i32).rem_euclid(n.max(1) as i32)) as usize)
+                .find(|&i| list.get(i).is_some_and(|s| lower(s)));
+            match found {
+                Some(new) => {
+                    set(d, &name, "sel", new as i32);
+                    let rows = fit(d, &name, n as i32);
+                    reveal(d, &name, new as i32, rows);
+                    Some(KeyAct::Press(format!("{name}#{new}")))
+                }
+                None => Some(KeyAct::Done),
+            }
+        }
         ("TRadioGroup", Key::Up | Key::Down | Key::Left | Key::Right) => {
             let n = items(c, d, &name).len() as i32;
             let cur = get_i(d, &name, "index").unwrap_or(0);

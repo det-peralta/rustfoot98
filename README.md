@@ -1,13 +1,41 @@
 # rustfoot98
 
-Reverse-engineering notes and a clean-room native browser port of **Elifoot 98**
-(André Elias, 1998, shareware), using [REA](https://github.com/morluto/rea) + Ghidra.
+A native Rust/WebAssembly port of **Elifoot 98** (André Elias and Ricardo Correia, 1998, shareware, a Windows 3.1 / Delphi 1 program) that
+runs in a browser with the **look and feel of the original**: the same 800x600 screens, fonts, dialogs and rules, without emulating Windows.
+The rules were recovered from the program with [REA](https://github.com/morluto/rea) + Ghidra; the interface is drawn by a renderer that
+reproduces Windows 3.1 and the Delphi VCL pixel for pixel from the data the original itself carries (forms, fonts, bitmaps).
 
-**Goal:** run the game natively in the browser (TypeScript, optionally Rust→WASM later)
-instead of emulating Windows 3.1 inside DOSBox/js-dos as
-[elifoot98.com.br](https://www.elifoot98.com.br) does today.
+> Private research repo. The original game files, fonts and bitmaps are **not** stored here (see `.gitignore`): you bring your own copy.
 
-> Private research repo. Original game binaries are **not** stored here (see `.gitignore`).
+## Play it (classic interface)
+```bash
+# 1. once: what the renderer needs, built from YOUR copy of the game (original/elifoot98/ and original/run/, see docs/installation.md)
+pip install freetype-py && python3 tools/ui/skin.py && python3 tools/ui/webpack.py
+rustup target add wasm32-unknown-unknown
+# 2. build the WebAssembly and serve it
+web/build.sh serve            # http://localhost:8080  (opens the classic interface; ?nosw is not needed)
+```
+Open `http://localhost:8080/` : About box, new game (name the file, name the coaches, "Sortear equipas"), then the main window with its
+menus, the squad list, the pages Jogo / Jogador / Finanças / Selecção / Adversário, the round view with the pie clock, half-time
+substitutions, penalties, cup draw, auctions, end of season. If `web/skin/` is missing the page asks you to pick the folder (it stays in the
+browser's IndexedDB; nothing is uploaded). Games are saved in the browser (autosave every 3 rounds, "Sair" saves); the original's `.e98`
+files can be read by the native tools.
+
+Not modelled yet: a second human coach on the same machine (hot seat; in progress), sound, the registered-copy features (the original
+hides loans, "Procurar jogadores" and the *Controle* page in an unregistered copy and so does the port; no key check is implemented).
+
+## How it is built
+| Crate / dir | Content |
+|---|---|
+| `core/` | pure Rust rules: formats (`.e98`, `.eft`), RNG, match engine, season, finance, market, history |
+| `ui/` | `win31/` renderer (frames, widgets, fonts, list dialogs) and `classic/` (the original's windows and dialogs as a state machine) |
+| `ui-web/` | WebAssembly host of `ui/`; `web/classic.html` + `web/classic.js` drive it |
+| `wasm/`, `web/legacy.html`, `web/canvas.html` | the older, simplified front ends (DOM / shared canvas UI) |
+| `tools/` | skin-pack builders, capture drivers (headless Chromium + the original under js-dos), Ghidra helpers |
+
+Native helpers: `cargo run --release -p rustfoot-ui --bin classic_shot -- game.e98|- out.bmp key=value ...` renders any window or plays scripted
+sessions (`docs/classic-dialogs.md`); `tools/ui/regions.py` lists where a render differs from a capture of the original;
+`tools/capture/classic_smoke.mjs` plays rounds in the browser build.
 
 ## Docs
 | File | Content |
@@ -24,33 +52,17 @@ instead of emulating Windows 3.1 inside DOSBox/js-dos as
 | [docs/season.md](docs/season.md) | Season structure: fixtures, rounds, standings, knock-out cup |
 | [docs/finance.md](docs/finance.md) | Economy index, player value, loans; transfer market map |
 | [docs/references.md](docs/references.md) | Third-party research (leads to verify) |
+| [docs/pixel-exact-ui.md](docs/pixel-exact-ui.md) | How the original's look is rebuilt; what was verified against captures |
+| [docs/classic-dialogs.md](docs/classic-dialogs.md) | The classic interface: dialogs, the `Dialog` model, `classic_shot` |
+| [docs/matchday.md](docs/matchday.md) | The match day: round view, half-time, penalties, cup draw, end of season |
 
-## Try it (browser demo)
-```bash
-rustup target add wasm32-unknown-unknown     # once
-web/build.sh serve                            # builds the 143 KB WebAssembly core and serves http://localhost:8080
-```
-Plays full seasons of a 4-division league using the decoded rules (no emulator), with **you managing one club**
-(formation, starters, bench and up to three planned substitutions per round): fictional clubs by default, or the
-real teams if you pick the `.EFT` files of your own Elifoot 98 install (read locally in the browser, never uploaded or bundled). **Offline / install:** the page registers a service worker (`web/sw.js`) that caches the app and the WebAssembly core, and has a
-web manifest, so browsers offer to install it as an app and it runs without a connection (needs https or localhost). While developing
-open it with `?nosw` to skip the cache. CI (`.github/workflows/ci.yml`) runs fmt, clippy, the tests and the WASM build.
 
-**Saving:** Guardar/Carregar use the browser's storage (optional autosave after every round); Exportar/Importar move a
-text file (`ELIFOOT98-RS 1`, our own format: `core/src/save.rs`). A loaded game continues identically (same RNG seed).
-**Importar .e98 original** reads a `JOGOS\*.e98` save of the original game in your browser (nothing is uploaded): squads, standings,
-morale, year and round carry over; injuries and the cup restart; cash, loans and the economic factor are read as well (see `docs/findings.md`).
-The computer-managed clubs trade players with each other (`core/src/market.rs`, shown in the "Transferências" card); you can bid in open auctions ("Mercado" card) and sell squad players for the best computer bid.
-Native checks:
-`cargo test`, `cargo run --release -p rustfoot-core --example sim|season|world`, and the browser smoke test
-`node tools/capture/web_test.mjs`.
-
-## Front ends
-The classic interface (`web/classic.html`, pixel-exact, opened by `/`) is the real port; the old DOM page (`web/legacy.html`) is kept as a simplified version; the shared UI (`ui/`) runs on SDL2 (`cargo run -p rustfoot-ui --features sdl --release`) and in the browser (`web/canvas.html`). See [docs/ui-strategy.md](docs/ui-strategy.md).
-
-## Layout
-- `core/` pure Rust: formats, RNG, match engine, season, world.  `wasm/` C-ABI bindings.  `web/` the demo page.
-- `tools/` reverse-engineering helpers (Ghidra scripts, decoders).  `docs/` findings (see below).
+## The older DOM demo
+`web/legacy.html` (and `web/canvas.html`) are the first, simplified front ends that came before the classic interface: a card-style page
+with a savegame exporter, the real `.EFT` team loader and the `.e98` importer. They are kept for reference.
+Checks: `cargo test --workspace`, `cargo run --release -p rustfoot-core --example sim|season|world`, `node tools/capture/web_test.mjs`.
+CI (`.github/workflows/ci.yml`) runs fmt, clippy, the tests and the WASM build.
 
 ## Status
-See the checklist in [docs/analysis-plan.md](docs/analysis-plan.md).
+See the checklist in [docs/analysis-plan.md](docs/analysis-plan.md); the pixel-exact work and what was measured against the original is in
+[docs/pixel-exact-ui.md](docs/pixel-exact-ui.md).
