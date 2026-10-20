@@ -20,9 +20,11 @@ use std::collections::{HashMap, VecDeque};
 /// What happens next at the end of a round, once the dialogs open are closed.
 pub enum Step {
     Open(Box<Dialog>),
-    /// The draw of the cup (if the options say so), then the cup round.
+    /// The draw of the cup (if the options say so).
     CupDraw,
-    CupView,
+    /// The league day is over and a cup round has been drawn: the main window comes back for the humans who play a tie (the
+    /// cup is played on its own day when they press *Jogar*); when no human plays, the cup day follows at once.
+    CupDay,
     /// The invitations to other clubs that humans have not answered yet, one dialog at a time (a refusal replays the round, so
     /// what is still to come is looked up when its turn comes).
     Invitations,
@@ -32,6 +34,8 @@ pub enum Step {
 
 /// The round being shown, with what is needed to play it again with the user's decisions.
 pub struct Session {
+    /// A cup day (the session of the ties, not of a league round).
+    pub cup_day: bool,
     /// The world before the round.
     pub snapshot: Box<World>,
     /// The random state at the checkpoints of the first run.
@@ -169,7 +173,7 @@ impl Classic {
         let Some((_, me)) = main_win::human_club(self) else {
             return String::new();
         };
-        let opp = &self.world.divisions[d][j];
+        let opp = self.world.club_of((d, j));
         if home {
             main_win::referee(self, &me, opp)
         } else {
@@ -191,16 +195,32 @@ impl Classic {
         out
     }
 
+    /// The humans who take a turn on the main window before the next day is played: all of them for a league day, only the
+    /// ones who play a tie on a cup day (`1010:3e9c` opens the main window only for the games of the day).
+    fn turn_seats(&self) -> Vec<usize> {
+        if self.world.cup_day_due() {
+            self.world.humans_in_cup_tie()
+        } else {
+            (0..self.world.human_count()).collect()
+        }
+    }
+
     /// The round button (hot seat): the main window goes to the next human; when every human has pressed it since the last
     /// round, the round is played. The turn does not go back to the first player afterwards: the human who has the main
     /// window when the round ends keeps it (observed in the original: after the auctions the next round opened on the last
-    /// human's window), and the others follow in seat order.
+    /// human's window), and the others follow in seat order. On a cup day it plays the cup day.
     pub fn round_button(&mut self) {
         self.turns += 1;
-        let n = self.world.human_count();
-        if self.turns < n {
+        let seats = self.turn_seats();
+        if self.turns < seats.len() {
             self.main.menu = None;
-            let next = (self.world.active_seat() + 1) % n;
+            let active = self.world.active_seat();
+            let next = seats
+                .iter()
+                .copied()
+                .find(|&s| s > active)
+                .or_else(|| seats.first().copied())
+                .unwrap_or(active);
             self.switch_human(next);
             return;
         }
@@ -208,25 +228,39 @@ impl Classic {
         self.play_round();
     }
 
-    /// Plays the next round of the league (and cup) and shows it.
+    /// The coaches of all clubs now (names for the sacking list).
+    fn coach_names(&self) -> HashMap<String, String> {
+        self.world
+            .divisions
+            .iter()
+            .flatten()
+            .chain(self.world.pool.iter())
+            .map(|c| (c.name.clone(), c.coach_name.clone()))
+            .collect()
+    }
+
+    /// *Jogar*: plays the next match day and shows it: the cup day when a cup round has been drawn, otherwise the next league round
+    /// (the cup of an even round is drawn at its end and played on its own day).
     pub fn play_round(&mut self) {
+        if self.world.cup_day_due() {
+            self.play_cup_day();
+        } else {
+            self.play_league_day();
+        }
+    }
+
+    fn play_league_day(&mut self) {
         self.main.menu = None;
         self.md.todo.clear();
         let referees = self.referees_of_next_games();
         self.world.accept_invitations = true;
         self.world.seats.declined.clear();
         let snapshot = Box::new(self.world.clone());
-        let coaches = self
-            .world
-            .divisions
-            .iter()
-            .flatten()
-            .chain(self.world.pool.iter())
-            .map(|c| (c.name.clone(), c.coach_name.clone()))
-            .collect();
+        let coaches = self.coach_names();
         let mut ctl = Control::default();
         self.world.play_round_ctl(&mut ctl);
         self.md.session = Some(Session {
+            cup_day: false,
             snapshot,
             log: std::mem::take(&mut ctl.log),
             league: Vec::new(),
@@ -238,6 +272,45 @@ impl Classic {
             coaches,
         });
         self.start_round_view();
+    }
+
+    /// Plays the cup day: the ties drawn at the end of the league day, with the humans' plans as they are now.
+    pub fn play_cup_day(&mut self) {
+        self.main.menu = None;
+        self.md.todo.clear();
+        self.world.seats.declined.clear();
+        let snapshot = Box::new(self.world.clone());
+        let coaches = self.coach_names();
+        let mut ctl = Control::default();
+        self.world.play_cup_day_ctl(&mut ctl);
+        self.md.session = Some(Session {
+            cup_day: true,
+            snapshot,
+            log: std::mem::take(&mut ctl.log),
+            league: Vec::new(),
+            cup: Vec::new(),
+            handled: Vec::new(),
+            referees: HashMap::new(),
+            declined: Vec::new(),
+            answered: Vec::new(),
+            coaches,
+        });
+        self.start_cup_view();
+    }
+
+    /// Shows the cup round just played (`Taça - <stage> - <year>`); without any tie the day is over.
+    pub fn start_cup_view(&mut self) {
+        match RoundView::of_cup(&self.world) {
+            Some(mut v) => {
+                v.interval = round_view::interval(self.opts.profile as usize + 1, v.humans());
+                self.screen = Screen::Round(Box::new(v));
+            }
+            None => {
+                self.screen = Screen::Round(Box::new(RoundView::backdrop()));
+                dialogs::matchday::end_of_cup(self);
+            }
+        }
+        self.dirty = true;
     }
 
     /// Shows the league round just played: the clock runs from -5 to 90.
@@ -263,7 +336,11 @@ impl Classic {
         w.accept_invitations = true;
         w.seats.declined = sess.declined.clone();
         let mut ctl = Control::replay(sess.log.clone(), sess.league.clone(), sess.cup.clone());
-        w.play_round_ctl(&mut ctl);
+        if sess.cup_day {
+            w.play_cup_day_ctl(&mut ctl);
+        } else {
+            w.play_round_ctl(&mut ctl);
+        }
         self.world = w;
         // the view of the same round with what the replay produced, at the minute it was
         if let Screen::Round(rv) = &self.screen {
@@ -532,10 +609,17 @@ impl Classic {
                     self.open(d);
                 }
             }
-            Step::CupView => {
-                if let Some(mut v) = RoundView::of_cup(&self.world) {
-                    v.interval = round_view::interval(self.opts.profile as usize + 1, v.humans());
-                    self.screen = Screen::Round(Box::new(v));
+            Step::CupDay => {
+                let seats = self.world.humans_in_cup_tie();
+                if seats.is_empty() {
+                    // no human plays a tie: no main window, the cup day follows the draw
+                    self.play_cup_day();
+                } else {
+                    if !seats.contains(&self.world.active_seat()) {
+                        self.switch_human(seats[0]);
+                    }
+                    self.turns = 0;
+                    self.finish_round();
                 }
             }
             Step::Invitations => {
@@ -839,14 +923,14 @@ mod tests {
     fn many_rounds_with_a_user_who_answers_everything_stay_consistent() {
         let mut c = classic(2);
         let start = c.world.year;
-        for _ in 0..16 {
+        for _ in 0..24 {
             c.play_round();
             let seen = play_through(&mut c);
-            assert!(seen.contains(&Kind::Halftime));
+            assert!(seen.contains(&Kind::Halftime) || c.world.cup_day_due() || seen.contains(&Kind::CupDraw));
             assert!(matches!(c.screen, Screen::Main));
             assert!(c.md.todo.is_empty());
         }
-        // 16 rounds: a season and two rounds; the end of the season was shown once
+        // 14 league days and the cup days of a season and more; the end of the season was shown once
         assert!(c.world.year > start);
     }
 
@@ -873,14 +957,12 @@ mod tests {
             }
             let mut c = Classic::new(w, Skin::default(), Forms::default(), Data::default());
             c.play_round();
-            // the league round: answer everything until the cup view starts
+            // the league round: answer everything until the main window of the cup day is back
             let mut guard = 0;
             loop {
                 run(&mut c);
-                match &c.screen {
-                    Screen::Round(rv) if rv.cup && rv.minute > -5 => break,
-                    Screen::Main => break,
-                    _ => {}
+                if matches!(&c.screen, Screen::Main) {
+                    break;
                 }
                 match top_kind(&c) {
                     Some(Kind::ForcedSubstitution) => {
@@ -901,9 +983,12 @@ mod tests {
                 guard += 1;
                 assert!(guard < 4000);
             }
-            if !matches!(&c.screen, Screen::Round(rv) if rv.cup) {
+            if !c.world.cup_day_due() || c.world.humans_in_cup_tie().is_empty() {
                 continue;
             }
+            // Jogar on the cup day
+            c.play_round();
+            run(&mut c);
             let Screen::Round(rv) = &c.screen else {
                 continue;
             };
@@ -1057,6 +1142,138 @@ mod tests {
         let seat = c.world.active_seat();
         c.round_button();
         assert_eq!(c.world.active_seat(), (seat + 1) % 3);
+    }
+
+    /// Plays league days like a user who answers everything until the main window is back with a cup day pending, in which a
+    /// human plays a tie; `None` when the season ended first.
+    fn until_cup_day(c: &mut Classic) -> Option<()> {
+        for _ in 0..40 {
+            if c.world.cup_day_due() && !c.world.humans_in_cup_tie().is_empty() {
+                return Some(());
+            }
+            c.play_round();
+            play_through(c);
+            assert!(matches!(c.screen, Screen::Main));
+        }
+        None
+    }
+
+    #[test]
+    fn the_cup_is_played_on_its_own_day_with_the_main_window_in_between() {
+        let mut found = 0;
+        for seed in [2, 7, 12, 30] {
+            let mut c = classic(seed);
+            let Some(()) = until_cup_day(&mut c) else {
+                continue;
+            };
+            found += 1;
+            let draw = c.world.cup_draw.clone().unwrap();
+            let round = c.world.round;
+            assert!(matches!(c.screen, Screen::Main) && c.md.session.is_none());
+            assert!(c.world.last_cup.is_none(), "the ties are not played yet");
+            // the main window shows the tie: the opponent with its division, the stage, no standings
+            let tie = c.world.human_cup_tie().unwrap();
+            let ((_, _), club) = main_win::human_club(&c).unwrap();
+            let v = main_win::view(&c, &club, crate::classic::Page::Game);
+            let opp = &v.texts["textOpponent"];
+            assert!(opp.contains(&tie.opponent), "{opp}");
+            assert!(
+                opp.contains(&format!(
+                    "{} TAÇA - {}",
+                    if tie.home { "CASA" } else { "FORA" },
+                    draw.name
+                )),
+                "{opp}"
+            );
+            assert!(
+                opp.contains("Divisão)") || opp.contains("(Distrital)"),
+                "{opp}"
+            );
+            assert!(v.lists["ListBoxClassification"].is_empty());
+            // the plan changed now counts: Jogar plays the cup day
+            c.round_button();
+            assert!(c.md.session.as_ref().is_some_and(|s| s.cup_day));
+            let Screen::Round(rv) = &c.screen else {
+                panic!("the cup view");
+            };
+            assert!(rv.cup && rv.title.starts_with("Taça - "), "{}", rv.title);
+            play_through(&mut c);
+            assert!(matches!(c.screen, Screen::Main));
+            assert!(!c.world.cup_day_due());
+            assert!(c.world.last_cup.is_some());
+            assert!(c.world.round == round || c.world.round == 0);
+            assert!(c.md.todo.is_empty());
+        }
+        assert!(found >= 2, "no cup day with a human tie in {found} seeds");
+    }
+
+    #[test]
+    fn a_human_out_of_the_cup_gets_no_main_window_on_the_cup_day() {
+        let mut shown = 0;
+        for seed in 0..60 {
+            let mut c = classic(seed);
+            for _ in 0..30 {
+                c.play_round();
+                run(&mut c);
+                let mut guard = 0;
+                // answer the dialogs of the league round; stop when the main window is back or the cup view runs
+                while !matches!(c.screen, Screen::Main) && guard < 40_000 {
+                    match top_kind(&c) {
+                        Some(Kind::ForcedSubstitution) => {
+                            press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                            press(&mut c, "OKBtn");
+                        }
+                        Some(Kind::Halftime) => press(&mut c, "OKBtn"),
+                        Some(_) => {
+                            c.dialogs.pop();
+                        }
+                        None => c.tick(20),
+                    }
+                    guard += 1;
+                }
+                // a cup day that the user does not play is never waiting on the main window
+                assert!(
+                    !matches!(c.screen, Screen::Main)
+                        || !c.world.cup_day_due()
+                        || !c.world.humans_in_cup_tie().is_empty(),
+                    "the main window came back for a cup day without a human tie"
+                );
+                if c.world.round % 2 == 0 && c.world.last_cup.is_some() && !c.world.cup_day_due() {
+                    shown += 1;
+                }
+            }
+        }
+        assert!(shown > 0);
+    }
+
+    #[test]
+    fn on_a_cup_day_only_the_humans_with_a_tie_take_turns() {
+        let mut found = 0;
+        for seed in [4, 9, 13, 17] {
+            let mut c = hot_seat(3, seed);
+            if until_cup_day(&mut c).is_none() {
+                continue;
+            }
+            let seats = c.world.humans_in_cup_tie();
+            assert!(!seats.is_empty());
+            assert!(
+                seats.contains(&c.world.active_seat()),
+                "the window is with a human who plays"
+            );
+            for k in 1..seats.len() {
+                let before = c.world.active_seat();
+                c.round_button();
+                assert!(c.md.session.is_none(), "turn {k}: the cup day is not played yet");
+                assert!(seats.contains(&c.world.active_seat()));
+                assert_ne!(c.world.active_seat(), before);
+            }
+            c.round_button();
+            assert!(c.md.session.as_ref().is_some_and(|s| s.cup_day));
+            play_through(&mut c);
+            assert!(!c.world.cup_day_due());
+            found += 1;
+        }
+        assert!(found >= 2);
     }
 
     #[test]

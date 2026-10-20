@@ -920,7 +920,7 @@ pub fn open_plantel(c: &Classic, club: &str, player: Option<&str>) -> Dialog {
 /// The squad viewer on the next opponent (the button of the opponent page).
 pub fn open_plantel_of_opponent(c: &Classic) -> Option<Dialog> {
     let (d, j, _) = main_win::next_opponent(c)?;
-    Some(open_plantel(c, &c.world.divisions[d][j].name, None))
+    Some(open_plantel(c, &c.world.club_of((d, j)).name, None))
 }
 
 fn plantel_club<'a>(c: &'a Classic, d: &Dialog) -> Option<&'a Club> {

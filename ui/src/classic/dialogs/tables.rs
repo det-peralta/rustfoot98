@@ -352,7 +352,7 @@ fn spec_for(c: &Classic, d: &Dialog) -> Option<Spec> {
         Kind::Calendar => {
             let club = if d.st.contains_key("opponent") {
                 let (dv, j, _) = main_win::next_opponent(c)?;
-                w.divisions[dv][j].name.clone()
+                w.club_of((dv, j)).name.clone()
             } else {
                 w.human.as_ref()?.club.clone()
             };

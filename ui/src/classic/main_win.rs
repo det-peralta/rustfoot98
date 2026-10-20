@@ -62,8 +62,19 @@ pub struct View {
     pub lists: BTreeMap<String, Vec<String>>,
 }
 
-/// Opponent of the user's club in the next round: `(division, index, is_home)`.
+/// The cup tie the active human plays on the pending cup day, if any (the main window of a cup day shows it).
+pub fn cup_tie(c: &Classic) -> Option<rustfoot_core::world::CupTie> {
+    c.world.human_cup_tie()
+}
+
+/// Opponent of the user's club in the next game: `(division, index, is_home)`; division 4 is the outside pool. On a cup day it
+/// is the club of the cup tie, otherwise the league opponent of the next round.
 pub fn next_opponent(c: &Classic) -> Option<(usize, usize, bool)> {
+    if c.world.cup_day_due() {
+        let t = cup_tie(c)?;
+        let (d, j) = c.world.find_club(&t.opponent)?;
+        return Some((d, j, t.home));
+    }
     let (d, i) = c.world.human_location()?;
     let round = c.world.round + 1;
     if round > 14 {
@@ -190,18 +201,32 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     t("TabSet.index", page.tab_index().to_string());
     t("TabSet.color", col(bg));
     // the next opponent
-    let opp = next_opponent(c).map(|(d, j, home)| (&c.world.divisions[d][j], home));
-    if let Some((o, home)) = opp {
+    let next = next_opponent(c).map(|(d, j, home)| (c.world.club_of((d, j)), home, d));
+    let opp = next.map(|(o, home, _)| (o, home));
+    let cup = cup_tie(c);
+    if let Some((o, home, od)) = next {
         let (obg, ofg) = (rgb(o.colors.0), rgb(o.colors.1));
-        t(
-            "textOpponent",
-            format!(
+        let line = match &cup {
+            // a cup day: the opponent's division (clubs outside the four divisions are "Distrital") and the stage
+            Some(tie) => format!(
+                " {} ({})\n{} TAÇA - {}",
+                o.name,
+                if od < 4 {
+                    format!("{}ª Divisão", od + 1)
+                } else {
+                    "Distrital".to_string()
+                },
+                if home { "CASA" } else { "FORA" },
+                tie.stage
+            ),
+            None => format!(
                 " {}\n{} {}ª Jornada",
                 o.name,
                 if home { "CASA" } else { "FORA" },
                 c.world.round + 1
             ),
-        );
+        };
+        t("textOpponent", line);
         t("textOpponent.color", col(obg));
         t("textOpponent.bgcolor", col(ofg));
         t("textOpponent.pad", "4".into());
@@ -235,6 +260,9 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
             col(text_c),
             col(back_c)
         ));
+    }
+    if cup.is_some() {
+        class_rows.clear(); // a cup day shows no standings
     }
     lists.insert("ListBoxClassification".to_string(), class_rows);
     t("LabelLastResult.visible", "0".into());

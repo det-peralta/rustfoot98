@@ -3305,7 +3305,7 @@ mod tests {
         let mut w = World::synthetic(14);
         let total = w.cup.len();
         while !w.cup_day_due() {
-            let odd = w.round % 2 == 0;
+            let odd = w.round.is_multiple_of(2);
             w.play_round_ctl(&mut Control::default());
             assert!(!odd || !w.cup_day_due(), "no cup after an odd round");
             assert!(w.round < 14);
@@ -3354,7 +3354,7 @@ mod tests {
         let mut w = World::synthetic(14);
         while !w.cup_day_due() {
             w.play_round_ctl(&mut Control::default());
-            if !w.cup_day_due() && w.cup_draw.is_none() && w.round % 2 == 0 {
+            if !w.cup_day_due() && w.cup_draw.is_none() && w.round.is_multiple_of(2) {
                 w.play_round();
             }
         }

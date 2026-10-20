@@ -637,16 +637,12 @@ fn bind_shootout(c: &Classic, d: &mut Dialog) {
     d.text("ListBoxPenalties.itemheight", "22");
 }
 
-/// The cup draw dialog, when the options ask for it (`1020:0ed4`): always, or when the user's club is drawn.
+/// The cup draw dialog, when the options ask for it (`1020:0ed4`): always, or when a human's club is drawn.
 pub fn cup_draw(c: &Classic) -> Option<Dialog> {
-    let cup = c.world.last_cup.as_ref()?;
-    let sess = c.md.session.as_ref()?;
-    let human_drawn = cup
-        .matches
-        .iter()
-        .any(|m| sess.snapshot.is_human_club(&m.home) || sess.snapshot.is_human_club(&m.away));
+    let draw = c.world.cup_draw.as_ref()?;
+    let human_drawn = !c.world.humans_in_cup_tie().is_empty();
     let show = c.opts.cup_draw == 2 || (c.opts.cup_draw == 1 && human_drawn);
-    if !show || sess.snapshot.cup.len() <= 2 {
+    if !show || c.world.cup.len() <= 2 || draw.pairs.is_empty() {
         return None;
     }
     let mut d = Dialog::new(Kind::CupDraw, "TSORTEIODLG");
@@ -656,51 +652,50 @@ pub fn cup_draw(c: &Classic) -> Option<Dialog> {
 }
 
 fn bind_cup_draw(c: &Classic, d: &mut Dialog) {
-    let (Some(cup), Some(sess)) = (c.world.last_cup.as_ref(), c.md.session.as_ref()) else {
+    let Some(draw) = c.world.cup_draw.as_ref() else {
         return;
     };
     let tick = if d.num("human") != 0 { 1500 } else { 400 };
     // two timer ticks per game: the home team is named, then the away team and the game goes into the list
     let ticks = (d.num("ms") / tick) as usize;
     let (done, home_only) = (ticks / 2, ticks % 2 == 1);
-    let games = cup.matches.len();
+    let games = draw.pairs.len();
     // the teams already drawn leave the list
-    let drawn: Vec<&str> = cup
-        .matches
+    let drawn: Vec<&str> = draw
+        .pairs
         .iter()
         .take(done.min(games))
-        .flat_map(|m| [m.home.as_str(), m.away.as_str()])
+        .flat_map(|(h, a)| [h.as_str(), a.as_str()])
         .collect();
-    let mut teams: Vec<String> = sess
-        .snapshot
+    let mut teams: Vec<String> = c
+        .world
         .cup
         .iter()
         .filter(|n| !drawn.contains(&n.as_str()))
         .cloned()
         .collect();
     teams.sort_by_key(|n| n.to_lowercase());
-    let current = cup.matches.get(done.min(games.saturating_sub(1)));
+    let current = draw.pairs.get(done.min(games.saturating_sub(1)));
     let (home, away) = match current {
         Some(m) if done < games && home_only => (Some(m), None),
         Some(_) if done > 0 && !home_only => {
-            let m = &cup.matches[(done - 1).min(games - 1)];
+            let m = &draw.pairs[(done - 1).min(games - 1)];
             (Some(m), Some(m))
         }
         Some(_) | None => (None, None),
     };
-    let sel = home.and_then(|m| teams.iter().position(|n| *n == m.home));
+    let sel = home.and_then(|m| teams.iter().position(|n| *n == m.0));
     d.lists.insert("listBoxOfCupTeams".into(), teams);
     set_sel(d, "listBoxOfCupTeams", sel);
     let shown = if home_only { done } else { done.min(games) };
-    let list: Vec<String> = cup
-        .matches
+    let list: Vec<String> = draw
+        .pairs
         .iter()
         .take(shown)
-        .map(|m| format!("{} - {}", m.home, m.away))
+        .map(|(h, a)| format!("{h} - {a}"))
         .collect();
-    let last = list.len().checked_sub(1);
     d.lists.insert("listBoxOfGames".into(), list);
-    let _ = last; // the original shows no selection in the list of games
+    // (the original shows no selection in the list of games)
     let mut label = |name: &str, team: Option<&str>| match team {
         Some(t) => {
             let (ink, form) = colors(find_club(&c.world, t));
@@ -713,8 +708,8 @@ fn bind_cup_draw(c: &Classic, d: &mut Dialog) {
             d.texts.remove(&format!("{name}.bgcolor"));
         }
     };
-    label("textHomeTeam", home.map(|m| m.home.as_str()));
-    label("textAwayTeam", away.map(|m| m.away.as_str()));
+    label("textHomeTeam", home.map(|m| m.0.as_str()));
+    label("textAwayTeam", away.map(|m| m.1.as_str()));
 }
 
 fn bind_end_of_season(c: &Classic, d: &mut Dialog) {
@@ -1131,28 +1126,21 @@ pub fn end_of_round(c: &mut Classic) {
     };
     let round = sess.snapshot.round + 1;
     let human_played = sess.snapshot.human_count() > 0;
-    let first_cup_change = c
-        .world
-        .last_cup
-        .as_ref()
-        .map_or(c.world.coach_changes.len(), |r| r.coach_changes_from);
     if c.next_invitation().is_some() {
         c.md.todo.push_back(Step::Invitations);
     }
-    if let Some(d) = lashes(c, 0, first_cup_change) {
+    if let Some(d) = lashes(c, 0, c.world.coach_changes.len()) {
         c.md.todo.push_back(Step::Open(Box::new(d)));
     }
     if human_played || round == ROUNDS {
         let d = super::tables::standings_dialog(true);
         c.md.todo.push_back(Step::Open(Box::new(d)));
     }
-    if c.world
-        .last_cup
-        .as_ref()
-        .is_some_and(|r| !r.matches.is_empty())
-    {
+    if c.world.cup_day_due() {
+        // `1020:11b8` runs the cup day (`1020:0ed4`) after the league day: its draw dialog, then the main window of the humans
+        // who play a tie. The auctions of the league day's market wait for the end of the cup day.
         c.md.todo.push_back(Step::CupDraw);
-        c.md.todo.push_back(Step::CupView);
+        c.md.todo.push_back(Step::CupDay);
     } else {
         finish_steps(c, round);
     }
@@ -1160,11 +1148,12 @@ pub fn end_of_round(c: &mut Classic) {
 
 /// The cup view is over: the shootouts, the sackings of the cup round, the end of the season.
 pub fn end_of_cup(c: &mut Classic) {
+    c.main.lineup_shown = false;
     let Some(sess) = c.md.session.as_ref() else {
         c.md.todo.push_back(Step::Main);
         return;
     };
-    let round = sess.snapshot.round + 1;
+    let round = sess.snapshot.round;
     let ties: Vec<usize> = c
         .world
         .last_cup
@@ -1194,7 +1183,7 @@ pub fn end_of_cup(c: &mut Classic) {
 }
 
 fn finish_steps(c: &mut Classic, round: usize) {
-    if round == ROUNDS {
+    if round == ROUNDS && c.world.round == 0 {
         if let Some(s) = c.world.last_season.as_ref() {
             // the season is over: count the titles and show the winners
             let champion = s.tables[0].first().map(|r| r.name.clone());
