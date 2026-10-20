@@ -144,6 +144,25 @@ pub struct CupMatch {
     pub bonus: (i32, i32),
 }
 
+/// A drawn cup round waiting for its match day: the ties in draw order (the first club of a pair plays at home), the clubs
+/// without a tie advance.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CupDraw {
+    /// The league round after which it was drawn (even).
+    pub round: usize,
+    /// Name of the stage ("32 avos de final", "Oitavos", ..., "FINAL").
+    pub name: String,
+    pub pairs: Vec<(String, String)>,
+}
+
+/// The cup tie of a human club, for the main window of a cup day.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CupTie {
+    pub opponent: String,
+    pub home: bool,
+    pub stage: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct CupRound {
     pub name: String,
@@ -236,6 +255,9 @@ pub struct World {
     pub cup: Vec<String>,
     /// The last cup round played in the current season (None before the first draw).
     pub last_cup: Option<CupRound>,
+    /// The cup round that has been drawn (at the end of an even league day, `1020:0ed4`) and is still to be played on its own
+    /// match day (`play_cup_day_ctl`).
+    pub cup_draw: Option<CupDraw>,
     pub cup_champion: Option<String>,
     /// Transfers made between computer-managed clubs, newest last (kept for the current season).
     pub transfers: Vec<Transfer>,
@@ -470,6 +492,7 @@ impl World {
             human: None,
             cup: Vec::new(),
             last_cup: None,
+            cup_draw: None,
             cup_champion: None,
             transfers: Vec::new(),
             board: Vec::new(),
@@ -511,6 +534,7 @@ impl World {
             human: None,
             cup: Vec::new(),
             last_cup: None,
+            cup_draw: None,
             cup_champion: None,
             transfers: Vec::new(),
             board: Vec::new(),
@@ -561,6 +585,7 @@ impl World {
             human: None,
             cup: Vec::new(),
             last_cup: None,
+            cup_draw: None,
             cup_champion: None,
             transfers: Vec::new(),
             board: Vec::new(),
@@ -1699,18 +1724,104 @@ impl World {
         }
     }
 
-    /// The cup of `round` (even), played after that round's league games; see `cup.rs` for the rules.
-    fn play_cup_round(&mut self, round: usize, ctl: &mut Control) {
+    /// The draw of the cup after the league games of `round` (even), `1020:0ed4` up to the draw dialog: the survivors are
+    /// shuffled and paired; the ties are played on their own match day (`play_cup_day_ctl`). Does nothing when the cup has
+    /// no round this time (see `cup.rs` for the rules).
+    pub fn draw_cup(&mut self, round: usize, ctl: &mut Control) {
+        self.cup_draw = None;
         let total = self.divisions.iter().map(Vec::len).sum::<usize>() + self.pool.len();
         if total <= cup::threshold(round) || self.cup.len() < 2 {
             return;
         }
         ctl.checkpoint(&mut self.rng);
-        let coach_changes_from = self.coach_changes.len();
         cup::shuffle(&mut self.rng, &mut self.cup);
         let n = self.cup.len();
         let (k, pairs) = cup::round_size(n);
-        let entrants: Vec<String> = self.cup.iter().take(pairs * 2).cloned().collect();
+        let pairs = self
+            .cup
+            .chunks(2)
+            .take(pairs)
+            .filter(|p| p.len() == 2)
+            .map(|p| (p[0].clone(), p[1].clone()))
+            .collect();
+        self.cup_draw = Some(CupDraw {
+            round,
+            name: cup::round_name(k),
+            pairs,
+        });
+    }
+
+    /// Whether the next match day is a cup day (a round has been drawn).
+    pub fn cup_day_due(&self) -> bool {
+        self.cup_draw.is_some()
+    }
+
+    /// The cup tie of the active human on the pending cup day, if he has one (a human who is out of the cup or has a bye
+    /// plays no game that day).
+    pub fn human_cup_tie(&self) -> Option<CupTie> {
+        let draw = self.cup_draw.as_ref()?;
+        let me = &self.human.as_ref()?.club;
+        draw.pairs.iter().find_map(|(h, a)| {
+            if h == me {
+                Some(CupTie {
+                    opponent: a.clone(),
+                    home: true,
+                    stage: draw.name.clone(),
+                })
+            } else if a == me {
+                Some(CupTie {
+                    opponent: h.clone(),
+                    home: false,
+                    stage: draw.name.clone(),
+                })
+            } else {
+                None
+            }
+        })
+    }
+
+    /// The seats of the humans who play a tie on the pending cup day, in seat order.
+    pub fn humans_in_cup_tie(&self) -> Vec<usize> {
+        let Some(draw) = self.cup_draw.as_ref() else {
+            return Vec::new();
+        };
+        (0..self.human_count())
+            .filter(|&s| {
+                self.human_at(s).is_some_and(|h| {
+                    draw.pairs.iter().any(|(a, b)| *a == h.club || *b == h.club)
+                })
+            })
+            .collect()
+    }
+
+    /// The cup match day: plays the drawn ties with the humans' plans as they are now (`1020:0ed4` after the draw dialog).
+    pub fn play_cup_day_ctl(&mut self, ctl: &mut Control) {
+        let Some(draw) = self.cup_draw.take() else {
+            return;
+        };
+        let round = draw.round;
+        self.play_cup_ties(&draw, ctl);
+        self.record_cup_fixtures(round);
+        self.apply_human_move();
+        self.for_each_human(|w| {
+            if let Some(h) = w.human.as_mut() {
+                h.plan.subs.clear(); // planned substitutions are for one game only
+            }
+            w.refresh_plan();
+        });
+        if round == ROUNDS {
+            self.finish_season();
+        }
+    }
+
+    fn play_cup_ties(&mut self, draw: &CupDraw, ctl: &mut Control) {
+        let round = draw.round;
+        let coach_changes_from = self.coach_changes.len();
+        let entrants: Vec<String> = draw
+            .pairs
+            .iter()
+            .flat_map(|(h, a)| [h.clone(), a.clone()])
+            .collect();
         let plans: Vec<(String, Plan)> = self
             .humans()
             .map(|h| (h.club.clone(), h.plan.clone()))
@@ -1853,7 +1964,7 @@ impl World {
             self.cup_champion = Some(self.cup[0].clone());
         }
         self.last_cup = Some(CupRound {
-            name: cup::round_name(k),
+            name: draw.name.clone(),
             matches,
             left: self.cup.len(),
             coach_changes_from,
@@ -1963,7 +2074,11 @@ impl World {
 
     /// Plays the next round of every division, evolves the squads, and runs the season end after round 14.
     pub fn play_round(&mut self) {
-        self.play_round_ctl(&mut Control::default());
+        let mut ctl = Control::default();
+        self.play_round_ctl(&mut ctl);
+        if self.cup_day_due() {
+            self.play_cup_day_ctl(&mut ctl);
+        }
     }
 
     /// [`World::play_round`] under the user's [`Control`]: the decisions made during the games and the replay support (the front
@@ -2033,18 +2148,17 @@ impl World {
         self.round = round;
         self.tie_order = (0..4).map(|d| self.table_order(d)).collect();
         self.last_cup = None;
+        self.cup_draw = None;
         if round.is_multiple_of(2) {
-            self.play_cup_round(round, ctl);
-            self.record_cup_fixtures(round);
-            self.apply_human_move();
+            self.draw_cup(round, ctl);
         }
         self.for_each_human(|w| {
             if let Some(h) = w.human.as_mut() {
-                h.plan.subs.clear(); // planned substitutions are for one round only (league game and cup tie)
+                h.plan.subs.clear(); // planned substitutions are for one game only
             }
             w.refresh_plan();
         });
-        if round == ROUNDS {
+        if round == ROUNDS && self.cup_draw.is_none() {
             self.finish_season();
         }
     }
@@ -3187,6 +3301,86 @@ mod tests {
     }
 
     #[test]
+    fn the_cup_is_drawn_after_an_even_league_day_and_played_on_its_own_day() {
+        let mut w = World::synthetic(14);
+        let total = w.cup.len();
+        while !w.cup_day_due() {
+            let odd = w.round % 2 == 0;
+            w.play_round_ctl(&mut Control::default());
+            assert!(!odd || !w.cup_day_due(), "no cup after an odd round");
+            assert!(w.round < 14);
+        }
+        let drawn_at = w.round;
+        assert_eq!(drawn_at % 2, 0, "the cup is drawn after an even round");
+        assert!(w.last_cup.is_none(), "the draw does not play the cup");
+        assert_eq!(w.cup.len(), total, "nobody is out before the cup day");
+        let draw = w.cup_draw.clone().unwrap();
+        assert!(draw.name.contains("avos") || !draw.name.is_empty());
+        assert!(!draw.pairs.is_empty());
+        let (hc, _) = w.human_location().unwrap();
+        let _ = hc;
+        // the humans' tie is found in the draw, from either side
+        let me = w.human.as_ref().unwrap().club.clone();
+        match w.human_cup_tie() {
+            Some(t) => {
+                let pair = draw.pairs.iter().find(|(h, a)| *h == me || *a == me).unwrap();
+                assert_eq!(t.home, pair.0 == me);
+                assert_eq!(t.opponent, if t.home { &pair.1 } else { &pair.0 }.clone());
+                assert_eq!(t.stage, draw.name);
+                assert_eq!(w.humans_in_cup_tie(), vec![0]);
+            }
+            None => assert!(w.humans_in_cup_tie().is_empty()),
+        }
+        // a game saved on the cup day keeps the draw
+        let back = World::load(&w.save()).unwrap();
+        assert_eq!(back.cup_draw, w.cup_draw);
+        let mut a = w.clone();
+        let mut b = back;
+        a.play_cup_day_ctl(&mut Control::default());
+        b.play_cup_day_ctl(&mut Control::default());
+        assert!(!a.cup_day_due());
+        assert!(a.last_cup.is_some());
+        assert_eq!(a.round, drawn_at);
+        assert!(a.cup.len() < total);
+        assert_eq!(a.cup, b.cup);
+        assert_eq!(a.rng.seed(), b.rng.seed());
+        // a new round after the cup day plays on as usual
+        a.play_round();
+        assert_eq!(a.round, drawn_at + 1);
+    }
+
+    #[test]
+    fn the_plan_changed_on_the_cup_day_is_the_plan_of_the_tie() {
+        let mut w = World::synthetic(14);
+        while !w.cup_day_due() {
+            w.play_round_ctl(&mut Control::default());
+            if !w.cup_day_due() && w.cup_draw.is_none() && w.round % 2 == 0 {
+                w.play_round();
+            }
+        }
+        let mut other = w.clone();
+        let Some(f) = (0..FORMATIONS.len()).find(|&f| {
+            let mut t = w.clone();
+            t.set_formation(f) && t.human.as_ref().unwrap().plan != w.human.as_ref().unwrap().plan
+        }) else {
+            return;
+        };
+        other.set_formation(f);
+        w.play_cup_day_ctl(&mut Control::default());
+        other.play_cup_day_ctl(&mut Control::default());
+        if w.last_cup.as_ref().is_some_and(|c| c.matches.iter().any(|m| {
+            let me = &w.human.as_ref().unwrap().club;
+            m.home == *me || m.away == *me
+        })) {
+            // the human's tie does not look the same with another formation
+            assert_ne!(
+                format!("{:?}", w.last_cup.as_ref().unwrap().matches),
+                format!("{:?}", other.last_cup.as_ref().unwrap().matches)
+            );
+        }
+    }
+
+    #[test]
     fn replaying_a_round_without_decisions_gives_the_same_round() {
         for seed in [3, 21, 40] {
             let mut w = World::synthetic(seed);
@@ -3194,6 +3388,9 @@ mod tests {
                 let snapshot = w.clone();
                 let mut ctl = Control::default();
                 w.play_round_ctl(&mut ctl);
+                let drawn = w.cup_draw.clone();
+                let mut cup_ctl = Control::default();
+                w.play_cup_day_ctl(&mut cup_ctl);
                 // the control does not change a round played without help
                 let mut plain = snapshot.clone();
                 plain.play_round();
@@ -3207,6 +3404,8 @@ mod tests {
                 let mut again = snapshot.clone();
                 again.play_round_ctl(&mut Control::replay(ctl.log.clone(), vec![], vec![]));
                 assert_eq!(round_text(&w), round_text(&again));
+                assert_eq!(drawn, again.cup_draw, "the draw is the same in a replay");
+                again.play_cup_day_ctl(&mut Control::replay(cup_ctl.log.clone(), vec![], vec![]));
                 assert_eq!(w.rng.seed(), again.rng.seed());
                 assert_eq!(
                     format!("{:?}", w.last_cup.as_ref().map(|c| &c.matches)),
