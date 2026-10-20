@@ -98,15 +98,13 @@ fn main() -> Result<(), String> {
                             } else {
                                 format!("auto:{stop}@3000000")
                             };
-                            // (every human picks a formation and presses Enter in turn; the last Enter starts the round)
-                            let humans = app.world.human_count().max(1);
+                            // one league round = a match day (every human picks a formation and presses Enter in turn; the
+                            // last Enter starts the day) and, when a cup round was drawn, the cup day with the humans who play a tie
                             (0..count.parse::<usize>().unwrap_or(0))
                                 .flat_map(|_| {
-                                    (0..humans)
-                                        .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string()])
-                                        .chain([auto.clone()])
+                                    ["turn:", auto.as_str(), "cupturn:", auto.as_str()]
                                         .map(|st| format!("\u{1}{st}")) // generated: skipped once the stop was reached
-                                        .collect::<Vec<_>>()
+                                        .to_vec()
                                 })
                                 .collect()
                         }
@@ -151,6 +149,24 @@ fn main() -> Result<(), String> {
                             }
                             if let Some(d) = app.dialogs.last() {
                                 eprintln!("dialog {:?} ({})", d.kind, d.form);
+                            }
+                        }
+                        "turn" | "cupturn" => {
+                            // F5 (a formation) and Enter for every human who takes a turn on the main window now; `cupturn` only
+                            // when the main window is waiting for a cup day
+                            let main = matches!(app.screen, rustfoot_ui::classic::Screen::Main)
+                                && app.dialogs.is_empty();
+                            let cup = app.world.cup_day_due();
+                            if main && (kind == "turn" || cup) {
+                                let n = if cup {
+                                    app.world.humans_in_cup_tie().len()
+                                } else {
+                                    app.world.human_count()
+                                };
+                                for _ in 0..n.max(1) {
+                                    app.event(Ev::Key(Key::F(5)));
+                                    app.event(Ev::Key(Key::Enter));
+                                }
                             }
                         }
                         "seat" => app.switch_human(arg.parse().unwrap_or(0)),

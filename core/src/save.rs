@@ -125,6 +125,13 @@ impl World {
         if let Some(c) = &self.cup_champion {
             out.push_str(&format!("cupchampion|{}\n", clean(c)));
         }
+        // a cup round drawn but not yet played (its own match day)
+        if let Some(d) = &self.cup_draw {
+            out.push_str(&format!("cupdraw|{}|{}\n", d.round, clean(&d.name)));
+            for (h, a) in &d.pairs {
+                out.push_str(&format!("cuptie|{}|{}\n", clean(h), clean(a)));
+            }
+        }
         for (d, order) in self.tie_order.iter().enumerate() {
             let list: Vec<String> = order.iter().map(|i| i.to_string()).collect();
             out.push_str(&format!("tieorder|{d}|{}\n", list.join(",")));
@@ -215,6 +222,7 @@ impl World {
         let mut lists: Vec<Lists> = vec![Default::default()];
         let seat_of = |f: &[&str], at: usize| f.get(at).and_then(|x| x.parse::<usize>().ok()).unwrap_or(0);
         let mut cup: Vec<String> = Vec::new();
+        let mut cup_draw: Option<crate::world::CupDraw> = None;
         let mut cup_champion: Option<String> = None;
         let mut has_cup = false;
         let mut has_finance = false;
@@ -389,6 +397,18 @@ impl World {
                     has_cup = true;
                     cup.push(f.get(1).ok_or("cup entry without name")?.to_string());
                 }
+                "cupdraw" => {
+                    cup_draw = Some(crate::world::CupDraw {
+                        round: num(n, &f, 1)? as usize,
+                        name: f.get(2).unwrap_or(&"").to_string(),
+                        pairs: Vec::new(),
+                    })
+                }
+                "cuptie" => {
+                    if let (Some(d), Some(h), Some(a)) = (cup_draw.as_mut(), f.get(1), f.get(2)) {
+                        d.pairs.push((h.to_string(), a.to_string()));
+                    }
+                }
                 "cupchampion" => {
                     cup_champion = Some(f.get(1).ok_or("cupchampion without name")?.to_string())
                 }
@@ -538,6 +558,7 @@ impl World {
             human: None,
             cup,
             last_cup: None,
+            cup_draw,
             cup_champion,
             transfers,
             board,

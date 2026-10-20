@@ -43,6 +43,10 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 | CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory (TPRINTLISTDLG, TCOACHMANAGERDLG, TCOACHOPTIONSDLG) | `dialogs/coach.rs` |
 | Halftime, ForcedSubstitution, Penalty, Shootout, CupDraw, EndOfSeason, RefereeAid, Invitation, Lashes | TSUBSTITUTIONDLG, TFORCEDSUBSTITUTIONDLG, TPENALTYDLG, TPENALTIESDLG, TSORTEIODLG, TENDOFSEASONDLG, TREFEREEAIDDLG | `dialogs/matchday.rs` |
 
+**Main window on a cup day**: `main_win::next_opponent` returns the club of the human's cup tie while `World::cup_day_due()` (division 4 = the
+outside pool; use `World::club_of`), and `main_win::view` writes `textOpponent` as ` NAME (nª Divisão|Distrital)` / `CASA|FORA TAÇA - <stage>` and an
+empty `ListBoxClassification`. The round button plays the cup day (`Classic::play_round` dispatches on `cup_day_due`).
+
 `dialogs::open_for_menu` / `open_for_button` map menu entries and main-window buttons to dialogs. The match day (round view, break, injuries, penalties, cup, end of season) is described in `docs/matchday.md`.
 
 ## Market dialogs (`dialogs/market.rs`)
