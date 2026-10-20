@@ -487,7 +487,11 @@ impl E98 {
             .collect();
         let mut out: [Vec<usize>; 4] = Default::default();
         for (k, (_, ids)) in self.divisions.iter().take(4).enumerate() {
-            let mut sorted: Vec<u16> = ids.iter().filter(|i| by_key.contains_key(i)).copied().collect();
+            let mut sorted: Vec<u16> = ids
+                .iter()
+                .filter(|i| by_key.contains_key(i))
+                .copied()
+                .collect();
             sorted.sort_unstable();
             out[k] = ids
                 .iter()

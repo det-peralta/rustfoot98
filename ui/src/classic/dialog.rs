@@ -271,7 +271,9 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
     let focusable = |h: &Hit, texts: &std::collections::BTreeMap<String, String>| {
         h.enabled
             && (h.class != "TRadioButton"
-                || texts.get(&format!("{}.checked", h.name)).is_some_and(|v| v == "1"))
+                || texts
+                    .get(&format!("{}.checked", h.name))
+                    .is_some_and(|v| v == "1"))
             && matches!(
                 h.class.as_str(),
                 "TBitBtn"

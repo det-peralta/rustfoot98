@@ -174,7 +174,14 @@ pub fn halftime(_c: &Classic, cup: bool, src: usize, side: usize, next: u16) -> 
 }
 
 /// The user's goalkeeper was sent off at `minute`: the dialog lets him bring another player on (`mode` 3).
-pub fn substitution(_c: &Classic, cup: bool, src: usize, minute: u16, side: usize, mode: u8) -> Dialog {
+pub fn substitution(
+    _c: &Classic,
+    cup: bool,
+    src: usize,
+    minute: u16,
+    side: usize,
+    mode: u8,
+) -> Dialog {
     squad_dialog(cup, src, side, minute, mode, minute)
 }
 
@@ -787,14 +794,13 @@ fn bind_invitation(_c: &Classic, d: &mut Dialog) {
 /// `from` is the club of the human who gets it (his coach's name is the dialog's).
 pub fn invitation(c: &Classic, from: &str, team: &str) -> Dialog {
     let mut d = Dialog::new(Kind::Invitation, "TINVITECOACHDLG");
-    let coach = c
-        .md
-        .session
-        .as_ref()
-        .and_then(|s| s.snapshot.humans().find(|h| h.club == from))
-        .map(|h| h.coach.clone())
-        .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| c.coach.clone());
+    let coach =
+        c.md.session
+            .as_ref()
+            .and_then(|s| s.snapshot.humans().find(|h| h.club == from))
+            .map(|h| h.coach.clone())
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| c.coach.clone());
     d.st.insert("coach".into(), coach);
     d.st.insert("from".into(), from.into());
     d.st.insert("team".into(), team.into());

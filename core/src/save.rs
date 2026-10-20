@@ -119,7 +119,11 @@ impl World {
                 ));
             }
             for player in sell_tried {
-                out.push_str(&format!("selltried|{}{}\n", clean(player), seat_suffix(seat)));
+                out.push_str(&format!(
+                    "selltried|{}{}\n",
+                    clean(player),
+                    seat_suffix(seat)
+                ));
             }
         }
         if let Some(c) = &self.cup_champion {
@@ -220,7 +224,8 @@ impl World {
         let mut active_seat = 0usize;
         type Lists = (Vec<Pending>, Vec<(String, String)>, Vec<String>);
         let mut lists: Vec<Lists> = vec![Default::default()];
-        let seat_of = |f: &[&str], at: usize| f.get(at).and_then(|x| x.parse::<usize>().ok()).unwrap_or(0);
+        let seat_of =
+            |f: &[&str], at: usize| f.get(at).and_then(|x| x.parse::<usize>().ok()).unwrap_or(0);
         let mut cup: Vec<String> = Vec::new();
         let mut cup_draw: Option<crate::world::CupDraw> = None;
         let mut cup_champion: Option<String> = None;
@@ -606,7 +611,11 @@ impl World {
                 w.pick_human();
             }
         }
-        w.switch_human(if active_seat < w.human_count() { active_seat } else { 0 });
+        w.switch_human(if active_seat < w.human_count() {
+            active_seat
+        } else {
+            0
+        });
         Ok(w)
     }
 }

@@ -557,8 +557,14 @@ impl Classic {
         let mut out: Vec<(usize, Dialog)> = Vec::new();
         for g in rv.shown().filter(|g| g.human) {
             for side in (0..2).filter(|&s| g.human_sides[s]) {
-                let seat = self.world.seat_of(&g.clubs[side].name).unwrap_or(usize::MAX);
-                out.push((seat, dialogs::matchday::halftime(self, rv.cup, g.src, side, next)));
+                let seat = self
+                    .world
+                    .seat_of(&g.clubs[side].name)
+                    .unwrap_or(usize::MAX);
+                out.push((
+                    seat,
+                    dialogs::matchday::halftime(self, rv.cup, g.src, side, next),
+                ));
             }
         }
         // (the humans in turn, in the order of the players)
@@ -926,7 +932,11 @@ mod tests {
         for _ in 0..24 {
             c.play_round();
             let seen = play_through(&mut c);
-            assert!(seen.contains(&Kind::Halftime) || c.world.cup_day_due() || seen.contains(&Kind::CupDraw));
+            assert!(
+                seen.contains(&Kind::Halftime)
+                    || c.world.cup_day_due()
+                    || seen.contains(&Kind::CupDraw)
+            );
             assert!(matches!(c.screen, Screen::Main));
             assert!(c.md.todo.is_empty());
         }
@@ -1079,9 +1089,10 @@ mod tests {
             let mut probe = w.clone();
             probe.accept_invitations = true;
             probe.play_round();
-            let invited = probe.human_moves().first().is_some_and(|(_, to)| {
-                probe.coach_changes.iter().any(|(sacked, _)| sacked == to)
-            });
+            let invited = probe
+                .human_moves()
+                .first()
+                .is_some_and(|(_, to)| probe.coach_changes.iter().any(|(sacked, _)| sacked == to));
             if !invited {
                 continue;
             }
@@ -1238,7 +1249,10 @@ mod tests {
                         || !c.world.humans_in_cup_tie().is_empty(),
                     "the main window came back for a cup day without a human tie"
                 );
-                if c.world.round % 2 == 0 && c.world.last_cup.is_some() && !c.world.cup_day_due() {
+                if c.world.round.is_multiple_of(2)
+                    && c.world.last_cup.is_some()
+                    && !c.world.cup_day_due()
+                {
                     shown += 1;
                 }
             }
@@ -1263,7 +1277,10 @@ mod tests {
             for k in 1..seats.len() {
                 let before = c.world.active_seat();
                 c.round_button();
-                assert!(c.md.session.is_none(), "turn {k}: the cup day is not played yet");
+                assert!(
+                    c.md.session.is_none(),
+                    "turn {k}: the cup day is not played yet"
+                );
                 assert!(seats.contains(&c.world.active_seat()));
                 assert_ne!(c.world.active_seat(), before);
             }

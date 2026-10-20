@@ -1071,7 +1071,12 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             super::printlist::draw_list(fb, cx, n, f, bg, x, y, w, h, rows);
             if n.name.starts_with("ListBoxDivision") {
                 // a flat list has a plain black outline over the rows' edges
-                for (rx, ry, rw, rh) in [(x, y, w, 1), (x, y + h - 1, w, 1), (x, y, 1, h), (x + w - 1, y, 1, h)] {
+                for (rx, ry, rw, rh) in [
+                    (x, y, w, 1),
+                    (x, y + h - 1, w, 1),
+                    (x, y, 1, h),
+                    (x + w - 1, y, 1, h),
+                ] {
                     fb.fill(rx, ry, rw, rh, BLACK);
                 }
             }
@@ -1462,7 +1467,11 @@ fn bitbtn_glyph_left(
             for c in 0..gw {
                 let p = b.px[(r * b.w + c + gi) as usize];
                 if p != key {
-                    fb.set(gx + c, gy + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
+                    fb.set(
+                        gx + c,
+                        gy + r,
+                        Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
+                    );
                 }
             }
         }

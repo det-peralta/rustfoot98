@@ -147,7 +147,10 @@ fn options_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     match name {
         // the arrow keys on the focused tab strip changed `TabbedNotebook1.page`
         "TabbedNotebook1" => {
-            let page = d.texts.get("TabbedNotebook1.page").and_then(|v| v.parse::<i64>().ok());
+            let page = d
+                .texts
+                .get("TabbedNotebook1.page")
+                .and_then(|v| v.parse::<i64>().ok());
             d.set_num("page", page.unwrap_or(0).clamp(0, 1));
             d.st.remove("open");
             return Outcome::Keep;
@@ -347,7 +350,6 @@ mod tests {
         assert!(lines.len() > 1);
         assert!(cw <= 400 + 16);
     }
-
 
     #[test]
     fn working_options_round_trip() {

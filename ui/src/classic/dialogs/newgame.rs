@@ -117,7 +117,10 @@ fn typed_names(d: &Dialog) -> Vec<String> {
 fn players_bind(c: &Classic, d: &mut Dialog) {
     let drawn = d.st.contains_key("drawn");
     for i in 1..=6 {
-        d.text(format!("playerName{i}.enabled"), if drawn { "0" } else { "1" });
+        d.text(
+            format!("playerName{i}.enabled"),
+            if drawn { "0" } else { "1" },
+        );
     }
     if drawn {
         d.text("Button1", "OK");
@@ -334,16 +337,28 @@ mod tests {
         for (i, n) in [(1, "Ana"), (2, ""), (3, " Rui "), (4, "Zé")] {
             d.texts.insert(format!("playerName{i}"), n.into());
         }
-        assert!(matches!(players_click(&mut c, &mut d, "Button1"), Outcome::Keep));
+        assert!(matches!(
+            players_click(&mut c, &mut d, "Button1"),
+            Outcome::Keep
+        ));
         assert_eq!(c.world.human_count(), 3, "the empty name gets no club");
         let mut bound = open_players();
         bound.st.insert("drawn".into(), "1".into());
         bind(&c, &mut bound);
         assert!((1..=3).all(|k| bound.texts.contains_key(&format!("playerTeam{k}"))));
         assert!(!bound.texts.contains_key("playerTeam4"));
-        assert!(matches!(players_click(&mut c, &mut d, "Button1"), Outcome::Close));
+        assert!(matches!(
+            players_click(&mut c, &mut d, "Button1"),
+            Outcome::Close
+        ));
         assert_eq!((c.coach.as_str(), c.world.active_seat()), ("Ana", 0));
-        assert_eq!(c.world.humans().map(|h| h.coach.clone()).collect::<Vec<_>>(), ["Ana", "Rui", "Zé"]);
+        assert_eq!(
+            c.world
+                .humans()
+                .map(|h| h.coach.clone())
+                .collect::<Vec<_>>(),
+            ["Ana", "Rui", "Zé"]
+        );
     }
 
     #[test]

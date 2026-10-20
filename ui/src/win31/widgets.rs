@@ -542,12 +542,19 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
     if cols > 1 {
         // `Columns`: the rows run down a column and on to the next; no scroll bar while the columns fit
         let cw = (w - 2) / cols;
-        let sel = get_num(cx, n, "sel").filter(|&v| v >= 0).map(|v| v as usize);
+        let sel = get_num(cx, n, "sel")
+            .filter(|&v| v >= 0)
+            .map(|v| v as usize);
         let old = fb.clip;
-        fb.clip = ((x + 1).max(old.0), (y + inset).max(old.1), (x + w - 1).min(old.2), (y + h - 1).min(old.3));
+        fb.clip = (
+            (x + 1).max(old.0),
+            (y + inset).max(old.1),
+            (x + w - 1).min(old.2),
+            (y + h - 1).min(old.3),
+        );
         for (i, item) in items.iter().enumerate() {
             let (col, row) = ((i / fit) as i32, (i % fit) as i32);
-            if col >= cols + 1 {
+            if col > cols {
                 break;
             }
             let (cx0, ry) = (x + col * cw, y + inset + row * ih);
@@ -558,7 +565,15 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
                 f.color
             };
             row_cells(fb, cx, n, f, cx0, ry, ih, item, fg, false);
-            push_hit(cx, format!("{}#{i}", n.name), "ListRow", cx0 + 1, ry, cw, ih);
+            push_hit(
+                cx,
+                format!("{}#{i}", n.name),
+                "ListRow",
+                cx0 + 1,
+                ry,
+                cw,
+                ih,
+            );
         }
         fb.clip = old;
         return;
@@ -882,7 +897,15 @@ pub(super) fn tabbed_notebook(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: 
         .min(pages.len() - 1);
     let cur = pages[page];
     // the strip as a whole takes the focus (Tab) and the arrow keys change the page
-    push_hit(cx, n.name.clone(), "TTabbedNotebook", x, y, w, cur.int("Top", 29) - 3);
+    push_hit(
+        cx,
+        n.name.clone(),
+        "TTabbedNotebook",
+        x,
+        y,
+        w,
+        cur.int("Top", 29) - 3,
+    );
     let frame_top = cur.int("Top", 29) - 3;
     // page frame: black outline, white and grey bevel
     let (fl, fr, fb_) = (x + 2, x + w - 3, y + h - 3);

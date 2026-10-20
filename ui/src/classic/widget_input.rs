@@ -269,7 +269,11 @@ pub fn key(c: &Classic, d: &mut Dialog, key: Key) -> Option<KeyAct> {
             let list = items(c, d, &name);
             let n = list.len();
             let cur = get_i(d, &name, "sel").unwrap_or(-1);
-            let lower = |s: &str| s.chars().next().is_some_and(|f| f.to_lowercase().eq(ch.to_lowercase()));
+            let lower = |s: &str| {
+                s.chars()
+                    .next()
+                    .is_some_and(|f| f.to_lowercase().eq(ch.to_lowercase()))
+            };
             let found = (1..=n)
                 .map(|k| ((cur + k as i32).rem_euclid(n.max(1) as i32)) as usize)
                 .find(|&i| list.get(i).is_some_and(|s| lower(s)));

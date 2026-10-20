@@ -222,7 +222,17 @@ pub fn draw_list(
     fb.clip = old;
     if bar {
         // the same scroll bar as every other list (`widgets::vscroll`, measured on the original)
-        super::widgets::vscroll(fb, cx, &n.name, cx0 + cw - BAR, cy0, ch, top, rows.len(), visible);
+        super::widgets::vscroll(
+            fb,
+            cx,
+            &n.name,
+            cx0 + cw - BAR,
+            cy0,
+            ch,
+            top,
+            rows.len(),
+            visible,
+        );
     }
 }
 

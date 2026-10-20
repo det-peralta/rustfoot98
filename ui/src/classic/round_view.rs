@@ -192,7 +192,10 @@ impl RoundView {
                     ),
                 }
             };
-            let human_sides = [humans.contains(&(*d, m.home)), humans.contains(&(*d, m.away))];
+            let human_sides = [
+                humans.contains(&(*d, m.home)),
+                humans.contains(&(*d, m.away)),
+            ];
             v.divisions[*d].push(Game {
                 attendance: m.attendance,
                 clubs: [club(m.home), club(m.away)],

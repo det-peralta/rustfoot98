@@ -835,7 +835,9 @@ impl World {
 
     /// Where the clubs of all humans are (seat order, those outside the divisions left out).
     pub fn human_locations(&self) -> Vec<(usize, usize)> {
-        self.humans().filter_map(|h| self.locate_in_divisions(&h.club)).collect()
+        self.humans()
+            .filter_map(|h| self.locate_in_divisions(&h.club))
+            .collect()
     }
 
     fn locate_in_divisions(&self, name: &str) -> Option<(usize, usize)> {
@@ -984,7 +986,13 @@ impl World {
     }
 
     /// Whether the human whose club is at `h` can take part in the auction of `slot_idx` of the club at `seller`.
-    fn may_bid_for(&self, h: (usize, usize), seller: (usize, usize), slot_idx: usize, ask: i64) -> bool {
+    fn may_bid_for(
+        &self,
+        h: (usize, usize),
+        seller: (usize, usize),
+        slot_idx: usize,
+        ask: i64,
+    ) -> bool {
         let c = self.club_ref(h);
         h != seller
             && self.history.options.auction != 2 // the coach profile: no buying in auctions
@@ -1625,13 +1633,10 @@ impl World {
                 }
             }
         }
-        let Some(&pick) = v
-            .iter()
-            .find(|&&k| {
-                !is_human(&cands[k].1)
-                    || (self.accept_invitations && !declined.contains(&cands[k].1.name))
-            })
-        else {
+        let Some(&pick) = v.iter().find(|&&k| {
+            !is_human(&cands[k].1)
+                || (self.accept_invitations && !declined.contains(&cands[k].1.name))
+        }) else {
             return;
         };
         let (ploc, p) = cands[pick].clone();
@@ -1787,9 +1792,8 @@ impl World {
         };
         (0..self.human_count())
             .filter(|&s| {
-                self.human_at(s).is_some_and(|h| {
-                    draw.pairs.iter().any(|(a, b)| *a == h.club || *b == h.club)
-                })
+                self.human_at(s)
+                    .is_some_and(|h| draw.pairs.iter().any(|(a, b)| *a == h.club || *b == h.club))
             })
             .collect()
     }
@@ -3323,7 +3327,11 @@ mod tests {
         let me = w.human.as_ref().unwrap().club.clone();
         match w.human_cup_tie() {
             Some(t) => {
-                let pair = draw.pairs.iter().find(|(h, a)| *h == me || *a == me).unwrap();
+                let pair = draw
+                    .pairs
+                    .iter()
+                    .find(|(h, a)| *h == me || *a == me)
+                    .unwrap();
                 assert_eq!(t.home, pair.0 == me);
                 assert_eq!(t.opponent, if t.home { &pair.1 } else { &pair.0 }.clone());
                 assert_eq!(t.stage, draw.name);
@@ -3368,10 +3376,12 @@ mod tests {
         other.set_formation(f);
         w.play_cup_day_ctl(&mut Control::default());
         other.play_cup_day_ctl(&mut Control::default());
-        if w.last_cup.as_ref().is_some_and(|c| c.matches.iter().any(|m| {
-            let me = &w.human.as_ref().unwrap().club;
-            m.home == *me || m.away == *me
-        })) {
+        if w.last_cup.as_ref().is_some_and(|c| {
+            c.matches.iter().any(|m| {
+                let me = &w.human.as_ref().unwrap().club;
+                m.home == *me || m.away == *me
+            })
+        }) {
             // the human's tie does not look the same with another formation
             assert_ne!(
                 format!("{:?}", w.last_cup.as_ref().unwrap().matches),
@@ -3821,11 +3831,10 @@ mod tests {
         let forms: Vec<usize> = (0..2)
             .map(|seat| {
                 w.switch_human(seat);
-                let f = (0..FORMATIONS.len())
+                (0..FORMATIONS.len())
                     .rev()
                     .find(|&f| w.set_formation(f))
-                    .unwrap();
-                f
+                    .unwrap()
             })
             .collect();
         let plans: Vec<Plan> = w.humans().map(|h| h.plan.clone()).collect();
@@ -3853,11 +3862,29 @@ mod tests {
         let mut w = hot_seat_world(2);
         let mut ctl = Control::default();
         ctl.league = vec![
-                ("A".into(), crate::matchsim::Decision::NoSubstitution { side: crate::matchsim::Side::Home, minute: 10 }),
-                ("B".into(), crate::matchsim::Decision::NoSubstitution { side: crate::matchsim::Side::Away, minute: 20 }),
-            ];
+            (
+                "A".into(),
+                crate::matchsim::Decision::NoSubstitution {
+                    side: crate::matchsim::Side::Home,
+                    minute: 10,
+                },
+            ),
+            (
+                "B".into(),
+                crate::matchsim::Decision::NoSubstitution {
+                    side: crate::matchsim::Side::Away,
+                    minute: 20,
+                },
+            ),
+        ];
         assert_eq!(ctl.decisions(false, "A").len(), 1);
-        assert_eq!(ctl.decisions(false, "B")[0], crate::matchsim::Decision::NoSubstitution { side: crate::matchsim::Side::Away, minute: 20 });
+        assert_eq!(
+            ctl.decisions(false, "B")[0],
+            crate::matchsim::Decision::NoSubstitution {
+                side: crate::matchsim::Side::Away,
+                minute: 20
+            }
+        );
         assert!(ctl.decisions(true, "A").is_empty());
         w.play_round();
     }
@@ -3919,15 +3946,24 @@ mod tests {
         w.observed.push(("CLUBX".into(), "Zed".into()));
         w.switch_human(2);
         w.sell_tried.push("Quim".into());
-        w.pending.push(Pending { seller: "S".into(), player: "P".into() });
+        w.pending.push(Pending {
+            seller: "S".into(),
+            player: "P".into(),
+        });
         w.set_formation(3);
         let text = w.save();
         let back = World::load(&text).unwrap();
         assert_eq!(back.human_clubs(), w.human_clubs());
         assert_eq!(back.active_seat(), 2);
         for seat in 0..3 {
-            assert_eq!(back.human_at(seat).unwrap().coach, format!("joga{}", seat + 1));
-            assert_eq!(back.human_at(seat).unwrap().plan, w.human_at(seat).unwrap().plan);
+            assert_eq!(
+                back.human_at(seat).unwrap().coach,
+                format!("joga{}", seat + 1)
+            );
+            assert_eq!(
+                back.human_at(seat).unwrap().plan,
+                w.human_at(seat).unwrap().plan
+            );
             assert_eq!(back.seat_lists(seat), w.seat_lists(seat));
         }
         assert_eq!(back.save(), text);
@@ -3947,7 +3983,10 @@ mod tests {
             .join("\n");
         let loaded = World::load(&old).unwrap();
         assert_eq!(loaded.human_count(), 1);
-        assert_eq!(loaded.human.as_ref().unwrap().club, one.human.as_ref().unwrap().club);
+        assert_eq!(
+            loaded.human.as_ref().unwrap().club,
+            one.human.as_ref().unwrap().club
+        );
         assert_eq!(loaded.human.as_ref().unwrap().coach, "");
     }
 
@@ -3956,7 +3995,9 @@ mod tests {
         let mut w = hot_seat_world(2);
         let clubs = w.human_clubs();
         // the second human is invited to a club of the 3rd division
-        w.seats.moves.push((clubs[1].clone(), w.divisions[2][0].name.clone()));
+        w.seats
+            .moves
+            .push((clubs[1].clone(), w.divisions[2][0].name.clone()));
         w.apply_human_move();
         assert_eq!(w.human_at(1).unwrap().club, w.divisions[2][0].name);
         assert_eq!(w.human_at(1).unwrap().coach, "joga2");

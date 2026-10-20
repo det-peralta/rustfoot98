@@ -188,11 +188,7 @@ pub fn calendar(w: &World, club: &str) -> Spec {
 /// `1010:cbd3`: the champions of past seasons, the coach of the user in bold.
 pub fn winners(w: &World) -> Spec {
     let coach = |name: &str| {
-        let m = if w.is_human_coach(name) {
-            "\u{2}"
-        } else {
-            ""
-        };
+        let m = if w.is_human_coach(name) { "\u{2}" } else { "" };
         field(m, 0x82, if name.is_empty() { " " } else { name })
     };
     let team = |name: &str| field("\u{4}", 0x78, if name.is_empty() { " " } else { name });
