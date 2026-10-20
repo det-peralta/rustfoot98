@@ -1205,6 +1205,9 @@ pub(super) fn paintbox(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
     glyph(fb, px + 37, py + 24, &CIRCLE, WHITE);
 }
 
+/// The left cut line of the stands ends this many pixels further out than the right one (measured on the original's picture).
+const LEFT_TIP: f64 = 1.7;
+
 /// Reach of the 2-pixel outline of the stadium picture from the geometric outline.
 const PEN: f64 = 1.1;
 
@@ -1252,7 +1255,7 @@ fn ellipse_part(
                     let t = ((dx * vx + dy * vy) / len2).clamp(0.0, 1.0);
                     ((dx - t * vx).powi(2) + (dy - t * vy).powi(2)).sqrt()
                 };
-                d = d.min(seg(ex)).min(seg(-ex));
+                d = d.min(seg(ex)).min(seg(-ex - LEFT_TIP));
                 // the arc counts only where it is part of the outline
                 if !in_sector && d_arc < 1.0 && theta - phi > 0.0 && d > d_arc {
                     d = f64::MAX.min(d);

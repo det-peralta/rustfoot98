@@ -5,8 +5,7 @@ use crate::classic::main_win::human_club;
 use crate::classic::options::{self, Options};
 use crate::classic::{text, Classic, Key};
 use crate::win31::draw::wrap;
-use crate::win31::fb::{Fb, Rgb, BLACK, GRAY, GREEN, WHITE, YELLOW};
-use crate::win31::Skin;
+use crate::win31::fb::{Rgb, WHITE};
 use rustfoot_core::finance;
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -203,6 +202,7 @@ fn stadium_bind(c: &Classic, d: &mut Dialog) {
     };
     let f = &club.fin;
     d.set_num("level", f.stadium as i64);
+    d.text("PaintBoxStadium.level", f.stadium.to_string());
     d.text("textCapacity", format!("{} lugares", f.capacity()));
     let cost = finance::expansion_cost(f, c.world.economy, c.world.scale);
     d.text(
@@ -235,85 +235,6 @@ fn stadium_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         },
         _ => Outcome::Keep,
     }
-}
-
-/// A filled rectangle with an outline of `w` pixels.
-fn rect(fb: &mut Fb, (x, y, wd, ht): (i32, i32, i32, i32), fill: Rgb, line: Rgb, w: i32) {
-    fb.fill(x, y, wd, ht, line);
-    fb.fill(x + w, y + w, wd - 2 * w, ht - 2 * w, fill);
-}
-
-fn circle(fb: &mut Fb, cx: i32, cy: i32, r: i32, c: Rgb) {
-    let (mut x, mut y, mut e) = (r, 0, 1 - r);
-    while x >= y {
-        for (dx, dy) in [
-            (x, y),
-            (y, x),
-            (-y, x),
-            (-x, y),
-            (-x, -y),
-            (-y, -x),
-            (y, -x),
-            (x, -y),
-        ] {
-            fb.set(cx + dx, cy + dy, c);
-        }
-        y += 1;
-        if e < 0 {
-            e += 2 * y + 1;
-        } else {
-            x -= 1;
-            e += 2 * (y - x) + 1;
-        }
-    }
-}
-
-/// The rings of stands around the pitch for a stadium of `level` (1..=24): three tiers of 6, 8 and 10 steps (`PaintBoxStadiumPaint`
-/// draws `level`, `level - 6` and `level - 14` steps of a ring, the outer ones only once the inner are complete). Returns the number
-/// of steps of each tier, inner first.
-pub fn tiers(level: i64) -> [i64; 3] {
-    [
-        level.clamp(0, 6),
-        (level - 6).clamp(0, 8),
-        (level - 14).clamp(0, 10),
-    ]
-}
-
-/// Paints the `TPaintBox` of the stadium form: yellow-outlined grey stands growing with the level around the green pitch with its white
-/// markings.
-pub fn paint_stadium(d: &Dialog, fb: &mut Fb, _skin: &Skin, ox: i32, oy: i32) {
-    let (bx, by, bw, bh) = (ox + 71, oy + 8, 332, 241);
-    let level = d.num("level");
-    let (px, py, pw, ph) = (bx + bw / 2 - 70, by + bh / 2 - 40, 140, 80);
-    let light = Rgb(255, 255, 128);
-    let t = tiers(level);
-    // each step adds 3 pixels at the sides and 2 above and below; the tiers stack outwards
-    let grow = |steps: i64| ((steps * 3) as i32, (steps * 2) as i32);
-    let tier_steps = [t[0], 6 + t[1], 14 + t[2]];
-    for k in (0..3).rev() {
-        if t[k] == 0 {
-            continue;
-        }
-        let (gx, gy) = grow(tier_steps[k]);
-        rect(
-            fb,
-            (px - gx, py - gy, pw + 2 * gx, ph + 2 * gy),
-            GRAY,
-            light,
-            2,
-        );
-    }
-    rect(fb, (px, py, pw, ph), GREEN, light, 2);
-    // markings
-    let (lx, ly) = (px + 6, py + 6);
-    rect(fb, (lx, ly, pw - 12, ph - 12), GREEN, WHITE, 1);
-    fb.fill(px + pw / 2, ly, 1, ph - 12, WHITE);
-    circle(fb, px + pw / 2, py + ph / 2, 10, WHITE);
-    for side in [0, 1] {
-        let x = if side == 0 { lx } else { px + pw - 6 - 16 };
-        rect(fb, (x, py + ph / 2 - 18, 17, 36), GREEN, WHITE, 1);
-    }
-    let _ = (BLACK, YELLOW);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -419,14 +340,6 @@ mod tests {
         assert!(cw <= 400 + 16);
     }
 
-    #[test]
-    fn stadium_tiers_fill_inner_first() {
-        assert_eq!(tiers(1), [1, 0, 0]);
-        assert_eq!(tiers(6), [6, 0, 0]);
-        assert_eq!(tiers(7), [6, 1, 0]);
-        assert_eq!(tiers(15), [6, 8, 1]);
-        assert_eq!(tiers(24), [6, 8, 10]);
-    }
 
     #[test]
     fn working_options_round_trip() {

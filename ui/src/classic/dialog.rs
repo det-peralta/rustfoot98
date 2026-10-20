@@ -162,7 +162,6 @@ impl Dialog {
         let old_clip = fb.clip;
         let (iw, ih) = if thick { (cw - 4, ch - 4) } else { (cw, ch) };
         fb.clip = (fx, fy, fx + iw, fy + ih);
-        dialogs::paint_under(self, fb, skin, ox, oy);
         controls(fb, &cx, form);
         fb.clip = old_clip;
         self.hits = hits.into_inner();
