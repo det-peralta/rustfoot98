@@ -1080,6 +1080,8 @@ fn click_invitation(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
 
 /// The round view is over (league part): queue what the original shows next, in its order.
 pub fn end_of_round(c: &mut Classic) {
+    // the squad list shows no line-up marks until the user chooses a formation for the next round
+    c.main.lineup_shown = false;
     let Some(sess) = c.md.session.as_ref() else {
         c.md.todo.push_back(Step::Main);
         return;
