@@ -54,6 +54,30 @@ hits Cancel). The saved game `ABCDEEEE` (a 2-round Brazil/Belgium league) lets "
 * **Buttons**: the caption's odd pixel goes left (MS Sans Serif: right); thin-framed buttons raise captions of regular raster fonts by one pixel; the default button is the `Default`/`bkOK` button unless another button has the focus.
 * **Stadium picture** (`PaintBoxStadiumPaint`, `1030:2cee`): up to three rings of stands (grey, 2-pixel light yellow outline, `Pie` wedges around the top covering `n/6`, `n/8`, `n/10` of the circle for levels 1..6, 7..14, 15..24; a full ring is an `Ellipse`) drawn first, then the pitch ellipse (green, same outline) with white lines. Ring and pitch geometry is fitted to a level-2 capture.
 
+## Measured against the original's own dialogs (information dialogs, October 2026)
+Captures of the original (the saved game ABCDEEEE = `original/saves/snap2.e98`) opened through its menus and compared with `classic_shot` renders
+(`tools/ui/regions.py`): standings, scorers, all-time scorers, calendar, transfers, coach history, ranking, options (both tabs), coach profile and
+stadium now differ only by the mouse cursor and the state that cannot be reproduced (referee names, the second human's bold row).
+* **Windows below a dialog** have the inactive caption: silver bar (and silver thick frame) with black lettering (`win31::draw::INACTIVE`).
+* **Thick frame sizes**: a `bsDialog` form is drawn `ClientWidth + 4` x `ClientHeight + 4` (the frame hides four pixels); a form the program resizes
+  itself passes `@client` in real units: the standings window is 592x375 (the DFM size, no +4), the list dialogs' `@client` is the computed size + 4
+  and the form is `client + 29` high when it is stretched to the 600-pixel screen (`tables::layout`).
+* **Flat list boxes** (`Ctl3D = False`, the four division lists of the standings): a plain black outline over the rows' edges, no focus rectangle.
+* **Club colours in tables**: row background = the club's second colour, lettering = the first (as in the round view).
+* **Ties** in the standings keep the order of the last sort (`World::tie_order`, loaded from the save's own division lists); scorers equal in goals
+  and strength come out in the reverse of the master-list order.
+* **`TBitBtn` with the default `Layout = blGlyphLeft`** (the OK button of the list dialogs): glyph and caption side by side, `CalcButtonLayout` inside
+  the client rectangle `(x + 2, y + 2, w - 5, h - 5)` (`bitbtn_glyph_left`); the other buttons of the game have `blGlyphTop`.
+* **Scroll bars** of every list use `widgets::vscroll` (solid silver track, arrow glyphs with a stem, black separator lines); the list dialogs had a
+  dithered copy until measured.
+* **Multi-column list boxes** (`Columns`): rows run down a column then on to the next, the selection bar is one column wide, no scroll bar.
+* **Notebook focus**: the tab strip is a tab stop (Tab follows the `TabOrder` of the form, among the children of each container) and the arrow
+  keys change the page; the options dialog has two tabs (the *Controle* page is for registered copies).
+* **New-game dialog**: no radio button is chosen until the user clicks a radio, the file-name field or a saved game; radio buttons are tab stops
+  only while chosen (so Tab goes edit -> list -> Cancel); typing a letter in the list selects the next game starting with it.
+* **Squad list marks** (the `+` / `-` of starters and substitutes at the left of the rows) appear only after the user chooses a formation for the
+  next round (F-keys or the *Seleccionar* menu) and disappear again when the round is played.
+
 ## Frames captured so far (analysis/shots, local)
 `guest1` About (done), `guest3` new-game dialog (done), `guest11/13` the same with a saved game listed and selected, `guest14` the "A carregar o jogo..."
 gauge dialog (`TProgressDlg`, `TGauge`: filled part black, rest white, percentage text inverted), `guest15` the **main screen** (`TPrepareGameDlg`, 632x434, black
