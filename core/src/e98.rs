@@ -726,15 +726,35 @@ impl World {
         w.transfers = transfers_of(save, &club_names);
         w.refresh_cash_ref();
         w.tie_order = save.division_order().into_iter().collect();
-        let human = divs.iter().enumerate().find_map(|(d, idx)| {
-            idx.iter()
-                .position(|&i| save.teams[i].id == save.human_id)
-                .map(|p| (d, p))
-        });
-        match human {
-            Some((d, p)) => w.set_human(d, p),
-            None => w.set_human(3, 7),
+        // the human coaches in the order of the save's coach list are the seats of the hot seat; `human_id` is the active one
+        let at = |id: u16| {
+            divs.iter().enumerate().find_map(|(d, idx)| {
+                idx.iter()
+                    .position(|&i| save.teams[i].id == id)
+                    .map(|p| (d, p))
+            })
+        };
+        let mut seats: Vec<((usize, usize), String, bool)> = Vec::new();
+        for k in save.coaches.iter().filter(|k| k.human) {
+            if let Some(t) = save.teams.iter().find(|t| t.coach == k.id) {
+                if let Some(loc) = at(t.id) {
+                    seats.push((loc, k.name.clone(), t.id == save.human_id));
+                }
+            }
         }
+        if seats.is_empty() {
+            // no human coach decoded: the user's club by `human_id`, or the start rule's default
+            let (d, p) = at(save.human_id).unwrap_or((3, 7));
+            seats.push(((d, p), String::new(), true));
+        }
+        let mut active = 0;
+        for (k, ((d, p), name, is_active)) in seats.iter().enumerate() {
+            w.add_human(*d, *p, name);
+            if *is_active {
+                active = k;
+            }
+        }
+        w.switch_human(active);
         Ok(w)
     }
 }
@@ -796,6 +816,12 @@ mod tests {
                         .count(),
                     50 // 54 coaches, four names are shared by two coaches
                 );
+                // both humans of the save sit at the table; `human_id` is the active one
+                assert_eq!(w.human_count(), 2);
+                let active = save.teams.iter().find(|t| t.id == save.human_id).unwrap();
+                assert_eq!(w.human.as_ref().unwrap().club, active.short_name.trim());
+                let coaches: Vec<String> = w.humans().map(|h| h.coach.clone()).collect();
+                assert!(coaches.iter().all(|c| !c.is_empty()), "{coaches:?}");
                 let me = &w.human.as_ref().unwrap().club;
                 let cal = w.calendar(me);
                 assert_eq!(cal.len(), 14);
