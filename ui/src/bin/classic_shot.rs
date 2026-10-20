@@ -80,17 +80,26 @@ fn main() -> Result<(), String> {
             "ev" => {
                 // a script of events: `click:x,y`, `move:x,y`, `key:F5|Enter|a`, `tick:ms`, separated by `;`
                 app.draw();
-                // `season:N` stands for N rounds of (F5, behave like a user until the main window is back)
+                // `season:N[:Kind]` stands for N rounds of (F5, behave like a user until the main window is back), the whole script
+                // stopping when a dialog of that kind opens
                 let steps: Vec<String> = v
                     .split(';')
                     .flat_map(|s| match s.strip_prefix("season:") {
-                        Some(n) => (0..n.parse::<usize>().unwrap_or(0))
-                            .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string(), "auto:3000000".to_string()])
-                            .collect(),
+                        Some(n) => {
+                            let (count, stop) = n.split_once(':').unwrap_or((n, ""));
+                            let auto = if stop.is_empty() {
+                                "auto:3000000".to_string()
+                            } else {
+                                format!("auto:{stop}@3000000")
+                            };
+                            (0..count.parse::<usize>().unwrap_or(0))
+                                .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string(), auto.clone()])
+                                .collect()
+                        }
                         None => vec![s.to_string()],
                     })
                     .collect();
-                for step in steps.iter().map(|s| s.as_str()) {
+                'steps: for step in steps.iter().map(|s| s.as_str()) {
                     let (kind, arg) = step.split_once(':').unwrap_or((step, ""));
                     let xy = || {
                         let (a, b) = arg.split_once(',').unwrap_or(("0", "0"));
@@ -147,6 +156,7 @@ fn main() -> Result<(), String> {
                                 None => ("", arg),
                             };
                             let mut seen = String::new();
+                            let mut hit = false;
                             for _ in 0..ms.parse::<u32>().unwrap_or(0) / 20 {
                                 if !app.dialogs.is_empty() {
                                     app.frame(); // the hits of the dialog
@@ -182,6 +192,7 @@ fn main() -> Result<(), String> {
                                         || (stop == "Cup"
                                             && matches!(&app.screen, rustfoot_ui::classic::Screen::Round(r) if r.cup && r.minute > 3)))
                                 {
+                                    hit = true;
                                     break;
                                 }
                                 let act = app.dialogs.last().map(|d| {
@@ -257,6 +268,10 @@ fn main() -> Result<(), String> {
                                 {
                                     break;
                                 }
+                            }
+                            if hit {
+                                app.frame();
+                                break 'steps;
                             }
                         }
                         "idle" => {
