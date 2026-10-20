@@ -856,6 +856,8 @@ pub(super) fn tabbed_notebook(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: 
         .max(0) as usize)
         .min(pages.len() - 1);
     let cur = pages[page];
+    // the strip as a whole takes the focus (Tab) and the arrow keys change the page
+    push_hit(cx, n.name.clone(), "TTabbedNotebook", x, y, w, cur.int("Top", 29) - 3);
     let frame_top = cur.int("Top", 29) - 3;
     // page frame: black outline, white and grey bevel
     let (fl, fr, fb_) = (x + 2, x + w - 3, y + h - 3);

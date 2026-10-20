@@ -119,9 +119,10 @@ fn options_bind(c: &Classic, d: &mut Dialog) {
     if !d.st.contains_key("init") {
         d.st.insert("init".into(), "1".into());
         load_working(&c.opts, d);
+        d.focus = "TabbedNotebook1".into(); // the tab strip has the focus first (`ActiveControl`)
     }
     // the "Controle" page belongs to the registered versions (`1028:2e0c` removes it): only two tabs
-    d.text("TabbedNotebook1.tabs", "Geral|Jogo");
+    d.text("TabbedNotebook1.tabcount", "2");
     d.text("TabbedNotebook1.page", d.num("page").to_string());
     let open = d.st.get("open").cloned().unwrap_or_default();
     for (name, key, items) in combos() {
@@ -144,6 +145,13 @@ fn options_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
         return Outcome::Keep;
     }
     match name {
+        // the arrow keys on the focused tab strip changed `TabbedNotebook1.page`
+        "TabbedNotebook1" => {
+            let page = d.texts.get("TabbedNotebook1.page").and_then(|v| v.parse::<i64>().ok());
+            d.set_num("page", page.unwrap_or(0).clamp(0, 1));
+            d.st.remove("open");
+            return Outcome::Keep;
+        }
         "OKBtn" => {
             c.opts = working_options(d);
             return Outcome::Close;

@@ -234,6 +234,26 @@ pub fn cancel_button(c: &Classic, d: &Dialog) -> Option<String> {
     c.forms.get(&d.form).and_then(|f| find_button(f, false))
 }
 
+/// The `TabOrder` of a control and of its containers, from the form down (controls the form does not know sort last).
+fn tab_path(form: &Node, name: &str) -> Vec<i32> {
+    fn walk(n: &Node, name: &str, path: &mut Vec<i32>) -> bool {
+        for (i, c) in n.children.iter().enumerate() {
+            path.push(c.int("TabOrder", 1000 + i as i32));
+            if c.name == name || walk(c, name, path) {
+                return true;
+            }
+            path.pop();
+        }
+        false
+    }
+    let mut path = Vec::new();
+    if walk(form, name, &mut path) {
+        path
+    } else {
+        vec![i32::MAX]
+    }
+}
+
 /// What the generic key handling of a dialog turned a key into.
 pub enum KeyAct {
     /// Press the named control.
@@ -294,7 +314,12 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
             None => KeyAct::None,
         },
         Key::Tab | Key::BackTab => {
-            let names: Vec<&Hit> = d.hits.iter().filter(|h| focusable(h, &d.texts)).collect();
+            let mut names: Vec<&Hit> = d.hits.iter().filter(|h| focusable(h, &d.texts)).collect();
+            // Tab follows the `TabOrder` of the form (among the children of each container), then the drawing order
+            if let Some(form) = c.forms.get(&d.form) {
+                names.sort_by_cached_key(|h| tab_path(form, &h.name));
+            }
+            names.dedup_by(|a, b| a.name == b.name);
             if names.is_empty() {
                 return KeyAct::Done;
             }
