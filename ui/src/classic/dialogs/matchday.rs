@@ -121,12 +121,17 @@ fn rows(info: &Info, side: usize, order: &[usize]) -> Vec<String> {
         .collect()
 }
 
-/// The side of the user in a game of the session, when he plays in it.
-fn human_side(c: &Classic, cup: bool, src: usize) -> Option<usize> {
-    let sess = c.md.session.as_ref()?;
-    let me = sess.snapshot.human.as_ref()?.club.as_str();
-    let info = info(&c.world, cup, src)?;
-    info.clubs.iter().position(|n| n == me)
+/// Which sides of a game of the session are humans' clubs (both when two humans play each other).
+fn human_sides(c: &Classic, cup: bool, src: usize) -> [bool; 2] {
+    let (Some(sess), Some(info)) = (c.md.session.as_ref(), info(&c.world, cup, src)) else {
+        return [false; 2];
+    };
+    [0, 1].map(|s| sess.snapshot.is_human_club(&info.clubs[s]))
+}
+
+/// Whether `side` of a game of the session is a human's club.
+fn is_human_side(c: &Classic, cup: bool, src: usize, side: usize) -> bool {
+    human_sides(c, cup, src)[side.min(1)]
 }
 
 fn goals(info: &Info, minute: u16) -> [i32; 2] {
@@ -169,8 +174,7 @@ pub fn halftime(_c: &Classic, cup: bool, src: usize, side: usize, next: u16) -> 
 }
 
 /// The user's goalkeeper was sent off at `minute`: the dialog lets him bring another player on (`mode` 3).
-pub fn substitution(c: &Classic, cup: bool, src: usize, minute: u16, mode: u8) -> Dialog {
-    let side = human_side(c, cup, src).unwrap_or(0);
+pub fn substitution(_c: &Classic, cup: bool, src: usize, minute: u16, side: usize, mode: u8) -> Dialog {
     squad_dialog(cup, src, side, minute, mode, minute)
 }
 
@@ -259,9 +263,8 @@ fn referee_of(c: &Classic, cup: bool, info: &Info) -> String {
     };
     if !cup {
         if let Some(s) = c.md.session.as_ref() {
-            let me = s.snapshot.human.as_ref().map(|h| h.club.as_str());
-            if me.is_some_and(|m| info.clubs.iter().any(|n| n == m)) {
-                return s.referee.clone();
+            if let Some(r) = info.clubs.iter().find_map(|n| s.referees.get(n)) {
+                return r.clone();
             }
         }
     }
@@ -332,7 +335,7 @@ fn bind_squad(c: &Classic, d: &mut Dialog) {
         "ListBoxOfEvents".into(),
         event_lines(&info, minute, c.md.view_red, c.md.view_injuries),
     );
-    let me = human_side(c, cup, src) == Some(side);
+    let me = is_human_side(c, cup, src, side);
     // the squads show only for the user's club (the original cuts the form short for the others)
     // (measured on the captures: the real form is 470 pixels wide; `Height` is the bottom of the squads' box + the caption's
     // 20 pixels + 5, or only the caption + the box's top - 2 for the clubs of the others)
@@ -386,9 +389,15 @@ fn pos_word(position: u8) -> &'static str {
 }
 
 /// `TForcedSubstitutionDlg`: a player of the user is injured and the user chooses who comes on.
-pub fn forced(c: &Classic, cup: bool, src: usize, minute: u16, player: usize) -> Dialog {
+pub fn forced(
+    _c: &Classic,
+    cup: bool,
+    src: usize,
+    minute: u16,
+    side: usize,
+    player: usize,
+) -> Dialog {
     let mut d = Dialog::new(Kind::ForcedSubstitution, "TFORCEDSUBSTITUTIONDLG");
-    let side = human_side(c, cup, src).unwrap_or(0);
     d.set_num("cup", cup as i64);
     d.set_num("src", src as i64);
     d.set_num("side", side as i64);
@@ -435,9 +444,15 @@ fn bind_forced(c: &Classic, d: &mut Dialog) {
 }
 
 /// The penalty of a primary chance at `minute` of the user's game: `attack` when the user's club shoots (he picks the shooter).
-pub fn penalty(c: &Classic, cup: bool, src: usize, minute: u16, attack: bool) -> Dialog {
+pub fn penalty(
+    _c: &Classic,
+    cup: bool,
+    src: usize,
+    minute: u16,
+    me: usize,
+    attack: bool,
+) -> Dialog {
     let mut d = Dialog::new(Kind::Penalty, "TPENALTYDLG");
-    let me = human_side(c, cup, src).unwrap_or(0);
     let side = if attack { me } else { 1 - me };
     d.set_num("cup", cup as i64);
     d.set_num("src", src as i64);
@@ -561,7 +576,7 @@ fn shootout(c: &Classic, src: usize) -> Dialog {
     let mut d = Dialog::new(Kind::Shootout, "TPENALTIESDLG");
     d.set_num("src", src as i64);
     d.set_num("ms", 0);
-    d.set_num("human", human_side(c, true, src).is_some() as i64);
+    d.set_num("human", human_sides(c, true, src).contains(&true) as i64);
     d
 }
 
@@ -626,8 +641,10 @@ fn bind_shootout(c: &Classic, d: &mut Dialog) {
 pub fn cup_draw(c: &Classic) -> Option<Dialog> {
     let cup = c.world.last_cup.as_ref()?;
     let sess = c.md.session.as_ref()?;
-    let me = sess.snapshot.human.as_ref()?.club.clone();
-    let human_drawn = cup.matches.iter().any(|m| m.home == me || m.away == me);
+    let human_drawn = cup
+        .matches
+        .iter()
+        .any(|m| sess.snapshot.is_human_club(&m.home) || sess.snapshot.is_human_club(&m.away));
     let show = c.opts.cup_draw == 2 || (c.opts.cup_draw == 1 && human_drawn);
     if !show || sess.snapshot.cup.len() <= 2 {
         return None;
@@ -759,9 +776,19 @@ fn bind_invitation(_c: &Classic, d: &mut Dialog) {
 }
 
 /// The dialog of an invitation to coach `team` (a club whose coach was sacked).
-pub fn invitation(c: &Classic, team: &str) -> Dialog {
+/// `from` is the club of the human who gets it (his coach's name is the dialog's).
+pub fn invitation(c: &Classic, from: &str, team: &str) -> Dialog {
     let mut d = Dialog::new(Kind::Invitation, "TINVITECOACHDLG");
-    d.st.insert("coach".into(), c.coach.clone());
+    let coach = c
+        .md
+        .session
+        .as_ref()
+        .and_then(|s| s.snapshot.humans().find(|h| h.club == from))
+        .map(|h| h.coach.clone())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| c.coach.clone());
+    d.st.insert("coach".into(), coach);
+    d.st.insert("from".into(), from.into());
     d.st.insert("team".into(), team.into());
     d
 }
@@ -775,7 +802,6 @@ fn bind_lashes(_c: &Classic, d: &mut Dialog) {
 /// The sackings of a round as the list of the original: the sacked coach, the coach who takes over, an empty line.
 fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
     let sess = c.md.session.as_ref()?;
-    let me = sess.snapshot.human.as_ref().map(|h| h.club.clone());
     let all = c.opts.lashes == 2;
     let coach = |club: &str| {
         let n = sess.coaches.get(club).cloned().unwrap_or_default();
@@ -793,7 +819,7 @@ fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
         .skip(from)
         .take(to.saturating_sub(from))
     {
-        let human = me.as_deref() == Some(sacked.as_str()) || me.as_deref() == Some(gave.as_str());
+        let human = sess.snapshot.is_human_club(sacked) || sess.snapshot.is_human_club(gave);
         if !(all || (c.opts.lashes == 1 && human)) {
             continue;
         }
@@ -983,8 +1009,8 @@ fn close_squad(c: &mut Classic, d: &mut Dialog) -> Outcome {
             }
         }
     }
-    if !ds.is_empty() && human_side(c, cup, d.num("src") as usize).is_some() {
-        c.decide(cup, ds);
+    if !ds.is_empty() && is_human_side(c, cup, d.num("src") as usize, d.num("side") as usize) {
+        c.decide(cup, d.num("src") as usize, ds);
     }
     Outcome::Close
 }
@@ -1009,6 +1035,7 @@ fn click_forced(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     if name == "OKBtn" && d.num("sel") >= 0 {
         c.decide(
             cup,
+            src,
             vec![Decision::Substitute {
                 side: side_of(side),
                 minute: d.num("minute") as u16,
@@ -1043,6 +1070,7 @@ fn click_penalty(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     } else if name == "shootBtn" && d.num("sel") >= 0 {
         c.decide(
             cup,
+            src,
             vec![Decision::Shooter {
                 side: side_of(side),
                 minute: d.num("minute") as u16,
@@ -1057,16 +1085,18 @@ fn click_penalty(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
 
 fn click_invitation(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     match name {
-        "yesBtn" => Outcome::Close,
-        "noBtn" => {
-            // the user declines: the round is played again without the invitation
-            let (l, cp) = match c.md.session.as_mut() {
-                Some(s) => {
-                    s.accept = false;
-                    (s.league.clone(), s.cup.clone())
-                }
-                None => return Outcome::Close,
+        "yesBtn" | "noBtn" => {
+            let from = d.st.get("from").cloned().unwrap_or_default();
+            let Some(s) = c.md.session.as_mut() else {
+                return Outcome::Close;
             };
+            s.answered.push(from.clone());
+            if name == "yesBtn" {
+                return Outcome::Close;
+            }
+            // the human declines: the round is played again without his invitation
+            s.declined.push(from);
+            let (l, cp) = (s.league.clone(), s.cup.clone());
             c.replay_round(l, cp);
             Outcome::Close
         }
@@ -1085,15 +1115,14 @@ pub fn end_of_round(c: &mut Classic) {
         return;
     };
     let round = sess.snapshot.round + 1;
-    let human_played = sess.snapshot.human.is_some();
+    let human_played = sess.snapshot.human_count() > 0;
     let first_cup_change = c
         .world
         .last_cup
         .as_ref()
         .map_or(c.world.coach_changes.len(), |r| r.coach_changes_from);
-    if let Some((_, to)) = c.is_invitation() {
-        let d = invitation(c, &to);
-        c.md.todo.push_back(Step::Open(Box::new(d)));
+    if c.next_invitation().is_some() {
+        c.md.todo.push_back(Step::Invitations);
     }
     if let Some(d) = lashes(c, 0, first_cup_change) {
         c.md.todo.push_back(Step::Open(Box::new(d)));

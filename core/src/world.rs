@@ -670,6 +670,17 @@ impl World {
             .map(|b| b.seat)
     }
 
+    /// Whether `name` is the name of a human coach (the players' own names, or the coach of a club a human manages).
+    pub fn is_human_coach(&self, name: &str) -> bool {
+        !name.is_empty()
+            && self.humans().any(|h| {
+                h.coach == name
+                    || self
+                        .locate(&h.club)
+                        .is_some_and(|l| self.club_ref(l).coach_name == name)
+            })
+    }
+
     /// Whether `club` is managed by a human (any seat).
     pub fn is_human_club(&self, club: &str) -> bool {
         self.seat_of(club).is_some()
@@ -941,14 +952,19 @@ impl World {
     }
 
     fn human_may_bid(&self, seller: (usize, usize), slot_idx: usize, ask: i64) -> bool {
-        // the coach profile: no buying in auctions
-        self.history.options.auction != 2
-            && self.human_locations().into_iter().any(|h| {
-                let c = self.club_ref(h);
-                h != seller
-                    && c.fin.cash >= ask
-                    && crate::market::may_bid(c, &self.club_ref(seller).slots[slot_idx])
-            })
+        // some human may still outbid the computer
+        self.human_locations()
+            .into_iter()
+            .any(|h| self.may_bid_for(h, seller, slot_idx, ask))
+    }
+
+    /// Whether the human whose club is at `h` can take part in the auction of `slot_idx` of the club at `seller`.
+    fn may_bid_for(&self, h: (usize, usize), seller: (usize, usize), slot_idx: usize, ask: i64) -> bool {
+        let c = self.club_ref(h);
+        h != seller
+            && self.history.options.auction != 2 // the coach profile: no buying in auctions
+            && c.fin.cash >= ask
+            && crate::market::may_bid(c, &self.club_ref(seller).slots[slot_idx])
     }
 
     /// `1008:39c7`: moves the player, books the fee on both sides and records the transfer.
@@ -2338,7 +2354,10 @@ impl World {
             .names
             .iter()
             .position(|n| *n == l.player)
-            .is_some_and(|idx| self.human_may_bid(seller, idx, l.ask))
+            .is_some_and(|idx| {
+                self.human_location()
+                    .is_some_and(|h| self.may_bid_for(h, seller, idx, l.ask))
+            })
     }
 
     /// Every club as `(division, index)` in master-list order (the outside pool is division 4).

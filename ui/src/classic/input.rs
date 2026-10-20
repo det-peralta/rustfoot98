@@ -50,6 +50,10 @@ impl Classic {
     fn next_queued(&mut self) {
         if self.dialogs.is_empty() {
             if let Some(d) = self.queue.pop_front() {
+                // a dialog of one human (his auction) shows on his main window
+                if let Some(seat) = d.st.get("seat").and_then(|s| s.parse().ok()) {
+                    self.switch_human(seat);
+                }
                 self.dialogs.push(d);
                 self.dirty = true;
             }
@@ -192,7 +196,7 @@ impl Classic {
             return;
         }
         match name {
-            "OKBtn" => self.play_round(),
+            "OKBtn" => self.round_button(),
             _ => {
                 if let Some(d) = dialogs::open_for_button(self, name) {
                     self.open(d);
@@ -268,7 +272,7 @@ impl Classic {
                     });
                 }
             }
-            Key::Enter if self.play_enabled() => self.play_round(),
+            Key::Enter if self.play_enabled() => self.round_button(),
             _ => {}
         }
     }

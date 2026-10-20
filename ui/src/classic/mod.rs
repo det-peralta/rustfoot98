@@ -165,8 +165,13 @@ pub struct Classic {
     pub forms: Forms,
     pub data: Data,
     pub fb: Fb,
+    /// The name of the active human coach (`World::human`), shown in the header of the main window.
     pub coach: String,
     pub main: main_win::MainState,
+    /// Whether each seat's line-up marks show (`MainState::lineup_shown` of the humans that are not on the main window).
+    pub seat_lineups: Vec<bool>,
+    /// Humans who pressed the round button since the last round (hot seat).
+    pub turns: usize,
     pub screen: Screen,
     /// Modal dialogs, the last one on top.
     pub dialogs: Vec<dialog::Dialog>,
@@ -204,6 +209,8 @@ impl Classic {
             fb: Fb::new(),
             coach: "Treinador".into(),
             main: main_win::MainState::default(),
+            seat_lineups: Vec::new(),
+            turns: 0,
             screen: Screen::Main,
             dialogs: Vec::new(),
             queue: Default::default(),
@@ -287,6 +294,33 @@ impl Classic {
         self.queue.clear();
         self.screen = Screen::Main;
         self.main = main_win::MainState::default();
+        self.seat_lineups.clear();
+        self.turns = 0;
+        self.sync_coach();
+        self.dirty = true;
+    }
+
+    /// The header shows the name of the active human (saves from before several humans have none: the name stays).
+    pub fn sync_coach(&mut self) {
+        if let Some(h) = self.world.human.as_ref().filter(|h| !h.coach.is_empty()) {
+            self.coach = h.coach.clone();
+        }
+    }
+
+    /// Hands the main window to the human of `seat` (hot seat): his club, squad, plan and market lists, his name in the header.
+    /// The window starts on its first page; the line-up marks are remembered per human.
+    pub fn switch_human(&mut self, seat: usize) {
+        let old = self.world.active_seat();
+        if seat == old || !self.world.switch_human(seat) {
+            return;
+        }
+        if self.seat_lineups.len() <= old.max(seat) {
+            self.seat_lineups.resize(old.max(seat) + 1, false);
+        }
+        self.seat_lineups[old] = self.main.lineup_shown;
+        self.main = main_win::MainState::default();
+        self.main.lineup_shown = self.seat_lineups[seat];
+        self.sync_coach();
         self.dirty = true;
     }
 

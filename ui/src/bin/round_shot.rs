@@ -214,7 +214,7 @@ fn main() -> Result<(), String> {
             ],
             events,
             human: false,
-            human_side: None,
+            human_sides: [false; 2],
             src: i,
             extra_time: false,
         });

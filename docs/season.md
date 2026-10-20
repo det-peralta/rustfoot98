@@ -143,3 +143,8 @@ original save (`World::from_e98`).
   hidden offers are stored only. The original's new-game values are all off, auction 1 (an imported save keeps what it stores); a port
   world starts with the wages switched on because the port never had the asking dialog.
 * **Holiday** (`coach+6`, `TCoachManagerDlg`): the computer picks the line-up for the user's club (`History::holiday`).
+
+## Several humans
+Season end gives a human whose club left the league another club of the bottom six (`pick_human`, never one another human manages); coach swaps
+(`replace_coach`) treat every human as a human (users last among the candidates, invitations only when accepted and not declined by that human),
+and the swapped human's seat takes the new club (`apply_human_move`). Computer clubs' finances (`update_factors`) leave out all humans.

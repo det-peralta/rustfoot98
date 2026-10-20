@@ -187,9 +187,8 @@ pub fn calendar(w: &World, club: &str) -> Spec {
 
 /// `1010:cbd3`: the champions of past seasons, the coach of the user in bold.
 pub fn winners(w: &World) -> Spec {
-    let me = human_coach(w);
     let coach = |name: &str| {
-        let m = if !name.is_empty() && name == me {
+        let m = if w.is_human_coach(name) {
             "\u{2}"
         } else {
             ""
@@ -234,9 +233,8 @@ pub fn human_coach(w: &World) -> String {
 
 /// `1010:d0e0`: a transfer of the list of the last ones (a transfer of the user's club is drawn in blue).
 pub fn transfer_row(w: &World, t: &rustfoot_core::world::Transfer) -> String {
-    let human = w.human.as_ref().map(|h| h.club.as_str());
     let mut r = String::new();
-    if human == Some(t.from.as_str()) || human == Some(t.to.as_str()) {
+    if w.is_human_club(&t.from) || w.is_human_club(&t.to) {
         r.push('\u{fc}');
     }
     // the player is looked up in the squad of the club that bought him

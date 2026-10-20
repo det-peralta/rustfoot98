@@ -1,5 +1,5 @@
 //! Renders the classic interface from a saved game into a BMP: `classic_shot game.e98 out.bmp [key=value ...]`
-//! (`human=NAME`, `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
+//! (`human=CLUB` (makes the human of that club the active one; any other club becomes the active human's), `seat=N` (the N-th human, from 0), `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
 use rustfoot_ui::classic::{Classic, Data, Ev, Key, Page};
 use rustfoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
@@ -48,7 +48,12 @@ fn main() -> Result<(), String> {
     };
     for (k, v) in &kv {
         match k.as_str() {
+            "seat" => app.switch_human(v.parse().map_err(|_| "bad seat")?),
             "human" => {
+                if let Some(seat) = app.world.seat_of(v) {
+                    app.switch_human(seat);
+                    continue;
+                }
                 let loc = app
                     .world
                     .divisions
@@ -57,6 +62,7 @@ fn main() -> Result<(), String> {
                     .find_map(|(d, v2)| v2.iter().position(|c| c.name == *v).map(|i| (d, i)))
                     .ok_or("no such club")?;
                 app.world.set_human(loc.0, loc.1);
+                app.sync_coach();
             }
             "coach" => app.coach = v.clone(),
             "page" => {
@@ -92,8 +98,15 @@ fn main() -> Result<(), String> {
                             } else {
                                 format!("auto:{stop}@3000000")
                             };
+                            // (every human picks a formation and presses Enter in turn; the last Enter starts the round)
+                            let humans = app.world.human_count().max(1);
                             (0..count.parse::<usize>().unwrap_or(0))
-                                .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string(), auto.clone()])
+                                .flat_map(|_| {
+                                    (0..humans)
+                                        .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string()])
+                                        .chain([auto.clone()])
+                                        .collect::<Vec<_>>()
+                                })
                                 .collect()
                         }
                         None => vec![s.to_string()],
@@ -133,6 +146,7 @@ fn main() -> Result<(), String> {
                                 eprintln!("dialog {:?} ({})", d.kind, d.form);
                             }
                         }
+                        "seat" => app.switch_human(arg.parse().unwrap_or(0)),
                         "skip" => {
                             // play whole rounds without the interface
                             for _ in 0..arg.parse::<u32>().unwrap_or(0) {
@@ -330,7 +344,7 @@ fn main() -> Result<(), String> {
                 // a dialog of the match day with sample data: `mdopen=invite`, `mdopen=lashes`
                 let d = match v.as_str() {
                     "invite" => {
-                        rustfoot_ui::classic::dialogs::matchday::invitation(&app, "PALMEIRAS")
+                        rustfoot_ui::classic::dialogs::matchday::invitation(&app, "", "PALMEIRAS")
                     }
                     "lashes" => rustfoot_ui::classic::dialogs::matchday::lashes_dialog(vec![
                         "Fulano foi despedido do SANTOS".into(),

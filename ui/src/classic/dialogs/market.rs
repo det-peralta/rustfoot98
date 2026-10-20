@@ -490,18 +490,29 @@ fn show_result(d: &mut Dialog, result: &str) {
 /// One auction dialog for every open auction of the board the user can still take part in, in the order the clubs offered them.
 /// The match-day code calls this at the end of a round; the dialogs are shown one after the other.
 pub fn queue_auctions(c: &mut Classic) {
-    let wanted: Vec<(String, String, i64)> = (0..c.world.board.len())
-        .filter(|&i| c.world.listing_open_to_user(i))
-        .map(|i| {
-            let l = &c.world.board[i];
-            (l.seller.clone(), l.player.clone(), l.ask)
-        })
-        .collect();
-    for (club, player, ask) in wanted {
-        if let Some(d) = auction_dialog(c, &club, &player, ask) {
+    // an auction is offered to every human who can take part, the first player first, before the next auction comes (as the
+    // original does); the main window goes to each human when his dialog shows
+    let back = c.world.active_seat();
+    let n = c.world.human_count();
+    let mut wanted: Vec<(usize, String, String, i64, usize)> = Vec::new();
+    for seat in 0..n {
+        c.world.switch_human(seat);
+        for i in 0..c.world.board.len() {
+            if c.world.listing_open_to_user(i) {
+                let l = &c.world.board[i];
+                wanted.push((i, l.seller.clone(), l.player.clone(), l.ask, seat));
+            }
+        }
+    }
+    wanted.sort_by_key(|w| (w.0, w.4));
+    for (_, club, player, ask, seat) in wanted {
+        c.world.switch_human(seat);
+        if let Some(mut d) = auction_dialog(c, &club, &player, ask) {
+            d.st.insert("seat".into(), seat.to_string());
             c.queue.push_back(d);
         }
     }
+    c.world.switch_human(back);
 }
 
 fn auction_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {

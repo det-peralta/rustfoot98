@@ -3,7 +3,8 @@
 //!
 //! The order is the original's (`1020:24d6`): About, select game; a saved game is read (`1020:1d8d`) and played; a new game is built
 //! (`1028:05da`), then the names are typed and "Sortear equipas" gives each name a club (`1028:0b26`: a random one of the bottom six of
-//! the 4th division, `World::pick_human`) and OK starts the game. The core has a single human coach, so only "Jogador 1" is usable.
+//! the 4th division, `World::pick_human`) and OK starts the game. Up to six names can be typed: every named coach gets a club
+//! (`World::name_humans`) and the game is played in hot seat (the humans prepare the round in turn, see `docs/matchday.md`).
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::{Classic, Key, Request};
 use crate::win31::fb::{Rgb, WHITE};
@@ -100,20 +101,42 @@ fn select_bind(c: &Classic, d: &mut Dialog) {
     d.text("labelWarning.bgcolor", format!("{r},{g},{b}"));
 }
 
+/// The names typed in the dialog, in order, without the empty ones.
+fn typed_names(d: &Dialog) -> Vec<String> {
+    (1..=6)
+        .map(|i| {
+            d.texts
+                .get(&format!("playerName{i}"))
+                .map_or("", |s| s.trim())
+                .to_string()
+        })
+        .filter(|n| !n.is_empty())
+        .collect()
+}
+
 fn players_bind(c: &Classic, d: &mut Dialog) {
     let drawn = d.st.contains_key("drawn");
-    for i in 2..=6 {
-        // the core plays with one human coach
-        d.text(format!("playerName{i}.enabled"), "0");
+    for i in 1..=6 {
+        d.text(format!("playerName{i}.enabled"), if drawn { "0" } else { "1" });
     }
-    d.text("playerName1.enabled", if drawn { "0" } else { "1" });
     if drawn {
         d.text("Button1", "OK");
-        if let Some((_, club)) = crate::classic::main_win::human_club(c) {
-            d.text("playerTeam1", club.full_name.clone());
-            let col = |v: [u8; 3]| format!("{},{},{}", v[0], v[1], v[2]);
-            d.text("playerTeam1.color", col(club.colors.0));
-            d.text("playerTeam1.bgcolor", col(club.colors.1));
+        let col = |v: [u8; 3]| format!("{},{},{}", v[0], v[1], v[2]);
+        // the seats in the order the names were typed
+        for (k, h) in c.world.humans().enumerate() {
+            let club = c
+                .world
+                .divisions
+                .iter()
+                .flatten()
+                .chain(c.world.pool.iter())
+                .find(|x| x.name == h.club);
+            if let Some(club) = club {
+                let n = k + 1;
+                d.text(format!("playerTeam{n}"), club.full_name.clone());
+                d.text(format!("playerTeam{n}.color"), col(club.colors.0));
+                d.text(format!("playerTeam{n}.bgcolor"), col(club.colors.1));
+            }
         }
     }
 }
@@ -211,19 +234,16 @@ fn players_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     if name != "Button1" {
         return Outcome::Keep;
     }
-    let coach = d
-        .texts
-        .get("playerName1")
-        .map_or("", |s| s.trim())
-        .to_string();
+    let names = typed_names(d);
     if d.st.contains_key("drawn") {
-        // OK: the game starts
-        c.coach = coach;
+        // OK: the game starts with the first player's main window
+        c.coach = names.first().cloned().unwrap_or_default();
         c.enter_game();
         return Outcome::Close;
     }
     // "Sortear equipas": nothing happens until a name is typed
-    if !coach.is_empty() {
+    if !names.is_empty() {
+        c.world.name_humans(&names);
         d.st.insert("drawn".into(), "1".into());
         d.focus = "Button1".into();
     }
@@ -247,7 +267,7 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
             d.st.insert("mode".into(), "continue".into());
             Some(Outcome::Keep)
         }
-        (Kind::CoachName, Key::Enter) if d.focus == "playerName1" => {
+        (Kind::CoachName, Key::Enter) if d.focus.starts_with("playerName") => {
             d.focus = "Button1".into();
             Some(Outcome::Keep)
         }
@@ -303,6 +323,28 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_named_coach_gets_a_club_and_the_game_starts_in_hot_seat() {
+        use crate::classic::Data;
+        use crate::win31::{Forms, Skin};
+        let w = rustfoot_core::world::World::synthetic(3);
+        let mut c = Classic::new(w, Skin::default(), Forms::default(), Data::default());
+        let mut d = open_players();
+        for (i, n) in [(1, "Ana"), (2, ""), (3, " Rui "), (4, "Zé")] {
+            d.texts.insert(format!("playerName{i}"), n.into());
+        }
+        assert!(matches!(players_click(&mut c, &mut d, "Button1"), Outcome::Keep));
+        assert_eq!(c.world.human_count(), 3, "the empty name gets no club");
+        let mut bound = open_players();
+        bound.st.insert("drawn".into(), "1".into());
+        bind(&c, &mut bound);
+        assert!((1..=3).all(|k| bound.texts.contains_key(&format!("playerTeam{k}"))));
+        assert!(!bound.texts.contains_key("playerTeam4"));
+        assert!(matches!(players_click(&mut c, &mut d, "Button1"), Outcome::Close));
+        assert_eq!((c.coach.as_str(), c.world.active_seat()), ("Ana", 0));
+        assert_eq!(c.world.humans().map(|h| h.coach.clone()).collect::<Vec<_>>(), ["Ana", "Rui", "Zé"]);
+    }
 
     #[test]
     fn file_names_are_eight_upper_case_letters_or_digits() {
