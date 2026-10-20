@@ -73,7 +73,9 @@ is most likely intended; the user counters it by buying players at auction.
 
 ## The cup (`1020:0ed4`, implemented in `core/src/cup.rs` and `world.rs`)
 
-- Played after the league games of every **even** round; every club of the world (divisions + pool) enters.
+- Played on its **own match day after the league day** of every **even** round (`1020:11b8` runs `0c41` then `0ed4`; see `matchday.md`); every
+  club of the world (divisions + pool) enters. The port draws at the end of the league day (`World::draw_cup`, `cup_draw`) and plays the
+  ties on the cup day (`World::play_cup_day_ctl`, which also runs the season end after the final on round 14); `World::play_round` does both.
 - The draw only happens when the number of survivors N is greater than `p = 2^((14 - r) / 2)`, so the final is always on round 14
   (checked for N = 34..128). Survivors are shuffled (3n remove-and-append swaps); `k` = smallest power of two >= n/2; `n - k`
   pairs are drawn (first of the pair is at home), the other clubs get a bye.

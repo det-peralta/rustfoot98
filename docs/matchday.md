@@ -13,16 +13,70 @@ that follow a round. Code: `ui/src/classic/{round_view,session}.rs`, `ui/src/cla
    in a game of a human coach: `TPenaltyDlg` (the human attacker picks the shooter from the starters and presses *Chutar*; otherwise the best
    attacker is announced; the result shows after 3 ticks, the window closes after 5).
 3. A click on a club of a game opens its squad dialog (mode 1: events so far, the squad only for the user's own club).
-4. After the view: sack list (*Chicotadas Psicológicas*, `TPrintListDlg`, by the option *Mostrar chicotadas psicológicas*), the
-   classification (`TClassificationDlg`, "Classificação - Nª jornada") when a human played or after round 14, then on even rounds the draw
-   of the cup (`TSorteioDlg`, option *Ver sorteio da taça*: never / when a human is drawn / always) and the cup view ("Taça - <round> - ano";
-   drawn ties continue to minute 120 with their own break at 90, the others leave the list; 20 ties per page, `<` `>` buttons).
-   Shootouts (`TPenaltiesDlg`) come after the cup view, season end (`TEndOfSeasonDlg`) after the final, auctions last.
+4. After the view of a league day: sack list (*Chicotadas Psicológicas*, `TPrintListDlg`, by the option *Mostrar chicotadas psicológicas*), the
+   classification (`TClassificationDlg`, "Classificação - Nª jornada") when a human played or after round 14. On **even** rounds the cup
+   has its **own match day** after that (see "The cup day" below): the draw (`TSorteioDlg`, option *Ver sorteio da taça*: never / when a
+   human is drawn / always), then the main window again, then *Jogar* plays the cup view ("Taça - <stage> - ano"; drawn ties continue to
+   minute 120 with their own break at 90, the others leave the list; 20 ties per page, `<` `>` buttons). Shootouts (`TPenaltiesDlg`)
+   come after the cup view, season end (`TEndOfSeasonDlg`) after the final, auctions last.
 5. A coach invitation (`TInviteCoachDlg`, "Convite") appears when a computer club sacks its coach and the user's coach is the one picked.
 
 Timer speed (`1048:0ba3`, profiles registered by `1060:3219`): without a human coach in the games 100 ms per minute (50 for *Ultrassónico*);
 with humans `p3 + (n - 1) * p1` ms for the profile `(p1, p3)` = Lento (200, 1000), Médio (150, 800, the default), Rápido (100, 600),
 Super-rápido (125, 400), Rapidíssimo (50, 250), Ultrassónico (0, 50).
+
+## The cup day (`1020:11b8` -> `1020:0ed4`, decoded; captures `season/or/r7,c1,c3,p2,d5`)
+`11b8` loops the rounds: `0c41` (league day) and, when the round number is even, `0ed4` (cup day). The structure, with the functions that
+matter for the order of things:
+* `0c41`: `01f6` (finishes the games left in the list `270a`, `1010:9396` per game = points, money, scores, sacking check), the factors/evolution
+  of each division (`6e48`), `38b8` (sorts the four division lists), then **`13e1(games, round, 0)`**: for every game of the day `a67f` ->
+  `3e9c(team, round)` for the home and then the away club. **`3e9c` is the per-club "before the game" routine**: the computer clubs'
+  sales and renegotiations (it calls `1010:5b37`, which opens the auction through `1008:2fec`, for the player a club puts up for sale) and, **for a
+  human club, the main window (`TPrepareGameDlg`, `1018:11f3`, shown modally through the nested procedure `1010:3a6c`)**; computer-managed
+  clubs go through `3aad`. The main window is therefore opened *per game with a human in it*, in the order of the list of games, not once
+  per round, and it is the same code for a league game and a cup tie (this is also where the autosave of the option *Gravar o jogo* runs, `1018:11f3`).
+  After `13e1`: `0aae` (the purchases arrive), the round view (`1048:03ea` = `TJourneyDlg`, caption "Nª Jornada - ano"), `01f6` again
+  (the results are booked), `025a` ("too many foreigners" list), a refresh of the main window, `38b8`, and the classification (`1020:3905`) when a human played
+  or in round 14; then the economy random walk (`10c8:2b46`) and the clearing of the per-round flag of every team.
+* `0ed4` (cup day; only when the survivors outnumber `2^((14-r)/2)`): `01f6`, the shuffle of the survivors (`1068:0f68`), `1010:0875` (pairs -> list of
+  games), the draw dialog (`1020:321a`, by the option), a sort of the games, then **`13e1(games, 0, 1)`** (again `3e9c` per club of each tie: the
+  main window of every human who has a tie, after the draw dialog), the cup round view (`03ea` with the stage name as caption), `01f6`
+  (the ties are booked here: extra time, the shootout dialogs of `1050:0d46`, sackings), `025a`, `0aae`.
+* A human who is out of the cup (or has a bye) is in no tie of the list, so `3e9c` is not run for his club: **no main window for him on that
+  day**; with no human tie at all the draw dialog is followed straight by the cup round view.
+* The globals `271a` (league day already played) and `271e` (ties left in the list) are what a save made on the main window of a cup day stores:
+  a loaded game resumes with `0c41` skipped and the draw not repeated.
+* Auctions: `5b37` is called from `3e9c` (and `3aad`), i.e. while `13e1` runs at the **start** of a day, once per listing of a club
+  *that has a game that day*, interleaved with the main windows. So a dialog of a day's market appears before the main window of that day
+  (clubs earlier in the list than the human's game) or after *Jogar* and before the round view (clubs later in the list); in the captures the cup
+  day shows auctions right after *Jogar* and, after the cup view, the auctions (and "Vendido ao X por Y") of the *next* league day before its main window.
+  The port approximates this: the market of a day is computed with the league round before it (`World::market_round`, "clubs of the next round's
+  games") and the auction dialogs open at the end of the previous sequence, i.e. **after the cup day when a cup day follows the league day**,
+  otherwise after the classification. The cup day itself has no market in the port (the original's `3e9c` also runs for the cup clubs).
+
+In the port: `World::play_round_ctl` plays the league day and, on an even round, ends with `World::draw_cup` (the shuffle and the pairing, the
+random state is checkpointed first, so a replay of the league day gives the same draw); the result is `World::cup_draw: Option<CupDraw>`
+(`round`, `name` of the stage, `pairs` in draw order, first of a pair at home). `World::cup_day_due()`, `human_cup_tie()` (the active human's
+`CupTie { opponent, home, stage }`) and `humans_in_cup_tie()` (seats) are what the interface asks. `World::play_cup_day_ctl(&mut Control)` plays the
+pairs with the **current** plans of the humans, books the ties (`last_cup`, calendars), clears the planned substitutions, and runs the
+season end after the final. `World::play_round()` is `play_round_ctl` followed, when due, by `play_cup_day_ctl` (the one-call API of the other front ends),
+so the random numbers are drawn in the same order as before the split. A save keeps a pending draw (`cupdraw|round|stage` and `cuptie|home|away` lines).
+
+Interface (`session.rs`, `dialogs/matchday.rs`, `main_win.rs`): the league session ends with the invitations, sackings, classification, then
+`Step::CupDraw` (the draw dialog, reading `World::cup_draw` and the survivors `World::cup`) and `Step::CupDay`: the main window comes back with the
+Adversário panel of the tie (below) for the humans in a tie; with none, `Classic::play_cup_day` runs at once. *Jogar* (`round_button`) on a cup day
+plays the cup day: a new `Session { cup_day: true }` whose snapshot is the world before the ties (a replay plays `play_cup_day_ctl` from it), the view
+`RoundView::of_cup`, then `end_of_cup` (shootouts, lashes of the cup round, end of season, **auctions of the league day's market**, main window).
+Hot seat: on a cup day only the humans who play a tie take turns on the main window (`Classic::turn_seats`); the window goes to the first of them when
+the league day ends.
+
+**Main window of a cup day** (captures `c1/00`, `c1/01`): the *Adversário* panel keeps the opponent's colours; first line ` NAME (3ª Divisão)`
+(`(Distrital)` for a club outside the four divisions), second line `CASA TAÇA - 32 avos de final` (`FORA` away; the stage is `cup::round_name`), the
+Jogo page has no mini standings table. Referee, squad, formation, market work as on a league day.
+
+Verified against the binary: the order league view -> classification -> draw dialog -> main window -> cup view, no main window without a tie
+(by the structure of `13e1`/`3e9c`), the point where the draw's random numbers are used. Approximated: the order of the humans' windows (seat order),
+auction timing as described above, no market on the cup day, the autosave happens when the main window of the cup day appears.
 
 ## How the user's decisions are applied: replay
 The core computes a round in one go. The interface plays it on a copy of the world and shows it; when the user decides something at a
@@ -30,9 +84,10 @@ minute of his own game (a substitution at the break, the replacement of an injur
 invitation) the round is played again from the world before it with the decision added, and the view goes on from the same minute.
 * `rustfoot_core::matchsim::Decision` (`Shooter`, `Substitute` (reply to an injury or a sent-off goalkeeper, replacing the automatic one),
   `NoSubstitution`, `Planned` (a substitution made at the break, for this game only)) and `Match::{decisions, primaries}`.
-* `season::Control { league, cup, log, frozen }` and `World::play_round_ctl(&mut Control)`; `World::play_round()` is `play_round_ctl` with
-  the default control, so a round nobody touches is unchanged (the golden tests of the core still hold). `Control::checkpoint` records the
-  random state at the start of the league round, before every game, at the start of the cup draw and before every tie; in a replay
+* `season::Control { league, cup, log, frozen }`, `World::play_round_ctl(&mut Control)` (league day + draw) and `World::play_cup_day_ctl(&mut Control)`
+  (the ties, with their own `Control`); `World::play_round()` is both with the default control, so a round nobody touches is unchanged (the golden
+  tests of the core still hold). `Control::checkpoint` records the
+  random state at the start of the league round, before every game, at the start of the cup draw and (cup day) before every tie; in a replay
   (`Control::replay(log, league, cup)`) the same checkpoints restore the recorded state, so **every game the user's decisions do not touch
   plays out exactly as before** (a decision at minute m changes only the user's game after m; tests in `world.rs` and `session.rs`).
 * `MatchRecord`/`CupMatch` carry what the dialogs need: `start` (both squads at the kick-off), `primaries` (every primary chance, goal or
@@ -47,7 +102,7 @@ invitation) the round is played again from the world before it with the decision
 | `ForcedSubstitution` | `TFORCEDSUBSTITUTIONDLG` | `cup src side minute player sel` | `Label1`, `ListBoxOfSubstitutePlayers`, `OKBtn.enabled` after a row is picked |
 | `Penalty` | `TPENALTYDLG` | `cup src side minute attack sel shot ms` | form painted in the club's colours; keys `LabelChoose`, `labelResult`, `shootBtn`, `ListBoxOfPlayers` |
 | `Shootout` | `TPENALTIESDLG` | `src ms human` | the recorded kicks one per second (three with a human); closes 3 s after the last |
-| `CupDraw` | `TSORTEIODLG` | `ms human` | 1500 ms per tick with a human drawn, otherwise 400; two ticks per game |
+| `CupDraw` | `TSORTEIODLG` | `ms human` | 1500 ms per tick with a human drawn, otherwise 400; two ticks per game; reads `World::cup_draw` and the survivors `World::cup`, opened at the end of the league day |
 | `EndOfSeason` | `TENDOFSEASONDLG` | `ms` | titles are counted in `Classic::md.titles` (this run of the program) |
 | `Invitation` | `TINVITECOACHDLG` | `coach team` | *Não* replays the round without the invitation (`World::accept_invitations`) |
 | `Lashes` | `TPRINTLISTDLG` | `lists["lines"]` | caption "Chicotadas Psicológicas", rows of `listOfItems` |
@@ -87,7 +142,7 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * The application window behind the end-of-round dialogs (silver caption bar "Elifoot 98") is pixel-exact against `match35`.
 
 ## Not done / differences
-* Hot seat: see the section below. Approximations: the order of the turns after a round (the window stays with the human who had it
+* Hot seat: see the section below (the cup day: only humans with a tie take turns). Approximations: the order of the turns after a round (the window stays with the human who had it
   and the others follow in seat order; the original's rule was only observed, not decoded), one coach profile (`History::options`) shared by
   all humans, the standings and the cup draw are the same for everybody.
 * Shootouts of ties without a human are shown only when the core played them with kicks (human tie or the final); the option *Ver os
