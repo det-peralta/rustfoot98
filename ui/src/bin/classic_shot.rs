@@ -80,7 +80,17 @@ fn main() -> Result<(), String> {
             "ev" => {
                 // a script of events: `click:x,y`, `move:x,y`, `key:F5|Enter|a`, `tick:ms`, separated by `;`
                 app.draw();
-                for step in v.split(';') {
+                // `season:N` stands for N rounds of (F5, behave like a user until the main window is back)
+                let steps: Vec<String> = v
+                    .split(';')
+                    .flat_map(|s| match s.strip_prefix("season:") {
+                        Some(n) => (0..n.parse::<usize>().unwrap_or(0))
+                            .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string(), "auto:3000000".to_string()])
+                            .collect(),
+                        None => vec![s.to_string()],
+                    })
+                    .collect();
+                for step in steps.iter().map(|s| s.as_str()) {
                     let (kind, arg) = step.split_once(':').unwrap_or((step, ""));
                     let xy = || {
                         let (a, b) = arg.split_once(',').unwrap_or(("0", "0"));

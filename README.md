@@ -46,7 +46,7 @@ Native checks:
 `node tools/capture/web_test.mjs`.
 
 ## Front ends
-The DOM page (`web/index.html`) is the most complete; the shared UI (`ui/`) runs on SDL2 (`cargo run -p rustfoot-ui --features sdl --release`) and in the browser (`web/canvas.html`). See [docs/ui-strategy.md](docs/ui-strategy.md).
+The classic interface (`web/classic.html`, pixel-exact, opened by `/`) is the real port; the old DOM page (`web/legacy.html`) is kept as a simplified version; the shared UI (`ui/`) runs on SDL2 (`cargo run -p rustfoot-ui --features sdl --release`) and in the browser (`web/canvas.html`). See [docs/ui-strategy.md](docs/ui-strategy.md).
 
 ## Layout
 - `core/` pure Rust: formats, RNG, match engine, season, world.  `wasm/` C-ABI bindings.  `web/` the demo page.

@@ -1,8 +1,8 @@
 // Service worker: precaches the app shell and the WebAssembly core so the game works offline.
 // Bump VERSION when the files change; old caches are removed on activation.
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `elifoot98-rs-${VERSION}`;
-const SHELL = ["./", "index.html", "style.css", "app.js", "rustfoot_wasm.wasm", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
+const SHELL = ["./", "legacy.html", "style.css", "app.js", "rustfoot_wasm.wasm", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

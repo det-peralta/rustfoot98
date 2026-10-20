@@ -19,7 +19,7 @@
 ## Options studied
 | option | verdict |
 |---|---|
-| Keep porting the DOM UI only (`web/index.html`, `app.js`) | works today and is the most complete (cup, market, finances), but it cannot run natively and the DOM details leak into game logic calls |
+| Keep porting the DOM UI only (`web/legacy.html`, `app.js`) | works today and is the most complete (cup, market, finances), but it cannot run natively and the DOM details leak into game logic calls |
 | **SDL 1.2 program** run through `sdl12-compat` | the compat layer (installed here: `sdl12-compat 1.2.68`) lets old SDL1 code run on SDL2; useful to keep a *legacy* binary alive, not a reason to write new SDL1 |
 | **SDL2 native** (crate `sdl2 0.38`, `sdl2_ttf`) | small, stable, hardware accelerated, same API on every desktop; on this machine `sdl2-compat 2.32.74` (SDL2 API over SDL3) is what runs it, so SDL2-API code keeps working when distributions move to SDL3 |
 | SDL2 compiled to the web with Emscripten (`-sUSE_SDL=2`, Rust target `wasm32-unknown-emscripten`) | one binary for desktop and browser, but the Emscripten toolchain is heavy and the Rust target is second-class; the web would show a canvas only (no DOM, no text selection, poor accessibility) |

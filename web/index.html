@@ -1,159 +1,22 @@
 <!doctype html>
-<html lang="pt-PT">
+<html lang="pt">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Rustfoot 98 — núcleo nativo</title>
-<link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#1f7a3a">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2714%27 fill=%27%231f7a3a%27/%3E%3Cpath d=%27M16 8l5 4-2 6h-6l-2-6z%27 fill=%27white%27/%3E%3C/svg%3E">
-<link rel="stylesheet" href="style.css">
+<title>Rustfoot 98</title>
+<style>html,body{margin:0;height:100%;background:#008000;color:#fff;font:14px system-ui,sans-serif;display:grid;place-items:center}a{color:#ff0}</style>
 </head>
 <body>
-<header>
-  <div class="brand">
-    <h1>Elifoot 98 <span>núcleo nativo (Rust → WebAssembly)</span></h1>
-    <p class="sub">Regras decodificadas do executável original · <span id="mode">clubes e jogadores fictícios</span></p>
-  </div>
-  <div class="status" aria-live="polite">
-    <div><span class="k">Época</span> <b id="year">–</b></div>
-    <div><span class="k">Jornada</span> <b id="round">–</b></div>
-    <div title="Índice económico global (10c8:2b46): passeio aleatório por jornada, entre 0,5 e 10; sobe nos anos 00–49 e desce nos anos 50–99"><span class="k">Economia</span> <b id="economy">–</b></div>
-  </div>
-</header>
-
-<section class="controls">
-  <button id="play-round" class="primary">Jogar jornada</button>
-  <button id="play-season">Jogar época inteira</button>
-  <label class="seed">Semente <input id="seed" type="number" value="1998" min="1"></label>
-  <button id="new-world">Nova liga</button>
-</section>
-
-<section class="controls saves">
-  <button id="save-now">Guardar</button>
-  <button id="load-now" disabled>Carregar</button>
-  <button id="export">Exportar ficheiro</button>
-  <label class="file"><span>Importar</span><input id="import" type="file" accept=".txt,.sav,text/plain"></label>
-  <label class="file" title="Lê um ficheiro JOGOS\\*.e98 do Elifoot 98 original (no teu browser; não é enviado)"><span>Importar .e98 original</span><input id="import-e98" type="file" accept=".e98,.E98"></label>
-  <label class="check"><input id="autosave" type="checkbox" checked> Guardar automaticamente</label>
-  <span id="save-status" class="note" role="status"></span>
-</section>
-
-<section class="controls saves" aria-label="Ranhuras de gravação">
-  <label>Ranhura <select id="slot"></select></label>
-  <button id="slot-save">Gravar na ranhura</button>
-  <button id="slot-load" disabled>Carregar da ranhura</button>
-  <button id="slot-delete" disabled>Apagar ranhura</button>
-  <span class="note">As ranhuras são partilhadas com o ecrã partilhado (canvas.html).</span>
-</section>
-
-<section class="controls real">
-  <label class="file">
-    <span>Equipas reais</span>
-    <input id="eft" type="file" accept=".eft,.EFT" multiple>
-  </label>
-  <button id="use-fiction" hidden>Voltar às equipas fictícias</button>
-  <p id="eft-status" class="note" role="status">Opcional: escolhe os ficheiros <code>.EFT</code> da pasta <code>EQUIPAS</code> do teu Elifoot 98 (são lidos no teu browser, não são enviados nem incluídos aqui). São precisas entre 34 e 128 equipas.</p>
-</section>
-
-<nav id="tabs" role="tablist" aria-label="Divisões"></nav>
-
-<main>
-  <section class="card" aria-labelledby="t-title">
-    <h2 id="t-title">Classificação</h2>
-    <div class="scroll">
-      <table id="table">
-        <thead><tr>
-          <th>#</th><th class="l">Clube</th><th title="Jogos">J</th><th title="Vitórias">V</th><th title="Empates">E</th>
-          <th title="Derrotas">D</th><th title="Golos marcados">GM</th><th title="Golos sofridos">GS</th>
-          <th title="Pontos">Pts</th><th title="Moral (K): média móvel dos resultados, 0 a 2,5">Moral</th>
-          <th title="Força média do plantel">Força</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
-    <p class="note" id="base-note"></p>
-  </section>
-
-  <section class="card" aria-labelledby="r-title">
-    <h2 id="r-title">Última jornada</h2>
-    <ul id="results" class="results"></ul>
-    <div id="match" class="match" hidden></div>
-  </section>
-
-  <section class="card wide" id="club-card" hidden aria-labelledby="c-title">
-    <h2 id="c-title">O meu clube</h2>
-    <div class="club-head">
-      <div><b id="club-name"></b> <span id="club-div" class="muted"></span></div>
-      <label>Formação <select id="formation"></select></label>
-      <button id="auto-plan">Escalar automaticamente</button>
-      <label>Mudar de clube <select id="change-club"></select></label>
-    </div>
-    <p id="club-msg" class="note" role="status"></p>
-    <div id="finance" class="finance"></div>
-    <div class="club-grid">
-      <div class="scroll">
-        <table id="squad">
-          <thead><tr><th class="l">Pos</th><th class="l">Jogador</th><th title="Força">F</th><th title="Craque: g ≥ 8 e não guarda-redes nem defesa">★</th><th class="l">Estado</th><th class="l">Papel</th><th title="Salário por jogo">Salário</th><th class="l">Vender</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-      <div>
-        <h3>Substituições planeadas <small>(máx. 3)</small></h3>
-        <div id="subs"></div>
-        <button id="add-sub">Adicionar substituição</button>
-        <p class="note">As lesões e expulsões continuam a ter substituição automática. O jogo original pára e pergunta-te; aqui cada jogo corre de uma vez.</p>
-        <h3>A minha jornada</h3>
-        <div id="my-match" class="empty">Ainda não jogaste.</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="card wide" id="cup-card" hidden aria-labelledby="cup-title">
-    <h2 id="cup-title">Taça</h2>
-    <ul id="cup-results" class="results"></ul>
-    <div id="cup-match" class="match" hidden></div>
-    <p class="note" id="cup-note"></p>
-  </section>
-
-  <section class="card wide" id="market-card" hidden aria-labelledby="mk-title">
-    <h2 id="mk-title">Mercado — leilões abertos</h2>
-    <p id="market-msg" class="note" role="status"></p>
-    <table id="board"><thead><tr><th class="l">Jogador</th><th class="l">Pos</th><th>F</th><th class="l">Clube</th><th>Base</th><th>Melhor oferta</th><th class="l">A tua licitação</th></tr></thead><tbody></tbody></table>
-    <p class="note">Os leilões fecham no início da jornada seguinte; se não licitares, ganha a melhor oferta dos clubes do computador. Vender: usa o botão na tabela do plantel.</p>
-  </section>
-
-  <section class="card wide" id="search-card" hidden aria-labelledby="sr-title">
-    <h2 id="sr-title">Procurar jogadores</h2>
-    <form id="search-form" class="searchform">
-      <label>Nome <input id="sr-name" type="text" size="12"></label>
-      <label>País <input id="sr-nat" type="text" size="4" maxlength="3" placeholder="BRA"></label>
-      <label>Força mínima <input id="sr-str" type="number" min="0" max="50" value="0"></label>
-      <label>Posição <select id="sr-pos"><option value="-1">Todas</option><option value="0">Guarda-redes</option><option value="1">Defesa</option><option value="2">Médio</option><option value="3">Avançado</option></select></label>
-      <label>Preço máximo <input id="sr-price" type="number" min="0" step="1000" value="0"></label>
-      <button type="submit">Procurar</button>
-    </form>
-    <table id="offers"><thead><tr><th class="l">Jogador</th><th class="l">Clube</th><th class="l">Pos</th><th>F</th><th class="l">País</th><th>Preço</th><th></th></tr></thead><tbody></tbody></table>
-    <p class="note">Só aparecem (até 50) os jogadores que o clube aceita vender, ao preço que pede. O pagamento é imediato e o jogador chega no fim da jornada.</p>
-  </section>
-
-  <section class="card wide" id="transfers-card" hidden aria-labelledby="tr-title">
-    <h2 id="tr-title">Transferências</h2>
-    <ul id="transfers" class="transfers"></ul>
-    <p class="note">Negócios entre clubes controlados pelo computador (leilão em que todos licitam). O teu clube ainda não compra nem vende.</p>
-  </section>
-
-  <section class="card wide" id="season-card" hidden aria-labelledby="s-title">
-    <h2 id="s-title">Fim de época</h2>
-    <div id="season"></div>
-  </section>
-</main>
-
-<footer>
-  <p><span id="offline-status">Modo offline: a verificar…</span> Núcleo em Rust compilado para WebAssembly (<span id="wasm-size">–</span>), sem emulador. O jogo original corre Windows 3.1 dentro do DOSBox; aqui as regras
-  (golos, cartões, lesões, evolução, moral, classificação, subidas e descidas) foram recuperadas do binário e reimplementadas.</p>
-</footer>
-<script src="app.js" type="module"></script>
+<p>A abrir o <a href="classic.html">Rustfoot 98</a>… (<a href="legacy.html">versão simplificada</a>)</p>
+<script>
+// an older service worker may still answer for this page: drop it and its caches, then go to the classic interface
+(async () => {
+  try {
+    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    for (const k of await caches.keys()) await caches.delete(k);
+  } catch (e) {}
+  location.replace("classic.html");
+})();
+</script>
 </body>
 </html>
