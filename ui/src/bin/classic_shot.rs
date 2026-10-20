@@ -105,6 +105,7 @@ fn main() -> Result<(), String> {
                                     (0..humans)
                                         .flat_map(|_| ["key:F5".to_string(), "key:Enter".to_string()])
                                         .chain([auto.clone()])
+                                        .map(|st| format!("\u{1}{st}")) // generated: skipped once the stop was reached
                                         .collect::<Vec<_>>()
                                 })
                                 .collect()
@@ -112,7 +113,13 @@ fn main() -> Result<(), String> {
                         None => vec![s.to_string()],
                     })
                     .collect();
-                'steps: for step in steps.iter().map(|s| s.as_str()) {
+                let mut halted = false;
+                for step in steps.iter().map(|s| s.as_str()) {
+                    let generated = step.starts_with('\u{1}');
+                    if generated && halted {
+                        continue;
+                    }
+                    let step = step.trim_start_matches('\u{1}');
                     let (kind, arg) = step.split_once(':').unwrap_or((step, ""));
                     let xy = || {
                         let (a, b) = arg.split_once(',').unwrap_or(("0", "0"));
@@ -285,7 +292,7 @@ fn main() -> Result<(), String> {
                             }
                             if hit {
                                 app.frame();
-                                break 'steps;
+                                halted = true;
                             }
                         }
                         "idle" => {

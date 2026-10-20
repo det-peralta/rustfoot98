@@ -538,6 +538,31 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
     let inset = get_num(cx, n, "inset").unwrap_or(1);
     let inner_h = h - 2;
     let fit = (inner_h / ih).max(1) as usize;
+    let cols = n.int("Columns", 0);
+    if cols > 1 {
+        // `Columns`: the rows run down a column and on to the next; no scroll bar while the columns fit
+        let cw = (w - 2) / cols;
+        let sel = get_num(cx, n, "sel").filter(|&v| v >= 0).map(|v| v as usize);
+        let old = fb.clip;
+        fb.clip = ((x + 1).max(old.0), (y + inset).max(old.1), (x + w - 1).min(old.2), (y + h - 1).min(old.3));
+        for (i, item) in items.iter().enumerate() {
+            let (col, row) = ((i / fit) as i32, (i % fit) as i32);
+            if col >= cols + 1 {
+                break;
+            }
+            let (cx0, ry) = (x + col * cw, y + inset + row * ih);
+            let fg = if sel == Some(i) {
+                fb.fill(cx0 + 1, ry, cw, ih, NAVY);
+                WHITE
+            } else {
+                f.color
+            };
+            row_cells(fb, cx, n, f, cx0, ry, ih, item, fg, false);
+            push_hit(cx, format!("{}#{i}", n.name), "ListRow", cx0 + 1, ry, cw, ih);
+        }
+        fb.clip = old;
+        return;
+    }
     let scrolled = items.len() > fit;
     let right = if scrolled { x + w - 17 } else { x + w - 1 };
     let top = view(cx, n, items.len(), fit);

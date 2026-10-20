@@ -663,9 +663,22 @@ fn bind_cup_draw(c: &Classic, d: &mut Dialog) {
     // two timer ticks per game: the home team is named, then the away team and the game goes into the list
     let ticks = (d.num("ms") / tick) as usize;
     let (done, home_only) = (ticks / 2, ticks % 2 == 1);
-    let mut teams: Vec<String> = sess.snapshot.cup.clone();
-    teams.sort_by_key(|n| n.to_lowercase());
     let games = cup.matches.len();
+    // the teams already drawn leave the list
+    let drawn: Vec<&str> = cup
+        .matches
+        .iter()
+        .take(done.min(games))
+        .flat_map(|m| [m.home.as_str(), m.away.as_str()])
+        .collect();
+    let mut teams: Vec<String> = sess
+        .snapshot
+        .cup
+        .iter()
+        .filter(|n| !drawn.contains(&n.as_str()))
+        .cloned()
+        .collect();
+    teams.sort_by_key(|n| n.to_lowercase());
     let current = cup.matches.get(done.min(games.saturating_sub(1)));
     let (home, away) = match current {
         Some(m) if done < games && home_only => (Some(m), None),
@@ -687,7 +700,7 @@ fn bind_cup_draw(c: &Classic, d: &mut Dialog) {
         .collect();
     let last = list.len().checked_sub(1);
     d.lists.insert("listBoxOfGames".into(), list);
-    set_sel(d, "listBoxOfGames", last);
+    let _ = last; // the original shows no selection in the list of games
     let mut label = |name: &str, team: Option<&str>| match team {
         Some(t) => {
             let (ink, form) = colors(find_club(&c.world, t));
