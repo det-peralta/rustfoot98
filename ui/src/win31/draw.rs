@@ -1408,6 +1408,79 @@ fn glyph_margin(cx: &Ctx, n: &Node, h: i32, gh: i32, f: &FontSpec) -> i32 {
     (h - 4 - (gh + n.int("Spacing", 4) + th) + 1) / 2
 }
 
+/// A `TBitBtn` with `Layout = blGlyphLeft` (the default): glyph and caption side by side, placed as `TBitBtn.CalcButtonLayout` does inside
+/// the client rectangle `(x + 2, y + 2, w - 5, h - 5)` (measured on the OK button of the list dialogs).
+#[allow(clippy::too_many_arguments)]
+fn bitbtn_glyph_left(
+    fb: &mut Fb,
+    cx: &Ctx,
+    n: &Node,
+    f: &FontSpec,
+    x: i32,
+    y: i32,
+    (w, h): (i32, i32),
+    bmp: Option<&super::skin::Bitmap>,
+    cap: &str,
+    enabled: bool,
+) {
+    let (cw, ch) = (w - 5, h - 5);
+    let font = cx.font(f);
+    let label: String = cap.replace('&', "");
+    let tw = font.map_or(0, |t| t.width(&label));
+    let th = font.map_or(0, |t| t.tm_height);
+    let (glyphs, gw, gh) = match bmp {
+        Some(b) => {
+            let glyphs = if b.w >= 2 * b.h {
+                2.max(n.int("NumGlyphs", 1))
+            } else {
+                n.int("NumGlyphs", 1).max(1)
+            };
+            (glyphs, b.w / glyphs, b.h)
+        }
+        None => (1, 0, 0),
+    };
+    let (mut margin, mut spacing) = (n.int("Margin", -1), n.int("Spacing", 4));
+    if tw == 0 || gw == 0 {
+        spacing = 0;
+    }
+    if margin == -1 {
+        if spacing == -1 {
+            margin = (cw - (gw + tw)) / 3;
+            spacing = margin;
+        } else {
+            margin = (cw - (gw + spacing + tw) + 1) / 2;
+        }
+    } else if spacing == -1 {
+        spacing = (cw - (margin + gw) - tw) / 2;
+    }
+    let gx = x + 2 + margin;
+    if let Some(b) = bmp {
+        let key = b.px[((b.h - 1) * b.w) as usize];
+        let gy = y + 2 + (ch - gh + 1) / 2;
+        let gi = if !enabled && glyphs > 1 { gw } else { 0 };
+        for r in 0..b.h {
+            for c in 0..gw {
+                let p = b.px[(r * b.w + c + gi) as usize];
+                if p != key {
+                    fb.set(gx + c, gy + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
+                }
+            }
+        }
+    }
+    if let Some(font) = font {
+        let (tx, ty) = (gx + gw + spacing, y + 2 + (ch - th + 1) / 2);
+        if enabled {
+            text(fb, font, tx, ty, &label, f.color, false);
+        } else {
+            text(fb, font, tx + 1, ty + 1, &label, WHITE, false);
+            text(fb, font, tx, ty, &label, GRAY, false);
+        }
+        if cx.focus == n.name {
+            focus_rect(fb, tx - 1, ty - 1, tw + 2, th + 2, x, y);
+        }
+    }
+}
+
 fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 64), n.int("Height", 64));
     let enabled = is_enabled(cx, n);
@@ -1438,6 +1511,10 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         c => c,
     };
     let gh = bmp.map_or(0, |b| b.h);
+    if n.ident("Layout").is_none_or(|l| l == "blGlyphLeft") {
+        bitbtn_glyph_left(fb, cx, n, f, x, y, (w, h), bmp, cap, enabled);
+        return;
+    }
     if let Some(b) = bmp {
         let glyphs = if b.w >= 2 * b.h {
             2.max(n.int("NumGlyphs", 1))

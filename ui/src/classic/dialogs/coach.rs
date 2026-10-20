@@ -109,8 +109,8 @@ pub fn coach_history(w: &World) -> Spec {
 }
 
 /// `TCoach` rows of the ranking: coach (the user's in bold, for the whole row), club, `league titles + cup titles = total` and the
-/// score of the coach (the add-in "Ver pontuação dos treinadores", offered here).
-pub fn ranking(w: &World) -> Spec {
+/// score of the coach (only in a registered copy).
+pub fn ranking(w: &World, registered: bool) -> Spec {
     let rows = w
         .coach_ranking()
         .into_iter()
@@ -127,7 +127,9 @@ pub fn ranking(w: &World) -> Spec {
             r += &field("\u{6}", 0x14, &format!("{l} + "));
             r += &field("\u{6}", 0x14, &format!("{c} = "));
             r += &field("\u{6}", 0x14, &(l + c).to_string());
-            r += &field("\u{6}", 0x28, &score.to_string());
+            if registered {
+                r += &field("\u{6}", 0x28, &score.to_string());
+            }
             numbered(k, r)
         })
         .collect();
@@ -144,7 +146,7 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
             let spec = match d.kind {
                 Kind::TeamHistory => team_history(&c.world),
                 Kind::CoachHistory => coach_history(&c.world),
-                _ => ranking(&c.world),
+                _ => ranking(&c.world, c.main.market.registered),
             };
             bind_list(d, spec);
         }
@@ -308,7 +310,7 @@ mod tests {
     fn coach_rows_follow_the_originals_strings() {
         let mut w = World::synthetic(8);
         w.play_season();
-        let r = ranking(&w);
+        let r = ranking(&w, true);
         assert_eq!(r.rows.len(), 38);
         assert_eq!(r.flags, NUMBERED | WIDE);
         // the first row: the number, then the coach

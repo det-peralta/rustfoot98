@@ -49,10 +49,10 @@ pub fn player_name(club: &Club, i: usize) -> String {
 
 /// The players of the world with the club they play for.
 pub fn all_players(w: &World) -> Vec<(&Club, usize)> {
-    w.divisions
-        .iter()
-        .flatten()
-        .chain(w.pool.iter())
+    let mut clubs: Vec<&Club> = w.divisions.iter().flatten().chain(w.pool.iter()).collect();
+    clubs.sort_by_key(|c| c.master); // the master list of all teams
+    clubs
+        .into_iter()
         .flat_map(|c| (0..c.slots.len()).map(move |i| (c, i)))
         .collect()
 }
@@ -104,7 +104,8 @@ pub fn top_scorers(w: &World, all_time: bool) -> Vec<Scorer<'_>> {
             take(&players, &goals, hi, lo, &mut picked);
         }
     }
-    // the stable bubble sort keeps the order of players equal in goals and strength
+    // players equal in goals and strength come out in the reverse of the world's order (measured on the original's list)
+    picked.reverse();
     picked.sort_by(|a, b| {
         b.2.cmp(&a.2)
             .then(b.0.slots[b.1].strength.cmp(&a.0.slots[a.1].strength))
@@ -378,7 +379,8 @@ pub struct Layout {
 pub fn layout(count: usize, flags: u32) -> Layout {
     let wide = if flags & WIDE != 0 { 200 } else { 0 };
     let (client_h, list_h) = (297, 225);
-    let form_h = client_h + 25;
+    // the form is 29 pixels taller than its client area (caption and thick frame)
+    let form_h = client_h + 29;
     let delta = (600 - form_h).min(count as i32 * 16 + 2 - list_h);
     Layout {
         client: (374 + wide, client_h + delta),
@@ -392,13 +394,14 @@ pub fn layout(count: usize, flags: u32) -> Layout {
 pub fn bind_list(d: &mut Dialog, spec: Spec) {
     let l = layout(spec.rows.len(), spec.flags);
     d.text("@caption", spec.caption);
-    d.text("@client", format!("{}x{}", l.client.0, l.client.1));
+    // `@client` is the real client size: the thick frame of the original hides four pixels of the declared one
+    d.text("@client", format!("{}x{}", l.client.0 + 4, l.client.1 + 4));
     d.text("listOfItems.size", format!("{},{}", l.list.0, l.list.1));
     d.text("Bevel1.size", format!("{},{}", l.bevel.0, l.bevel.1));
     d.text("OKBtn.pos", format!("{},{}", l.ok.0, l.ok.1));
     let n = spec.rows.len();
     if spec.flags & SELECT_LAST != 0 && n > 0 {
-        d.text("listOfItems.sel", (n - 1).to_string());
+        // the list ends on its last row; the original's `DrawTheItem` shows no selection
         let fit = ((l.list.1 - 2) / 16) as usize;
         d.text("listOfItems.top", n.saturating_sub(fit).to_string());
     }
@@ -673,8 +676,8 @@ mod tests {
         let l = layout(4, 0);
         assert_eq!((l.list.1, l.client.1), (66, 297 + 66 - 225));
         let l = layout(100, WIDE);
-        // never taller than the screen allows: 600 - (297 + 25) = 278 more pixels
-        assert_eq!(l.list, (545, 225 + 278));
+        // never taller than the screen allows: 600 - (297 + 29) = 274 more pixels
+        assert_eq!(l.list, (545, 225 + 274));
         assert_eq!(l.ok.0, 252);
         assert_eq!(layout(14, 0).list.1, 226);
     }
@@ -691,11 +694,10 @@ mod tests {
                 flags: SELECT_LAST,
             },
         );
-        // 40 rows: the list takes the 278 pixels the screen leaves (17 rows) and ends on the last row
-        assert_eq!(d.texts["listOfItems.sel"], "39");
-        assert_eq!(d.texts["listOfItems.top"], (40 - 501 / 16).to_string());
-        assert_eq!(d.texts["listOfItems.size"], "345,503");
-        assert_eq!(d.texts["@client"], "374x575");
+        // 40 rows: the list takes the 274 pixels the screen leaves and ends on the last row
+        assert_eq!(d.texts["listOfItems.top"], (40 - 497 / 16).to_string());
+        assert_eq!(d.texts["listOfItems.size"], "345,499");
+        assert_eq!(d.texts["@client"], "378x575");
         assert!(matches!(
             click_list(&mut d, "listOfItems.pgup"),
             Outcome::Keep
@@ -712,7 +714,7 @@ mod tests {
         for _ in 0..100 {
             key_list(&mut d, Key::Down);
         }
-        assert_eq!(d.texts["listOfItems.top"], (40 - 501 / 16).to_string());
+        assert_eq!(d.texts["listOfItems.top"], (40 - 497 / 16).to_string());
         assert!(matches!(click_list(&mut d, "OKBtn"), Outcome::Close));
     }
 

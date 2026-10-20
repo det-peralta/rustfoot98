@@ -13,7 +13,7 @@
 //! Texts of the list in the dialog's `texts`: `<name>.top` (first visible row), `<name>.sel` (selected row), `<name>.focus` (the row
 //! with the dotted focus rectangle). A list that does not fit gets a vertical scroll bar.
 use super::draw::{focus_rect, text, Ctx, FontSpec, Hit};
-use super::fb::{Fb, Rgb, BLACK, GRAY, SILVER, WHITE};
+use super::fb::{Fb, Rgb};
 use super::form::Node;
 
 /// What a field of a row shows.
@@ -127,74 +127,6 @@ pub fn layout(fields: &str, width_of: &dyn Fn(&str, bool) -> i32) -> Vec<Placed>
 /// Width of a vertical scroll bar.
 pub const BAR: i32 = 16;
 
-/// The scroll bar of a list: track, two arrow buttons and the thumb. Returns the hits `(name suffix, x, y, w, h)` of arrow up, arrow
-/// down, page up and page down.
-pub fn vscroll(
-    fb: &mut Fb,
-    x: i32,
-    y: i32,
-    h: i32,
-    top: usize,
-    count: usize,
-    visible: usize,
-) -> Vec<(&'static str, i32, i32, i32, i32)> {
-    // the dithered track
-    for yy in 0..h {
-        for xx in 0..BAR {
-            fb.set(
-                x + xx,
-                y + yy,
-                if (xx + yy) % 2 == 0 { WHITE } else { SILVER },
-            );
-        }
-    }
-    let button = |fb: &mut Fb, bx: i32, by: i32| {
-        fb.fill(bx, by, BAR, BAR, BLACK);
-        fb.fill(bx + 1, by + 1, BAR - 2, BAR - 2, SILVER);
-        fb.fill(bx + 1, by + 1, BAR - 3, 1, WHITE);
-        fb.fill(bx + 1, by + 1, 1, BAR - 3, WHITE);
-        fb.fill(bx + BAR - 3, by + 2, 1, BAR - 4, GRAY);
-        fb.fill(bx + 2, by + BAR - 3, BAR - 4, 1, GRAY);
-    };
-    button(fb, x, y);
-    button(fb, x, y + h - BAR);
-    for k in 0..4 {
-        // arrow up (4 rows) and down
-        fb.fill(x + 7 - k, y + 5 + k, 2 * k + 2, 1, BLACK);
-        fb.fill(x + 7 - k, y + h - BAR + 10 - k, 2 * k + 2, 1, BLACK);
-    }
-    let track = h - 2 * BAR;
-    let thumb_h = if count == 0 {
-        track
-    } else {
-        ((track as i64 * visible.min(count) as i64) / count as i64).max(BAR as i64) as i32
-    };
-    let range = count.saturating_sub(visible).max(1);
-    let thumb_y =
-        y + BAR + ((track - thumb_h) as i64 * top.min(range) as i64 / range as i64) as i32;
-    button(fb, x, thumb_y);
-    if thumb_h > BAR {
-        fb.fill(x, thumb_y + BAR, BAR, thumb_h - BAR, BLACK);
-        fb.fill(x + 1, thumb_y + BAR - 1, BAR - 2, thumb_h - BAR, SILVER);
-        fb.fill(x + 1, thumb_y + 1, 1, thumb_h - 2, WHITE);
-        fb.fill(x + BAR - 3, thumb_y + 2, 1, thumb_h - 3, GRAY);
-        fb.fill(x + 2, thumb_y + thumb_h - 3, BAR - 4, 1, GRAY);
-        fb.fill(x + 1, thumb_y + thumb_h - 1, BAR - 2, 1, BLACK);
-    }
-    vec![
-        ("up", x, y, BAR, BAR),
-        ("down", x, y + h - BAR, BAR, BAR),
-        ("pgup", x, y + BAR, BAR, (thumb_y - y - BAR).max(0)),
-        (
-            "pgdn",
-            x,
-            thumb_y + thumb_h,
-            BAR,
-            (y + h - BAR - thumb_y - thumb_h).max(0),
-        ),
-    ]
-}
-
 /// Rows the list shows at once (a partly visible row counts).
 pub fn visible_rows(client_h: i32, row_h: i32) -> usize {
     ((client_h + row_h - 1) / row_h).max(1) as usize
@@ -289,20 +221,8 @@ pub fn draw_list(
     }
     fb.clip = old;
     if bar {
-        let hits = vscroll(fb, cx0 + cw - BAR, cy0, ch, top, rows.len(), visible);
-        for (k, bx, by, bw, bh) in hits {
-            if bw > 0 && bh > 0 {
-                cx.hits.borrow_mut().push(Hit {
-                    name: format!("{}.{k}", n.name),
-                    class: "TSpeedButton".into(),
-                    x: bx,
-                    y: by,
-                    w: bw,
-                    h: bh,
-                    enabled: true,
-                });
-            }
-        }
+        // the same scroll bar as every other list (`widgets::vscroll`, measured on the original)
+        super::widgets::vscroll(fb, cx, &n.name, cx0 + cw - BAR, cy0, ch, top, rows.len(), visible);
     }
 }
 
