@@ -42,3 +42,4 @@ analysis/jsdos/
 web/skin/
 # captures of the widgets work (local goldens for tools/ui/check.py)
 analysis/shots/w/
+analysis/captures/
