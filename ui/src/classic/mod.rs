@@ -462,4 +462,24 @@ mod tests {
         c.command("Sairsemgravar1");
         assert_eq!(c.requests, vec![Request::Quit]);
     }
+
+    #[test]
+    fn the_save_after_a_round_shows_its_gauge_first() {
+        let mut c = bare();
+        c.world = World::synthetic(3);
+        c.enter_game();
+        c.game_name = "X".into();
+        c.opts.save_when = 0; // after every round
+        c.finish_round();
+        assert_eq!(c.dialogs.len(), 1);
+        assert_eq!(c.dialogs[0].kind, dialog::Kind::Progress);
+        assert!(
+            c.requests.is_empty(),
+            "nothing is stored before the gauge is full"
+        );
+        c.tick(5000);
+        assert_eq!(c.requests, vec![Request::Save("X".into())]);
+        assert!(c.dialogs.is_empty());
+        assert!(matches!(c.screen, Screen::Main));
+    }
 }

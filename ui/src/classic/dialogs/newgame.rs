@@ -25,7 +25,14 @@ pub fn open_select() -> Dialog {
 /// The gauge dialog for `job`: `new:NAME` builds the world, `load:NAME` asks the host for the saved text.
 pub fn open_progress(job: &str) -> Dialog {
     let mut d = Dialog::new(Kind::Progress, "TPROGRESSDLG");
-    d.text("@caption", "A carregar o jogo...");
+    d.text(
+        "@caption",
+        if job == "save" {
+            "A gravar o jogo..."
+        } else {
+            "A carregar o jogo..."
+        },
+    );
     // the window is a little larger than the form's client area (measured on the capture of the original)
     d.text("@client", "481x37");
     d.st.insert("job".into(), job.to_string());
@@ -297,6 +304,12 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
         return Outcome::Keep;
     }
     let job = d.st.get("job").cloned().unwrap_or_default();
+    if job == "save" {
+        // the gauge is full: the host stores the game and the end of the round goes on to the main window
+        c.save_now();
+        c.finish_round();
+        return Outcome::Close;
+    }
     if let Some(name) = job.strip_prefix("new:") {
         return match build_world(c) {
             Ok(w) => {

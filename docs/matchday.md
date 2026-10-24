@@ -159,8 +159,9 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
   this text; `Troca com` stays normal). Open: how a human becomes free in the original (the capture shows joga1 without a club after the season end).
 * The port's sack list now uses `tables::bind_list` (height from the rows, rows in the field encoding: the first letters were being eaten before)
   and the list is the active control (the capture has no focus rectangle on OK); checked against `season4/1693`.
-* **Progress boxes**: the original shows `A gravar o jogo...` (the `TProgressDlg` gauge) while saving, e.g. at the end of the season; the port saves
-  without it (`A carregar o jogo...` exists for loading).
+* **Progress boxes**: the original shows `A gravar o jogo...` (the `TProgressDlg` gauge, over the backdrop of the round) while saving after a
+  round. The port now does too: `finish_round` opens the gauge (`open_progress("save")`, `State::saving`), and the save request and the main window
+  follow when it is full (same duration as the loading gauge, 1.2 s: the original's duration is not measured).
 * **Cup draw** (`Sorteio dos jogos da taça`) at the round of 32: same form, fonts and column layout as the port's render (three columns of 25 rows; the capture is
   taken mid-draw, so fewer clubs are left). The 'one column' remark under *Not done* is stale.
 * **Injury substitution** (`TForceSubstitutionDlg`) can show a list with a single goalkeeper for an injured midfielder and OK stays disabled until

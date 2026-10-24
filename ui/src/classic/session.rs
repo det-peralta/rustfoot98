@@ -61,6 +61,8 @@ pub struct State {
     pub view_red: bool,
     pub view_injuries: bool,
     pub session: Option<Session>,
+    /// The `A gravar o jogo...` gauge of the save after a round is open (the save is requested when it is full).
+    pub saving: bool,
     pub todo: VecDeque<Step>,
     /// Titles won in this run of the program: `club -> (league, cup)` (the end-of-season window counts them).
     pub titles: HashMap<String, (u16, u16)>,
@@ -589,12 +591,21 @@ impl Classic {
 
     /// The final whistle of the round view: kept for the hosts (the flow itself is `finish_view`).
     pub fn finish_round(&mut self) {
+        // the game is saved after the round as the options say (the world is final now: the replays are over); the original
+        // shows the gauge `A gravar o jogo...` over the backdrop of the round first
+        if !self.md.saving
+            && self.started
+            && !self.game_name.is_empty()
+            && self.opts.saves_after(self.world.round)
+        {
+            self.md.saving = true;
+            self.open(dialogs::newgame::open_progress("save"));
+            self.dirty = true;
+            return;
+        }
+        self.md.saving = false;
         self.screen = Screen::Main;
         self.md.session = None;
-        // the game is saved after the round as the options say (the world is final now: the replays are over)
-        if self.opts.saves_after(self.world.round) {
-            self.save_now();
-        }
         self.dirty = true;
     }
 
