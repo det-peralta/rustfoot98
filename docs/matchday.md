@@ -159,8 +159,8 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * The port's sack list now uses `tables::bind_list` (height from the rows, rows in the field encoding: the first letters were being eaten before).
 * **Progress boxes**: the original shows `A gravar o jogo...` (the `TProgressDlg` gauge) while saving, e.g. at the end of the season; the port saves
   without it (`A carregar o jogo...` exists for loading).
-* **Cup draw** (`Sorteio dos jogos da taça`) at the round of 32: same form and fonts as ours, the left list is in several columns of 25 rows
-  (ours: see above), and the draw takes the clubs out of the list one by one.
+* **Cup draw** (`Sorteio dos jogos da taça`) at the round of 32: same form, fonts and column layout as the port's render (three columns of 25 rows; the capture is
+  taken mid-draw, so fewer clubs are left). The 'one column' remark under *Not done* is stale.
 * **Injury substitution** (`TForceSubstitutionDlg`) can show a list with a single goalkeeper for an injured midfielder and OK stays disabled until
   a row is selected; the recorder could not select it (keys and the relative mouse do nothing). What the port offers in that case is unchecked.
 * The recorder: after an auction the original sometimes stops answering keys on the main form (Windows still answers Alt+Tab); roughly 1 in 300 to
