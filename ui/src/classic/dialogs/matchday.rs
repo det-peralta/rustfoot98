@@ -808,9 +808,20 @@ pub fn invitation(c: &Classic, from: &str, team: &str) -> Dialog {
 }
 
 fn bind_lashes(_c: &Classic, d: &mut Dialog) {
-    d.text("@caption", "Chicotadas Psicológicas");
-    let lines = d.lists.get("lines").cloned().unwrap_or_default();
-    d.lists.insert("listOfItems".into(), lines);
+    // a `TPrintListDlg`: the list is as high as its rows and the rows are in the field encoding
+    let rows = d
+        .lists
+        .get("lines")
+        .map(|v| v.iter().map(|l| super::tables::field("", 0, l)).collect())
+        .unwrap_or_default();
+    super::tables::bind_list(
+        d,
+        super::tables::Spec {
+            caption: "Chicotadas Psicológicas".into(),
+            rows,
+            flags: 0,
+        },
+    );
 }
 
 /// The sackings of a round as the list of the original: the sacked coach, the coach who takes over, an empty line.

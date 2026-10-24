@@ -149,3 +149,19 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
   desempates por penalties nos jogos sem treinadores humanos* is not honoured by the core.
 * Mid-game substitutions by clicking on the user's club (mode 1 with `Substituir`) are applied from the next minute by a replay.
 * `TSorteioDlg` shows the left list in one column (the form asks for three); the balance picture of the referee aid is missing; no sounds.
+
+## Seen in a played season of the original (recorder `tools/capture/season.sh`, frames in `analysis/captures/`, 2026-10-24)
+* **Sack list** (`TPrintListDlg`, 3 rows: the form is 148 high, list 52): `<coach> foi despedido do <CLUB>` (normal), the second line (bold in the
+  capture) and an empty row. The lines come from the coach swap `1010:5343` (three `0x3ac` event objects): the second is `Troca com <coach> (<CLUB>)`
+  when the coach taken over has a club, **`Para o seu lugar foi contratado <coach>`** when he has none (`1010:d55c` finds no club): in the capture
+  a human coach (joga1) without a club was hired by PONTE PRETA. The port always swaps two clubs, so it never writes the second text (open: the
+  original keeps unemployed human coaches; when does a sacked human become one?). The bold of the second line is seen only for this text.
+* The port's sack list now uses `tables::bind_list` (height from the rows, rows in the field encoding: the first letters were being eaten before).
+* **Progress boxes**: the original shows `A gravar o jogo...` (the `TProgressDlg` gauge) while saving, e.g. at the end of the season; the port saves
+  without it (`A carregar o jogo...` exists for loading).
+* **Cup draw** (`Sorteio dos jogos da taça`) at the round of 32: same form and fonts as ours, the left list is in several columns of 25 rows
+  (ours: see above), and the draw takes the clubs out of the list one by one.
+* **Injury substitution** (`TForceSubstitutionDlg`) can show a list with a single goalkeeper for an injured midfielder and OK stays disabled until
+  a row is selected; the recorder could not select it (keys and the relative mouse do nothing). What the port offers in that case is unchecked.
+* The recorder: after an auction the original sometimes stops answering keys on the main form (Windows still answers Alt+Tab); roughly 1 in 300 to
+  1 in 2000 steps. `tools/capture/season_retry.sh` restarts from the save.
