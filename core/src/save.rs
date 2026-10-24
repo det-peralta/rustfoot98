@@ -572,6 +572,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
+            coach_changes_free: Vec::new(),
             seats: Default::default(),
             history,
             tie_order,

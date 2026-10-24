@@ -371,7 +371,7 @@ fn main() -> Result<(), String> {
                     }
                     "lashes" => rustfoot_ui::classic::dialogs::matchday::lashes_dialog(vec![
                         "Fulano foi despedido do SANTOS".into(),
-                        "Troca com Beltrano (FLAMENGO)".into(),
+                        "\u{2}Para o seu lugar foi contratado Beltrano".into(),
                         String::new(),
                     ]),
                     _ => return Err(format!("unknown dialog {v}")),

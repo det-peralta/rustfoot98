@@ -154,9 +154,11 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * **Sack list** (`TPrintListDlg`, 3 rows: the form is 148 high, list 52): `<coach> foi despedido do <CLUB>` (normal), the second line (bold in the
   capture) and an empty row. The lines come from the coach swap `1010:5343` (three `0x3ac` event objects): the second is `Troca com <coach> (<CLUB>)`
   when the coach taken over has a club, **`Para o seu lugar foi contratado <coach>`** when he has none (`1010:d55c` finds no club): in the capture
-  a human coach (joga1) without a club was hired by PONTE PRETA. The port always swaps two clubs, so it never writes the second text (open: the
-  original keeps unemployed human coaches; when does a sacked human become one?). The bold of the second line is seen only for this text.
-* The port's sack list now uses `tables::bind_list` (height from the rows, rows in the field encoding: the first letters were being eaten before).
+  a human coach (joga1) without a club was hired by PONTE PRETA. In the port the free coaches are the clubs of the pool (division 4 of the save, `World::pool`):
+  `World::coach_changes_free` records that the coach taken over came from it, and the list then writes the bold second text (bold seen only for
+  this text; `Troca com` stays normal). Open: how a human becomes free in the original (the capture shows joga1 without a club after the season end).
+* The port's sack list now uses `tables::bind_list` (height from the rows, rows in the field encoding: the first letters were being eaten before)
+  and the list is the active control (the capture has no focus rectangle on OK); checked against `season4/1693`.
 * **Progress boxes**: the original shows `A gravar o jogo...` (the `TProgressDlg` gauge) while saving, e.g. at the end of the season; the port saves
   without it (`A carregar o jogo...` exists for loading).
 * **Cup draw** (`Sorteio dos jogos da taça`) at the round of 32: same form, fonts and column layout as the port's render (three columns of 25 rows; the capture is

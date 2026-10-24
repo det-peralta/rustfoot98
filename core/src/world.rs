@@ -274,6 +274,9 @@ pub struct World {
     /// Coach changes of the last round played, as `(sacked club, club that gave its coach)`; the second is the club the
     /// coach came from. The humans' own moves are in `seats.moves`.
     pub coach_changes: Vec<(String, String)>,
+    /// Parallel to `coach_changes`: the coach taken over had no club (he came from the pool of unemployed coaches, `1010:d55c` finds
+    /// no team), which the sack list words differently.
+    pub coach_changes_free: Vec<bool>,
     /// The other human coaches of a hot-seat game and the coach swaps of the round (see [`Seats`]).
     pub seats: Seats,
     /// Calendars, champions, club and coach histories, the user's coach profile (`history.rs`, `docs/season.md`).
@@ -501,6 +504,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
+            coach_changes_free: Vec::new(),
             seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
@@ -543,6 +547,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
+            coach_changes_free: Vec::new(),
             seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
@@ -594,6 +599,7 @@ impl World {
             sell_tried: Vec::new(),
             accept_invitations: false,
             coach_changes: Vec::new(),
+            coach_changes_free: Vec::new(),
             seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
@@ -1661,6 +1667,7 @@ impl World {
         }
         self.log_coach_swap(&t, &p);
         self.coach_changes.push((t.name.clone(), p.name.clone()));
+        self.coach_changes_free.push(ploc.0 == 4);
         if t_human {
             self.seats.moves.push((t.name.clone(), p.name.clone()));
         }
@@ -2096,6 +2103,7 @@ impl World {
         }
         self.last_round.clear();
         self.coach_changes.clear();
+        self.coach_changes_free.clear();
         self.seats.moves.clear();
         self.seats.applied = 0;
         let round = self.round + 1;

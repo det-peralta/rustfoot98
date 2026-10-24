@@ -808,11 +808,20 @@ pub fn invitation(c: &Classic, from: &str, team: &str) -> Dialog {
 }
 
 fn bind_lashes(_c: &Classic, d: &mut Dialog) {
+    // the captured form has no focus rectangle on OK: the list is the active control
+    d.focus = "listOfItems".into();
     // a `TPrintListDlg`: the list is as high as its rows and the rows are in the field encoding
     let rows = d
         .lists
         .get("lines")
-        .map(|v| v.iter().map(|l| super::tables::field("", 0, l)).collect())
+        .map(|v| {
+            v.iter()
+                .map(|l| match l.strip_prefix('\u{2}') {
+                    Some(bold) => super::tables::field("\u{2}", 0, bold),
+                    None => super::tables::field("", 0, l),
+                })
+                .collect()
+        })
         .unwrap_or_default();
     super::tables::bind_list(
         d,
@@ -837,19 +846,29 @@ fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
         }
     };
     let mut lines = Vec::new();
-    for (sacked, gave) in c
+    for (k, (sacked, gave)) in c
         .world
         .coach_changes
         .iter()
+        .enumerate()
         .skip(from)
         .take(to.saturating_sub(from))
     {
+        let free = c.world.coach_changes_free.get(k).copied().unwrap_or(false);
         let human = sess.snapshot.is_human_club(sacked) || sess.snapshot.is_human_club(gave);
         if !(all || (c.opts.lashes == 1 && human)) {
             continue;
         }
         lines.push(format!("{} foi despedido do {sacked}", coach(sacked)));
-        lines.push(format!("Troca com {} ({gave})", coach(gave)));
+        if free {
+            // the coach taken over had no club: `Para o seu lugar foi contratado <coach>`, drawn in bold
+            lines.push(format!(
+                "\u{2}Para o seu lugar foi contratado {}",
+                coach(gave)
+            ));
+        } else {
+            lines.push(format!("Troca com {} ({gave})", coach(gave)));
+        }
         lines.push(String::new());
     }
     (!lines.is_empty()).then(|| lashes_dialog(lines))
