@@ -3,7 +3,7 @@
 # ArrowDown+Enter on penalty dialogs); keeps a frame whenever the kind of screen changes (and every 15th step).
 # Needs the original booted and loaded (tools/capture/boot.sh) and analysis/captures/venv (pillow, numpy).
 cd "$(dirname "$0")/../.."
-D=$1; mkdir -p $D; : > $D/log.txt; prev=""
+D=$1; mkdir -p $D; : > $D/log.txt; prev=""; same=0; ph=""
 key() { bash tools/capture/c.sh "{\"op\":\"key\",\"key\":\"$1\"}" >/dev/null; }
 for i in $(seq -w 1 $2); do
   bash tools/capture/c.sh "{\"op\":\"guest\",\"path\":\"$PWD/$D/cur.png\"}" >/dev/null
@@ -12,10 +12,13 @@ for i in $(seq -w 1 $2); do
   if [ "$k" != "$prev" ] || [ $((10#$i % 15)) = 0 ]; then cp $D/cur.png $D/${i}_$k.png; fi
   case $k in
     roundview) ;;
-    auction|halftime) key Enter;;
+    auction) key 1; key Enter; sleep 2;;
+    halftime) key Enter;;
     penalty|dialog_over_roundview) key ArrowDown; key Enter;;
     main|main_inactive) key F5; key Enter;;
     *) key Enter;;
   esac
+  h=$(md5sum $D/cur.png | cut -c1-8); if [ "$h" = "$ph" ]; then same=$((same+1)); else same=0; fi; ph=$h
+  if [ $same -ge 40 ]; then echo "stuck at $i ($k)" | tee -a $D/log.txt; exit 1; fi
   prev=$k; sleep 0.8
 done
