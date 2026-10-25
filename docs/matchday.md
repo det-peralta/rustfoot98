@@ -180,3 +180,8 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
   league day is played with the other human only (`probe3` steps 1020-1085). The port still swaps the sacked human to another club at once
   (`World::replace_coach`, `seats.moves`). Open: when and how an unemployed human is hired again (invitations; the recorder keeps playing to see it).
 * **The recorder's old "freeze"** was F5 (formation 4-4-2) greyed out for the squad: the recorder presses A (*Automático*) now.
+* **How the unemployed human came back** (`probe3` steps 1150-1224): joga1 had no main window for rounds 1-3 of 2028; right after the standings of round 3
+  the next main window is joga1's **at CRUZEIRO EC** (4ª Divisão, a different club from the one he was sacked from) with no invitation, sack list or
+  other dialog in between. So the free human is placed by the sack/hire step of the round (candidates of `1010:5343` with flag 0x200 include the
+  unemployed coach), without asking. Not modelled: the port has no unemployed humans. To do: decode which club takes him and when (`1010:4f40`
+  calls with the club's rating below 15), then add an unemployed state to `Seats`, skip his turn, and hire him in that step.
