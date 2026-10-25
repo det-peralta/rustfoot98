@@ -168,3 +168,15 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
   a row is selected; the recorder could not select it (keys and the relative mouse do nothing). What the port offers in that case is unchecked.
 * The recorder: after an auction the original sometimes stops answering keys on the main form (Windows still answers Alt+Tab); roughly 1 in 300 to
   1 in 2000 steps. `tools/capture/season_retry.sh` restarts from the save.
+
+### Second season end (recorder `probe3`, 2027 -> 2028; a season is 14 league rounds, the end comes about 1000 steps after the previous one)
+* **Order at the end of the last day (round 14 + cup final)**: standings (`Classificação - 14ª jornada`), the cup final view, the shootout (`Desempate por
+  Penalis`), the sack list, **`Fim de Época`** (champion, cup winner, best scorer, prizes; layout equal to the port's, only the focus rectangle on
+  *Fechar* was ours and is gone), then the main window of the next season's first round of the humans who have a club. The gauge `A gravar o jogo...`
+  comes **after Jogar of the next day**, on the bare desktop, before its round view (not at the end of a round): the port now opens it in `play_round`.
+* **Bold in the sack list marks the human coach's line**: `joga1 foi despedido do BAHIA` (bold) / `Para o seu lugar foi contratado Amado Bucar`;
+  and in the first capture `Pardal foi despedido do PONTE PRETA` / **`Para o seu lugar foi contratado joga1`** (bold). The port follows that now.
+* **A sacked human becomes unemployed** (joga1 at BAHIA, replaced by a free coach): after the sack list he has **no main window** and the next
+  league day is played with the other human only (`probe3` steps 1020-1085). The port still swaps the sacked human to another club at once
+  (`World::replace_coach`, `seats.moves`). Open: when and how an unemployed human is hired again (invitations; the recorder keeps playing to see it).
+* **The recorder's old "freeze"** was F5 (formation 4-4-2) greyed out for the squad: the recorder presses A (*Automático*) now.

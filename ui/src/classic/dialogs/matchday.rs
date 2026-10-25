@@ -720,6 +720,8 @@ fn bind_cup_draw(c: &Classic, d: &mut Dialog) {
 }
 
 fn bind_end_of_season(c: &Classic, d: &mut Dialog) {
+    // the captured window shows no focus rectangle on *Fechar*
+    d.focus = "-".into();
     let Some(s) = c.world.last_season.as_ref() else {
         return;
     };
