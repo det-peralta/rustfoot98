@@ -464,22 +464,24 @@ mod tests {
     }
 
     #[test]
-    fn the_save_after_a_round_shows_its_gauge_first() {
+    fn the_save_when_a_day_starts_shows_its_gauge_first() {
         let mut c = bare();
         c.world = World::synthetic(3);
         c.enter_game();
         c.game_name = "X".into();
-        c.opts.save_when = 0; // after every round
-        c.finish_round();
+        c.opts.save_when = 0; // every round
+        c.play_round();
         assert_eq!(c.dialogs.len(), 1);
         assert_eq!(c.dialogs[0].kind, dialog::Kind::Progress);
-        assert!(
-            c.requests.is_empty(),
-            "nothing is stored before the gauge is full"
+        assert_eq!(
+            c.world.round, 0,
+            "the day is not played before the gauge is full"
         );
+        assert!(c.requests.is_empty());
         c.tick(5000);
         assert_eq!(c.requests, vec![Request::Save("X".into())]);
+        assert_eq!(c.world.round, 1);
         assert!(c.dialogs.is_empty());
-        assert!(matches!(c.screen, Screen::Main));
+        assert!(matches!(c.screen, Screen::Round(_)));
     }
 }

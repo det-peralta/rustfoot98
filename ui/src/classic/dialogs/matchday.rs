@@ -859,15 +859,22 @@ fn lashes(c: &Classic, from: usize, to: usize) -> Option<Dialog> {
         if !(all || (c.opts.lashes == 1 && human)) {
             continue;
         }
-        lines.push(format!("{} foi despedido do {sacked}", coach(sacked)));
+        // the line that names a human coach is drawn in bold (both captured sack lists)
+        let bold = |is_human: bool| if is_human { "\u{2}" } else { "" };
+        lines.push(format!(
+            "{}{} foi despedido do {sacked}",
+            bold(sess.snapshot.is_human_club(sacked)),
+            coach(sacked)
+        ));
+        let gave_human = bold(sess.snapshot.is_human_club(gave));
         if free {
-            // the coach taken over had no club: `Para o seu lugar foi contratado <coach>`, drawn in bold
+            // the coach taken over had no club
             lines.push(format!(
-                "\u{2}Para o seu lugar foi contratado {}",
+                "{gave_human}Para o seu lugar foi contratado {}",
                 coach(gave)
             ));
         } else {
-            lines.push(format!("Troca com {} ({gave})", coach(gave)));
+            lines.push(format!("{gave_human}Troca com {} ({gave})", coach(gave)));
         }
         lines.push(String::new());
     }

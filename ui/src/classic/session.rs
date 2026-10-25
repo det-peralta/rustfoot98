@@ -244,6 +244,21 @@ impl Classic {
     /// *Jogar*: plays the next match day and shows it: the cup day when a cup round has been drawn, otherwise the next league round
     /// (the cup of an even round is drawn at its end and played on its own day).
     pub fn play_round(&mut self) {
+        // the game is saved when the day starts as the options say (the original shows the gauge `A gravar o jogo...` on the bare
+        // desktop right after *Jogar*, then the round view); the day is played when the gauge is full
+        if !self.md.saving
+            && self.started
+            && !self.game_name.is_empty()
+            && self.opts.saves_after(self.world.round)
+        {
+            self.md.saving = true;
+            self.main.menu = None;
+            self.screen = Screen::Round(Box::new(RoundView::backdrop()));
+            self.open(dialogs::newgame::open_progress("save"));
+            self.dirty = true;
+            return;
+        }
+        self.md.saving = false;
         if self.world.cup_day_due() {
             self.play_cup_day();
         } else {
@@ -591,19 +606,6 @@ impl Classic {
 
     /// The final whistle of the round view: kept for the hosts (the flow itself is `finish_view`).
     pub fn finish_round(&mut self) {
-        // the game is saved after the round as the options say (the world is final now: the replays are over); the original
-        // shows the gauge `A gravar o jogo...` over the backdrop of the round first
-        if !self.md.saving
-            && self.started
-            && !self.game_name.is_empty()
-            && self.opts.saves_after(self.world.round)
-        {
-            self.md.saving = true;
-            self.open(dialogs::newgame::open_progress("save"));
-            self.dirty = true;
-            return;
-        }
-        self.md.saving = false;
         self.screen = Screen::Main;
         self.md.session = None;
         self.dirty = true;
