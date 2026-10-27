@@ -220,6 +220,7 @@ pub fn open_save(e: &Editor, after: After) -> Dialog {
         .as_ref()
         .map(|o| o.file.split('.').next().unwrap_or("").to_string())
         .unwrap_or_default();
+    d.text("teamFilename.sellen", base.chars().count().to_string());
     d.text("teamFilename", base);
     d.text("saveTheTeam.checked", "1");
     d.st.insert(
@@ -322,13 +323,17 @@ pub fn bind(e: &Editor, d: &mut Dialog) {
         d.text(format!("{n}.wrap"), "1");
     }
     if is(d, "ed_about") {
+        // the game's box with the editor's version (`98.002` on the capture), its banner and blinking notice
         d.text("textGameName", "Elifoot 98");
-        d.text("textSubVersion", crate::classic::dialogs::about::VERSION);
+        d.text("textSubVersion", "98.002");
         d.text(
             "labelNotRegistered",
             crate::classic::dialogs::about::NOT_REGISTERED,
         );
+        let shown = d.st.get("blink").map(String::as_str) != Some("off");
+        d.text("labelNotRegistered.visible", if shown { "1" } else { "0" });
         d.text("labelWarning.visible", "0");
+        d.text("Banner1.scroll", d.num("scroll").to_string());
         return;
     }
     if is(d, "ed_open") || is(d, "ed_transfer") {
@@ -368,6 +373,10 @@ pub fn bind(e: &Editor, d: &mut Dialog) {
         } else if !open {
             d.st.remove("shown");
         }
+    } else if is(d, "ed_save") {
+        // the file name only while *Gravar a equipa* is ticked
+        let on = d.texts.get("saveTheTeam.checked").is_some_and(|v| v == "1");
+        d.text("teamFilename.enabled", if on { "1" } else { "0" });
     } else if is(d, "ed_level") {
         let v = d.num("level").clamp(1, 20);
         d.text("textSkill.value", v.to_string());

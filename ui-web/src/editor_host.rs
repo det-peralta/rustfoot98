@@ -137,6 +137,16 @@ pub extern "C" fn ed_event(kind: u32, a: i32, b: i32) {
     })
 }
 
+/// Time passes (milliseconds since the last call): the *Acerca* box's banner.
+#[no_mangle]
+pub extern "C" fn ed_tick(ms: u32) {
+    HOST.with(|h| {
+        if let Some(app) = h.borrow_mut().app.as_mut() {
+            app.tick(ms.min(250));
+        }
+    })
+}
+
 /// Draws a frame if something changed; 1 when the RGBA picture at `ed_fb_ptr()` is new.
 #[no_mangle]
 pub extern "C" fn ed_frame() -> i32 {

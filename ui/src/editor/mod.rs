@@ -138,6 +138,18 @@ impl Editor {
         self.dirty = true;
     }
 
+    /// Time passes: the *Acerca* box scrolls its banner.
+    pub fn tick(&mut self, ms: u32) {
+        let Some(mut d) = self.dialogs.pop() else {
+            return;
+        };
+        if d.kind == crate::classic::dialog::Kind::Other("ed_about".into()) {
+            crate::classic::dialogs::about::tick_box(&self.skin, &self.forms, &mut d, ms);
+            self.dirty = true;
+        }
+        self.dialogs.push(d);
+    }
+
     /// Draws the whole screen into `self.fb`.
     pub fn draw(&mut self) {
         self.fb

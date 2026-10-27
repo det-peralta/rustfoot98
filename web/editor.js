@@ -105,8 +105,11 @@ function requests() {
   }
 }
 
-function loop() {
+let last = 0;
+function loop(now) {
   if (!w) return;
+  w.ed_tick(Math.round(Math.min(now - (last || now), 250)));
+  last = now;
   requests();
   if (w && w.ed_frame()) {
     ctx.putImageData(new ImageData(new Uint8ClampedArray(w.memory.buffer, w.ed_fb_ptr(), 800 * 600 * 4), 800, 600), 0, 0);

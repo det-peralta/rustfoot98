@@ -45,10 +45,11 @@ printing.
   *Adicionar* loop, *Remover*, *Transferir* queued until the target opens, the save check `1020:2720` with Bosman/PLOP players not
   foreign); `editor_shot` renders scripted sessions; `web/editor.html` (+ `editor.js`, `pack.js`) runs it in the browser with the saved
   teams in IndexedDB, used by the game's new games, and `.EFT` import/export.
-- Compared with the captures in `analysis/captures/editor/`: colour, name, coach, level, country (closed and open), transfer, open and
-  player dialogs within the mouse cursor and a few pixels; the main window within the list's focus rectangle and the frame.
-- Open: the *Acerca* box of the editor (the game's box is shown; no capture), *Gravar Equipa* / *Erro* not yet compared with a capture, a
-  new team's default colours and level (not decoded), a team edited in the port opened in the original.
+- Compared with the captures in `analysis/captures/editor/`: colour, name, coach, level, country (closed and open), transfer, open,
+  player, save (ticked and not), error and About dialogs within the mouse cursor and a few pixels; the main window within the list's
+  focus rectangle and the frame. Checked on the original: *Remover* keeps the selection on the same row; after the error list the
+  command is dropped; without *Gravar a equipa* the changes are dropped and the command goes on.
+- Open: a new team's default colours and level (not decoded), a team edited in the port opened in the original.
 
 ## 6. Browser product and close-out
 - A full season in the browser (Playwright) at every speed; autosave, load, *Sair*, service-worker update; speed against the original.

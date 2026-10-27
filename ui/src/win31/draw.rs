@@ -842,10 +842,12 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let pre: String = chars[..a].iter().collect();
     let mid: String = chars[a..b].iter().collect();
     let post: String = chars[b..].iter().collect();
-    let ink = if enabled { f.color } else { GRAY };
+    // (a disabled edit's text is silver: measured on the team editor's save dialog)
+    let ink = if enabled { f.color } else { SILVER };
     let mut pen = tx;
     pen += text(fb, font, pen, ty, &pre, ink, false);
-    if !mid.is_empty() {
+    // the selection shows only while the edit has the focus
+    if !mid.is_empty() && cx.focus == n.name && enabled {
         let mw = font.width(&mid);
         // (the team editor's edits, `indent` 3: the highlight starts at the text and is a pixel wider and taller)
         if indent == 3 {
@@ -855,6 +857,8 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         }
         text(fb, font, pen, ty, &mid, WHITE, false);
         pen += mw;
+    } else {
+        pen += text(fb, font, pen, ty, &mid, ink, false);
     }
     text(fb, font, pen, ty, &post, ink, false);
     // the caret: a black line before character `<name>.caret`, a pixel taller than the font's line

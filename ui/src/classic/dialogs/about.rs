@@ -5,6 +5,7 @@
 //! registration (`TCodeDlg`) is not part of the port: the "Registar" button is drawn but does nothing.
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::Classic;
+use crate::win31::{Forms, Skin};
 
 /// The version label of the capture of the original (`98.003`).
 pub const VERSION: &str = "98.003";
@@ -47,15 +48,21 @@ pub fn click(_c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
 }
 
 /// Width in pixels of the whole banner text (its font is the form's: Arial 13 bold).
-fn banner_width(c: &Classic, text: &str) -> i32 {
-    c.skin
-        .font("arial", 13, true, false)
+fn banner_width(skin: &Skin, text: &str) -> i32 {
+    skin.font("arial", 13, true, false)
         .map_or(0, |f| f.width(text))
 }
 
 pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
+    tick_box(&c.skin, &c.forms, d, ms);
+    c.dirty = true;
+    Outcome::Keep
+}
+
+/// The banner and the blinking notice after `ms` more milliseconds (the game's box and the team editor's).
+pub fn tick_box(skin: &Skin, forms: &Forms, d: &mut Dialog, ms: u32) {
     let (interval, pixels, width, text) = {
-        let b = c.forms.get(&d.form).and_then(|f| f.find("Banner1"));
+        let b = forms.get(&d.form).and_then(|f| f.find("Banner1"));
         (
             b.map_or(30, |b| b.int("ScrollInterval", 30)).max(1) as u32,
             b.map_or(1, |b| b.int("ScrollPixels", 1)),
@@ -65,7 +72,7 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
                 .to_string(),
         )
     };
-    let total = width + banner_width(c, &text);
+    let total = width + banner_width(skin, &text);
     let (scroll, rest) = advance_banner(
         d.num("scroll") as i32,
         d.num("scroll_ms") as u32 + ms,
@@ -85,8 +92,6 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
             if was_on { "off" } else { "on" }.to_string(),
         );
     }
-    c.dirty = true;
-    Outcome::Keep
 }
 
 /// The banner's scroll position after `ms` more milliseconds (including what was left over): one step of `pixels` per `interval`;
