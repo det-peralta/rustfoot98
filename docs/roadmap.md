@@ -52,7 +52,9 @@ printing.
 - *Nova equipa* walked through on the original and matched step by step (`analysis/captures/editor/new_*.png`): the window stays empty
   until the players, the colour/country/level/coach steps have no Cancel, T black / F white, no country chosen, level 10, Guarda-redes;
   OK waits for the names, the coach, a country, the player's name; a spin edit keeps Enter.
-- Open: a team edited in the port opened in the original; hover hints (`ShowHint`) are not drawn.
+- A team made in the port (`editor_shot ... save=`) put in the original's bundle opens in `EDITEQ.EXE` with its names, coach,
+  country, level, players and colours (`analysis/captures/editor/port_team_in_original.png`).
+- Open: hover hints (`ShowHint`) are not drawn; list boxes have no type-ahead (a letter jumps to the first row with it in the original).
 
 ## 6. Browser product and close-out
 - A full season in the browser (Playwright) at every speed; autosave, load, *Sair*, service-worker update; speed against the original.

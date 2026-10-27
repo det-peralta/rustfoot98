@@ -1,7 +1,7 @@
 //! Renders the team editor into a BMP: `editor_shot out.bmp [key=value ...]` with `dir=EQUIPAS directory` (default the original's),
 //! `team=FILE.EFT` (open it), `sel=N` (select a player), `menu=N` and `hl=N` (an open menu), then `do=` a `;`-separated script of
 //! menu commands (`TeamColor`), clicks (`@x,y` or `@x,y,r` for the right button), presses of a dialog's control (`!OKBtn`) and keys
-//! (`#Enter`, `#Tab`, `#a`). Needs the skin
+//! (`#Enter`, `#Tab`, `#a`); `save=path` writes the last team file the script saved. Needs the skin
 //! pack in `analysis/out/skin`.
 use rustfoot_ui::classic::Key;
 use rustfoot_ui::editor::{Editor, Ev};
@@ -92,6 +92,16 @@ fn main() -> Result<(), String> {
         }
     }
     e.draw();
+    // `save=path`: the last team file the script saved
+    if let Some(path) = get("save") {
+        let last = e.requests.iter().rev().find_map(|r| match r {
+            rustfoot_ui::editor::Request::Save(_, bytes) => Some(bytes.clone()),
+            _ => None,
+        });
+        if let Some(bytes) = last {
+            std::fs::write(&path, bytes).map_err(|x| x.to_string())?;
+        }
+    }
     std::fs::write(&out, e.fb.bmp()).map_err(|x| x.to_string())?;
     println!("wrote {out}");
     Ok(())
