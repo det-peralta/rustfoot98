@@ -378,6 +378,33 @@ fn main() -> Result<(), String> {
                 };
                 app.open(d);
             }
+            "ngopen" => {
+                // a dialog of a new game: `ngopen=countries` (optionally `pick=BRA,POR`), `ngopen=currency`
+                use rustfoot_ui::classic::dialogs::newgame;
+                app.dialogs.clear();
+                let d = match v.as_str() {
+                    "countries" => {
+                        let mut d = newgame::open_countries(&app, "NOVO");
+                        if let Some((_, picks)) = kv.iter().find(|(k, _)| k == "pick") {
+                            for code in picks.split(',') {
+                                let rows = d.lists.get_mut("ListBoxOfCountries").unwrap();
+                                if let Some(i) =
+                                    rows.iter().position(|r| r.starts_with(&format!("{code}|")))
+                                {
+                                    let r = rows[i].clone();
+                                    rows[i] = format!("{}|1", r.rsplit_once('|').unwrap().0);
+                                    d.set_num("sel", i as i64);
+                                }
+                            }
+                        }
+                        d
+                    }
+                    "currency" => newgame::open_currency("NOVO"),
+                    _ => return Err(format!("unknown dialog {v}")),
+                };
+                app.open(d);
+            }
+            "pick" => {}
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }

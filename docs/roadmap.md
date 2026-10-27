@@ -17,7 +17,8 @@ printing.
 - Forced substitution with only a goalkeeper left: the port behaves as the original (list, OK disabled until a row is chosen).
 
 ## 2. Screens that need the original first (capture, render with `classic_shot`, diff with `tools/ui/regions.py`)
-- New game: currency (`TcurrencyDlg`, "Com que moeda vai querer jogar?") and countries (`TselectCountriesDlg`, if the free copy has it).
+- New game: *Selecção de Países* done (the free copy has it; captures in `analysis/captures/newgame/`); *Dinheiro* shown, the currency still to
+  apply (records at `DS:0062`: scale `G`, prizes, money words; `World` keeps `G = 5` and the texts say *reais*).
 - Invitation of a human who has a club (`TinviteCoachDlg`).
 - Stadium levels above 2, spin edit / speed button / colour grid, `TCheckPlayerDlg`, observed and acquisitions dialogs.
 

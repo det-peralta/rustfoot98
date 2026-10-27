@@ -457,10 +457,69 @@ impl World {
                 teams.len()
             ));
         }
-        let mut rng = DelphiRng::new(seed);
         let mut order: Vec<usize> = (0..teams.len()).collect();
         order.sort_by_key(|&i| std::cmp::Reverse(teams[i].level)); // stable: ties keep the given (directory) order
         order.truncate(MAX_TEAMS);
+        World::from_order(DelphiRng::new(seed), teams, &order)
+    }
+
+    /// A new game with the countries chosen in *Selecção de Países* (`TSelectCountriesDlg`). `list` is the dialog's list, in its
+    /// order, as `(country code, selected)`. With more than 128 teams in the chosen countries, `OKBtnClick` (`1028:19ac`) takes teams
+    /// away at random, the bigger countries losing more: it picks a row (`Random(rows)`) and, if that country is chosen and has more
+    /// than one team left (more than none when every chosen country has one), removes one when `Random(128)` is below its count.
+    /// Then `1028:002a` takes, for every level from 20 down to 1, the teams of that level in directory order while their
+    /// country has places left.
+    pub fn from_countries(
+        seed: u32,
+        teams: &[EftTeam],
+        list: &[(String, bool)],
+    ) -> Result<World, String> {
+        let mut rng = DelphiRng::new(seed);
+        let mut left: Vec<usize> = list
+            .iter()
+            .map(|(code, on)| {
+                if *on {
+                    teams.iter().filter(|t| &t.country == code).count()
+                } else {
+                    0
+                }
+            })
+            .collect();
+        let mut total: usize = left.iter().sum();
+        if total < MIN_TEAMS {
+            return Err(format!("need at least {MIN_TEAMS} teams, got {total}"));
+        }
+        let mut countries = left.iter().filter(|&&n| n > 0).count();
+        while total > MAX_TEAMS {
+            let r = rng.random(list.len() as u16) as usize;
+            let floor = 1 - (countries == total) as usize;
+            if list[r].1 && left[r] > floor && (rng.random(128) as usize) < left[r] {
+                left[r] -= 1;
+                total -= 1;
+                if left[r] == 0 {
+                    countries -= 1;
+                }
+            }
+        }
+        let mut order = Vec::new();
+        for level in (1..=20u8).rev() {
+            for (i, t) in teams.iter().enumerate() {
+                if t.level != level {
+                    continue;
+                }
+                if let Some(k) = list.iter().position(|(code, on)| *on && *code == t.country) {
+                    if left[k] > 0 {
+                        left[k] -= 1;
+                        order.push(i);
+                    }
+                }
+            }
+        }
+        World::from_order(rng, teams, &order)
+    }
+
+    /// The world of the teams `order` (indices into `teams`, master-list order): the first 32 fill the divisions.
+    fn from_order(mut rng: DelphiRng, teams: &[EftTeam], order: &[usize]) -> Result<World, String> {
         let mut used = std::collections::HashSet::new();
         let mut clubs = Vec::new();
         for (pos, &i) in order.iter().enumerate() {
@@ -2795,6 +2854,71 @@ mod tests {
         }
         // the real save: Figueirense is the 30th team (index 29) and its squad averaged 5.4
         assert_eq!(base_strength(29), 5);
+    }
+
+    /// *Selecção de Países*: only the chosen countries' teams; above 128 the counts are cut at random down to 128 (`1028:19ac`),
+    /// every chosen country keeping at least one team; at or below 128 the world is the one of those teams alone.
+    #[test]
+    fn a_new_game_takes_the_teams_of_the_chosen_countries() {
+        let team = |i: usize, level: u8, country: &str| {
+            let mut t = fake_team(i, level);
+            t.short_name = format!("T{i}");
+            t.country = country.into();
+            t
+        };
+        let mut teams: Vec<EftTeam> = (0..90)
+            .map(|i| team(i, (i % 20 + 1) as u8, "BRA"))
+            .collect();
+        teams.extend((90..150).map(|i| team(i, (i % 20 + 1) as u8, "POR")));
+        teams.extend((150..160).map(|i| team(i, (i % 20 + 1) as u8, "ESP")));
+        let list = |b: bool, p: bool, e: bool| {
+            vec![
+                ("BRA".to_string(), b),
+                ("POR".to_string(), p),
+                ("ESP".to_string(), e),
+            ]
+        };
+        // too few
+        assert!(World::from_countries(1, &teams, &list(false, false, true)).is_err());
+        // 70 teams: no cut, the same world as the old builder of those teams
+        let w = World::from_countries(3, &teams, &list(false, true, true)).unwrap();
+        let only: Vec<EftTeam> = teams
+            .iter()
+            .filter(|t| t.country != "BRA")
+            .cloned()
+            .collect();
+        let v = World::from_teams(3, &only).unwrap();
+        let names = |w: &World| -> Vec<String> {
+            w.divisions
+                .iter()
+                .flatten()
+                .chain(w.pool.iter())
+                .map(|c| c.name.clone())
+                .collect()
+        };
+        assert_eq!(names(&w), names(&v));
+        // 160 teams: cut to 128, every country keeps teams, the bigger ones lose more
+        let w = World::from_countries(7, &teams, &list(true, true, true)).unwrap();
+        let all = names(&w);
+        assert_eq!(all.len(), MAX_TEAMS);
+        let count = |c: &str| {
+            teams
+                .iter()
+                .filter(|t| t.country == c && all.contains(&t.short_name))
+                .count()
+        };
+        let (b, p, e) = (count("BRA"), count("POR"), count("ESP"));
+        assert_eq!(b + p + e, MAX_TEAMS);
+        assert!(
+            e >= 1 && 90 - b >= 60 - p && 60 - p >= 10 - e,
+            "{b} {p} {e}"
+        );
+        // the master list keeps the level order
+        let levels: Vec<u8> = all
+            .iter()
+            .map(|n| teams.iter().find(|t| &t.short_name == n).unwrap().level)
+            .collect();
+        assert!(levels.windows(2).all(|x| x[0] >= x[1]));
     }
 
     #[test]

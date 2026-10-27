@@ -23,7 +23,11 @@ pub fn message(caption: &str, text: &str) -> Dialog {
 pub fn bind(c: &Classic, d: &mut Dialog) {
     match &d.kind {
         Kind::About => about::bind(c, d),
-        Kind::SelectGame | Kind::CoachName | Kind::Progress => newgame::bind(c, d),
+        Kind::SelectGame
+        | Kind::SelectCountries
+        | Kind::Currency
+        | Kind::CoachName
+        | Kind::Progress => newgame::bind(c, d),
         Kind::Halftime
         | Kind::ForcedSubstitution
         | Kind::Penalty
@@ -62,7 +66,11 @@ pub fn bind(c: &Classic, d: &mut Dialog) {
 pub fn click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     match &d.kind {
         Kind::About => about::click(c, d, name),
-        Kind::SelectGame | Kind::CoachName | Kind::Progress => newgame::click(c, d, name),
+        Kind::SelectGame
+        | Kind::SelectCountries
+        | Kind::Currency
+        | Kind::CoachName
+        | Kind::Progress => newgame::click(c, d, name),
         Kind::Halftime
         | Kind::ForcedSubstitution
         | Kind::Penalty
@@ -122,7 +130,9 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
         | Kind::Auction
         | Kind::Plantel => market::key(c, d, key),
         Kind::Other(n) if n == market::ASK_MORE_SALARY => market::key(c, d, key),
-        Kind::SelectGame | Kind::CoachName => newgame::key(c, d, key),
+        Kind::SelectGame | Kind::SelectCountries | Kind::Currency | Kind::CoachName => {
+            newgame::key(c, d, key)
+        }
         Kind::Message | Kind::Options | Kind::Stadium | Kind::Loan => misc::key(c, d, key),
         _ => None,
     }

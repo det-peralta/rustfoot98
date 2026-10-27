@@ -189,6 +189,8 @@ pub struct Classic {
     /// The teams a new game is made of (empty: invented clubs) and the seed for it.
     pub teams: Vec<rustfoot_core::eft::EftTeam>,
     pub seed: u32,
+    /// What the new-game dialogs chose (countries, currency) until the world is built.
+    pub new_game: dialogs::newgame::NewGame,
     /// Name the current game is saved under (empty before the first game starts).
     pub game_name: String,
     /// The name of the game being loaded (waiting for the host's text).
@@ -222,6 +224,7 @@ impl Classic {
             started: true,
             teams: Vec::new(),
             seed: 1,
+            new_game: Default::default(),
             game_name: String::new(),
             loading: None,
             clock: String::new(),

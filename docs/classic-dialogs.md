@@ -67,8 +67,11 @@ empty `ListBoxClassification`. The round button plays the cup day (`Classic::pla
 * `classic_shot` options: `open=search|observed|plantel|auction|auction_demo|sell|contract|message`, `page=sell|contract|message`, `registered=1`.
 
 ## Start, save and exit (`Classic::start`, `dialogs/newgame.rs`, `options.rs`)
-`Classic::start(skin, forms, data, teams, seed)` begins with no game: the desktop, the About box (OK leads on), `TSelectGameDlg`, a `TProgressDlg` while
-the world is built (`World::from_teams`, which already applies the start rule `pick_human`) or while the host answers `Request::Load(name)`, then for a
+`Classic::start(skin, forms, data, teams, seed)` begins with no game: the desktop, the About box (OK leads on), `TSelectGameDlg`; a new game then
+asks for the countries (`TSelectCountriesDlg`: the pack's countries sorted as Windows 3.1 sorts them, accented initials first; a click chooses or
+leaves out a country; *Todas*; OK from 34 teams; above 128 the yellow warning; Cancel quits) and the currency (`TCurrencyDlg`, *Dinheiro*), and the
+world is built under `TProgressDlg` *A iniciar o jogo...* (`World::from_countries`: the cut to 128 of `1028:19ac`, teams by level of `1028:002a`;
+`World::from_teams` when the pack is empty); a saved game shows *A carregar o jogo...* while the host answers `Request::Load(name)`. Then for a
 new game `TGetTeamsDlg` ("Sortear equipas" shows the club the rule gave, OK enters the main window). Cancel in the choice quits.
 Host API: `cl_start`, `Classic::load_text(text)` (answer to `Request::Load`), `Classic::save_text()` (answer to `Request::Save`), `Classic.clock`
 (`dd/mm/yy hh:mm`, for the description of saves) and `Data::set_saves("NAME\tfirst line of the text\n...")`. The first line of a saved text is a header

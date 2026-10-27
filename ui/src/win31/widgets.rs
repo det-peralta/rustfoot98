@@ -665,8 +665,12 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
             .or_else(|| cx.texts.get(&n.name).cloned())
             .unwrap_or_else(|| n.str("Text").unwrap_or("").to_string()),
     };
-    // the closed combo box is a pixel shorter than the control's `Height`
-    let h = n.int("Height", font.height() + 8) - 1;
+    // the closed combo box is a pixel shorter than the control's `Height`, but a drop-down list is at least as high as its font
+    // needs (the line height plus 7: 32 pixels for the currency's 19-pixel Arial, measured)
+    let mut h = n.int("Height", font.height() + 8) - 1;
+    if n.ident("Style") == Some("csDropDownList") {
+        h = h.max(font.tm_height + 7);
+    }
     let enabled = is_enabled(cx, n);
     if n.flag("Ctl3D", true) {
         sunken_box(fb, x, y, w, h, WHITE);

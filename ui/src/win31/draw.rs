@@ -1022,6 +1022,121 @@ fn balance_list(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32, r
     }
 }
 
+/// The owner-drawn list of *Selecção de Países* (`DrawCountry` `1028:171d`): rows of 31 pixels with the flag (`FLAGS/<code>`) at the
+/// left, the name 43 pixels in and the number of teams right-aligned 20 pixels before the scroll bar; a chosen country is yellow and
+/// bold, the current row has the focus rectangle. Rows are `code|name|count|chosen` (`1` or `0`); `<name>.top`, `<name>.sel`.
+#[allow(clippy::too_many_arguments)]
+fn countries(
+    fb: &mut Fb,
+    cx: &Ctx,
+    n: &Node,
+    f: &FontSpec,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    rows: &[String],
+) {
+    const ROW: i32 = 31;
+    // the rows are written larger than the form's font (Arial 16 pixels, measured)
+    let f = &FontSpec {
+        px: 16,
+        ..f.clone()
+    };
+    let (Some(reg), Some(bold)) = (
+        cx.font(f),
+        cx.font(&FontSpec {
+            bold: true,
+            ..f.clone()
+        }),
+    ) else {
+        return;
+    };
+    let num = |k: &str| {
+        cx.texts
+            .get(&format!("{}.{k}", n.name))
+            .and_then(|v| v.parse::<i64>().ok())
+    };
+    let fit = ((h - 4) / ROW) as usize;
+    let top = (num("top").unwrap_or(0).max(0) as usize).min(rows.len().saturating_sub(fit));
+    let sel = num("sel").unwrap_or(-1);
+    let scroll = rows.len() > fit;
+    let (rx, rw) = (x + 2, w - 4 - if scroll { 16 } else { 0 });
+    for (k, row) in rows.iter().enumerate().skip(top).take(fit) {
+        let c: Vec<&str> = row.split('|').collect();
+        // (the rows start one pixel above the list's client area: measured)
+        let ry = y + 1 + (k - top) as i32 * ROW;
+        let on = c.get(3) == Some(&"1");
+        if on {
+            fb.fill(rx, ry, rw, ROW, Rgb(248, 252, 0));
+        }
+        if let Some(b) = cx.skin.bitmap("FLAGS", c.first().copied().unwrap_or("")) {
+            for r in 0..b.h {
+                for col in 0..b.w {
+                    let p = b.px[(r * b.w + col) as usize];
+                    fb.set(
+                        rx - 1 + col,
+                        ry + 1 + r,
+                        Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
+                    );
+                }
+            }
+        }
+        let font = if on { bold } else { reg };
+        let ty = ry + (ROW - font.height()) / 2 - 1;
+        text(
+            fb,
+            font,
+            rx + 43,
+            ty,
+            c.get(1).copied().unwrap_or(""),
+            BLACK,
+            false,
+        );
+        let count = c.get(2).copied().unwrap_or("0");
+        let label = if count == "1" {
+            "1 equipa".to_string()
+        } else {
+            format!("{count} equipas")
+        };
+        // placed as if it were always plural: "1 equipa" ends one letter short of the others
+        text(
+            fb,
+            font,
+            rx + rw - 20 - font.width(&format!("{count} equipas")),
+            ty,
+            &label,
+            BLACK,
+            false,
+        );
+        if k as i64 == sel {
+            focus_rect(fb, rx, ry, rw, ROW, rx, ry);
+        }
+        cx.hits.borrow_mut().push(Hit {
+            name: format!("{}#{k}", n.name),
+            class: "ListRow".into(),
+            x: rx,
+            y: ry,
+            w: rw,
+            h: ROW,
+            enabled: true,
+        });
+    }
+    if scroll {
+        widgets::vscroll(
+            fb,
+            cx,
+            &n.name,
+            x + w - 16,
+            y + 2,
+            h - 4,
+            top,
+            rows.len(),
+            fit,
+        );
+    }
+}
+
 fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
     let flat = (!n.flag("Ctl3D", true) && n.flag("ParentColor", false))
@@ -1041,6 +1156,12 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if n.name == "ListBoxBalance" {
         if let Some(rows) = cx.lists.get(&n.name) {
             balance_list(fb, cx, n, f, x, y, rows);
+        }
+        return;
+    }
+    if n.name == "ListBoxOfCountries" {
+        if let Some(rows) = cx.lists.get(&n.name) {
+            countries(fb, cx, n, f, x, y, w, h, rows);
         }
         return;
     }
@@ -1556,6 +1677,15 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let spaced = n.int("Margin", -1) < 0 && n.int("Spacing", 4) >= 0;
         let ty = if spaced {
             y + 2 + glyph_margin(cx, n, h, gh, f) + gh + n.int("Spacing", 4)
+        } else if n.int("Margin", -1) >= 0
+            && n.int("Spacing", 4) == -1
+            && gh > 0
+            && font.height() != font.tm_height
+        {
+            // `CalcButtonLayout` with a margin and `Spacing = -1`: the caption is centred in what the glyph leaves, so its place
+            // depends on the glyph's height (client area `h - 5` high, from `y + 2`)
+            let m = n.int("Margin", 4);
+            y + 2 + m + gh + (h - 5 - m - gh - font.tm_height) / 2
         } else {
             y + h - 2 - n.int("Margin", 4) - font.tm_height
                 + if font.height() != font.tm_height {

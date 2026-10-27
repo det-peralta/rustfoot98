@@ -15,6 +15,9 @@ pub enum Kind {
     Message,
     About,
     SelectGame,
+    /// *Selecção de Países* (`TSELECTCOUNTRIESDLG`) and *Dinheiro* (`TCURRENCYDLG`) of a new game.
+    SelectCountries,
+    Currency,
     CoachName,
     Progress,
     Options,
