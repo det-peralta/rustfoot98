@@ -47,6 +47,7 @@ console.log('select', await status());
 await p.mouse.click(456, 224); await p.keyboard.type('teste'); await run(200);
 console.log('typed', await status()); await shot('s1');
 await p.keyboard.press('Enter'); await run(1500);
+let named = false;
 let st = '', last = '', same = 0, steps = 0;
 const start = (await status()).split(' ');
 console.log('start', start.join(' '));
@@ -63,10 +64,18 @@ while (steps < 200000) {
   // a new game: every country (Todas), then OK
   if (dlg === 'SelectCountries') { await p.mouse.click(507, 130); await run(200); await p.mouse.click(600, 130); await run(800); continue; }
   if (dlg === 'CoachName') {
-    for (let i = 1; i <= humans; i++) { await p.keyboard.type('joga' + i); if (i < humans) await p.keyboard.press('Tab'); }
+    // the names once; Enter in a name moves to the button, which draws the clubs and then becomes OK
+    if (!named) {
+      for (let i = 1; i <= humans; i++) { await p.keyboard.type('joga' + i); if (i < humans) await p.keyboard.press('Tab'); }
+      named = true;
+    }
     await p.keyboard.press('Enter'); await run(800); continue;
   }
   if (started === 'false' && dlg === '-') { await run(500); continue; }
+  // the cup draw runs by itself (1.5 s per tie while a human is still in the pot)
+  if (dlg === 'CupDraw') { await run(3000); await p.keyboard.press('Enter'); continue; }
+  // a human's penalty: a shooter first (the list's first row), then Chutar / the goalkeeper's side
+  if (dlg === 'Penalty') { await p.mouse.click(300, 279); await run(200); await p.keyboard.press('Enter'); await run(600); continue; }
   if (dlg === 'ForcedSubstitution') { await p.mouse.click(300, 312); await p.keyboard.press('Enter'); await run(300); continue; }
   if (dlg === 'Auction') { await p.keyboard.press('Escape'); await run(300); continue; }
   if (dlg !== '-') { await p.keyboard.press('Enter'); await run(300); continue; }

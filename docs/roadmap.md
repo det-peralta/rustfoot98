@@ -58,8 +58,11 @@ printing.
 - Open: hover hints (`ShowHint`) are not drawn.
 
 ## 6. Browser product and close-out
-- A full season in the browser (Playwright) at every speed; autosave, load, *Sair*, service-worker update; speed against the original.
-- Final run: two humans, three seasons, native and browser, no panics; CI green; README "Not modelled" and this file updated.
+- Done: `tools/capture/classic_season.mjs` plays the browser build by the game's state (`cl_status`): one human for a season and two
+  humans for three seasons (1998 -> 2001, 13 198 steps) without a console error, the autosave loads back after a reload. Natively the
+  test `three_seasons_with_two_humans_survive_saving_and_loading` does the same with a save/load round trip every season.
+- Open: the speed settings against the original's timing (the runs use the default), the service worker (the classic and editor pages
+  do not register one; only the legacy page does).
 
 ## Size
 | Step | Sessions |
