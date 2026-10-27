@@ -136,11 +136,18 @@ pub fn pick_for_sale(club: &Club) -> Option<usize> {
 
 /// `1010:633d` (without the human rules): may `buyer` bid for `slot`?
 pub fn may_bid(buyer: &Club, slot: &Slot) -> bool {
+    bid_refusal(buyer, slot).is_none()
+}
+
+/// Why `buyer` may not take `slot`, in the original's words: a full squad (24 with the players bought) or the fifth foreigner
+/// outside the Bosman group.
+pub fn bid_refusal(buyer: &Club, slot: &Slot) -> Option<&'static str> {
     if buyer.slots.len() + buyer.bought as usize >= 24 {
-        return false;
+        return Some("Tem demasiados jogadores");
     }
     let class = country_class(buyer.country, slot.nat);
-    !(foreigners(buyer) + buyer.bought_foreign as usize >= 5 && class == 2)
+    (foreigners(buyer) + buyer.bought_foreign as usize >= 5 && class == 2)
+        .then_some("Tem demasiados jogadores estrangeiros")
 }
 
 /// `1010:5bb1`: how much the buyer wants the player.
@@ -249,6 +256,30 @@ pub fn floor_1000(v: i64) -> i64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_refused_bid_gives_the_originals_reason() {
+        let w = crate::world::World::synthetic(1);
+        let mut c = w.divisions[0][0].clone();
+        c.country = *b"BRA";
+        let mut s = c.slots[0];
+        s.nat = *b"BRA";
+        c.bought = 0;
+        c.bought_foreign = 0;
+        for x in c.slots.iter_mut() {
+            x.nat = *b"BRA";
+        }
+        assert_eq!(bid_refusal(&c, &s), None);
+        c.bought = (24 - c.slots.len()) as u16;
+        assert_eq!(bid_refusal(&c, &s), Some("Tem demasiados jogadores"));
+        c.bought = 0;
+        c.bought_foreign = 5;
+        s.nat = *b"JPN";
+        assert_eq!(
+            bid_refusal(&c, &s),
+            Some("Tem demasiados jogadores estrangeiros")
+        );
+    }
 
     #[test]
     fn country_classes_follow_the_group_files() {

@@ -1234,8 +1234,8 @@ impl World {
         if me.fin.cash < price {
             return Err(format!("sem dinheiro: o preço é {price}"));
         }
-        if !crate::market::may_bid(me, &slot) {
-            return Err("o plantel está cheio ou já tens estrangeiros a mais".into());
+        if let Some(why) = crate::market::bid_refusal(me, &slot) {
+            return Err(why.into());
         }
         let year = self.year;
         let round = self.round;
@@ -1407,8 +1407,8 @@ impl World {
         if hc.fin.cash < amount {
             return Err("sem dinheiro suficiente".into());
         }
-        if !crate::market::may_bid(hc, &self.club_ref(seller).slots[idx]) {
-            return Err("o plantel está cheio ou já tens estrangeiros a mais".into());
+        if let Some(why) = crate::market::bid_refusal(hc, &self.club_ref(seller).slots[idx]) {
+            return Err(why.into());
         }
         self.board.remove(listing);
         self.settle(seller, idx, human, amount, l.round);
