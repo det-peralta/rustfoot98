@@ -13,7 +13,7 @@ reproduces Windows 3.1 and the Delphi VCL pixel for pixel from the data the orig
 pip install freetype-py && python3 tools/ui/skin.py && python3 tools/ui/webpack.py
 rustup target add wasm32-unknown-unknown
 # 2. build the WebAssembly and serve it
-web/build.sh serve            # http://localhost:8080  (opens the classic interface; ?nosw is not needed)
+web/build.sh serve            # http://localhost:8080  (opens the classic interface; works offline after a visit, ?nosw turns that off)
 ```
 Open `http://localhost:8080/` : About box, new game (name the file, name the coaches, "Sortear equipas"), then the main window with its
 menus, the squad list, the pages Jogo / Jogador / Finanças / Selecção / Adversário, the round view with the pie clock, half-time

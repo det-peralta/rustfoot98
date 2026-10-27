@@ -1,6 +1,6 @@
 // Host of the team editor (ui/src/editor, the original's EDITEQ.EXE) compiled to WebAssembly (ui-web/src/editor_host.rs).
 // The teams are the pack's (pack.js) with the ones saved here, which are kept in this browser and used by new games.
-import { allTeams, saveTeam, start } from "./pack.js";
+import { allTeams, offline, saveTeam, start } from "./pack.js";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -117,4 +117,5 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+offline();
 start(say, run);

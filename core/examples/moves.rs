@@ -1,34 +1,58 @@
+//! Players who changed clubs between two saves of the original: `cargo run --release -p rustfoot-core --example moves -- a.e98 b.e98`.
 use rustfoot_core::e98;
-use std::collections::HashMap;
-fn main() {
-    let a = e98::parse(&std::fs::read(std::env::args().nth(1).unwrap()).unwrap()).unwrap();
-    let b = e98::parse(&std::fs::read(std::env::args().nth(2).unwrap()).unwrap()).unwrap();
-    let mut owner: HashMap<u16, (String, u16, u8)> = HashMap::new();
-    for t in &a.teams {
+
+fn main() -> Result<(), String> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let [a, b] = &args[..] else {
+        return Err("usage: moves before.e98 after.e98".into());
+    };
+    let before = e98::parse(&std::fs::read(a).map_err(|e| e.to_string())?)?;
+    let after = e98::parse(&std::fs::read(b).map_err(|e| e.to_string())?)?;
+    let club_of = |s: &e98::E98, id: u16| {
+        s.teams
+            .iter()
+            .find(|t| t.players.iter().any(|p| p.id == id))
+            .map(|t| t.short_name.clone())
+    };
+    for t in &before.teams {
         for p in &t.players {
-            owner.insert(p.id, (t.short_name.clone(), p.strength, p.position));
-        }
-    }
-    for t in &b.teams {
-        println!(
-            "{:<14} {} -> {} players",
-            t.short_name,
-            a.teams
-                .iter()
-                .find(|x| x.id == t.id)
-                .map(|x| x.players.len())
-                .unwrap_or(0),
-            t.players.len()
-        );
-        for p in &t.players {
-            match owner.get(&p.id) {
-                Some((o, s, pos)) if *o != t.short_name => println!(
-                    "   MOVED {} (str {}->{}, pos {}) from {}",
-                    p.name, s, p.strength, pos, o
-                ),
-                None => println!("   NEW {} str {} pos {}", p.name, p.strength, p.position),
-                _ => {}
+            let now = club_of(&after, p.id);
+            if now.as_deref() != Some(t.short_name.as_str()) {
+                let q = after
+                    .teams
+                    .iter()
+                    .flat_map(|t| &t.players)
+                    .find(|q| q.id == p.id);
+                println!(
+                    "{:<20} {:<16} str {:>2} wage {:>6} -> {:<16} {}",
+                    p.name,
+                    t.short_name,
+                    p.strength,
+                    p.wage,
+                    now.unwrap_or_else(|| "(gone)".into()),
+                    q.map(|q| format!("str {} wage {} fresh {}", q.strength, q.wage, q.fresh))
+                        .unwrap_or_default()
+                );
             }
         }
     }
+    for t in &after.teams {
+        for p in &t.players {
+            if club_of(&before, p.id).is_none() {
+                println!(
+                    "{:<20} new at {:<16} str {:>2} wage {}",
+                    p.name, t.short_name, p.strength, p.wage
+                );
+            }
+        }
+    }
+    println!(
+        "transfers listed in the save: {} (before: {})",
+        after.transfers.len(),
+        before.transfers.len()
+    );
+    for t in after.transfers.iter().skip(before.transfers.len()) {
+        println!("  new: {t:?}");
+    }
+    Ok(())
 }

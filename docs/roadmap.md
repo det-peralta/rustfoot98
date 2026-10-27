@@ -64,8 +64,10 @@ printing.
 - Done: `tools/capture/classic_season.mjs` plays the browser build by the game's state (`cl_status`): one human for a season and two
   humans for three seasons (1998 -> 2001, 13 198 steps) without a console error, the autosave loads back after a reload. Natively the
   test `three_seasons_with_two_humans_survive_saving_and_loading` does the same with a save/load round trip every season.
-- Open: the speed settings against the original's timing (the runs use the default), the service worker (the classic and editor pages
-  do not register one; only the legacy page does).
+- Offline (2026-10-27): the game and editor pages register `sw.js` (v3, network first, the cache answers without a network; the skin
+  pack the server has is precached); `tools/capture/offline.mjs` loads the game, the editor and `/` with the network off after one visit.
+  `?nosw` removes the worker while developing.
+- Open: the speed settings against the original's timing (the runs use the default).
 
 ## Size
 | Step | Sessions |

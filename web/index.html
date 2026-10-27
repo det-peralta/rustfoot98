@@ -9,14 +9,8 @@
 <body>
 <p>A abrir o <a href="classic.html">Rustfoot 98</a>… (<a href="legacy.html">versão simplificada</a>)</p>
 <script>
-// an older service worker may still answer for this page: drop it and its caches, then go to the classic interface
-(async () => {
-  try {
-    for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
-    for (const k of await caches.keys()) await caches.delete(k);
-  } catch (e) {}
-  location.replace("classic.html");
-})();
+// the classic interface (the service worker it registers keeps this page too, for offline use)
+location.replace("classic.html" + location.search);
 </script>
 </body>
 </html>

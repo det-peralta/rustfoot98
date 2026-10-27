@@ -1,6 +1,6 @@
 // Host of the pixel-exact classic interface (ui/src/classic) compiled to WebAssembly (ui-web/src/classic_host.rs).
 // The skin pack and the teams (with those saved by the team editor) come from pack.js.
-import { allTeams, start } from "./pack.js";
+import { allTeams, offline, start } from "./pack.js";
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const msg = document.getElementById("msg");
@@ -129,4 +129,5 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
+offline();
 start(say, run);

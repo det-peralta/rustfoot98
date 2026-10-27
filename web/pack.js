@@ -109,6 +109,20 @@ export function askForPack(say, run) {
   });
 }
 
+/// Offline use: registers the service worker (sw.js), or with `?nosw` in the URL removes it (while developing).
+export async function offline() {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    if (location.search.includes("nosw")) {
+      for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    } else {
+      await navigator.serviceWorker.register("sw.js");
+    }
+  } catch (e) {
+    // no https / localhost: the game works, only not offline
+  }
+}
+
 /// Loads the pack (served, else stored) and runs `run(pack)`, or asks for it.
 export async function start(say, run) {
   try {
