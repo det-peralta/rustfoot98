@@ -37,7 +37,7 @@ bare form. `tools/ui/regions.py golden.png out.bmp x y w h` lists the differing 
 |---|---|---|
 | About | TABOUTDLG | `dialogs/about.rs` |
 | SelectGame, CoachName, Progress | TSELECTGAMEDLG, TGETTEAMSDLG (`CoachName`: the players' names and the draw of the club), TPROGRESSDLG | `dialogs/newgame.rs` |
-| Options, Stadium, Loan, Message | TOPTIONSDLG, TSTADIUMDLG, TLOANDLG, message boxes | `dialogs/misc.rs` |
+| Options, Stadium, Loan, Message, Balance sheet | TOPTIONSDLG, TSTADIUMDLG, TLOANDLG, message boxes, TBALANCEDLG | `dialogs/misc.rs` |
 | Standings, Scorers, Calendar, Winners, AllTimeScorers, Transactions, Acquisitions | TCLASSIFICATIONDLG, TPRINTLISTDLG | `dialogs/tables.rs` |
 | Sell, Contract, Search, Observed, Auction, Plantel | main window pages, TCHECKPLAYERDLG, TOBSERVEDPLAYERSDLG, TSELLPLAYERDLG, TPLANTELDLG | `dialogs/market.rs` |
 | CoachHistory, CoachManager, CoachRanking, CoachProfile, TeamHistory (TPRINTLISTDLG, TCOACHMANAGERDLG, TCOACHOPTIONSDLG) | `dialogs/coach.rs` |

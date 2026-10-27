@@ -14,6 +14,8 @@ pub struct MainState {
     pub page: Option<Page>,
     /// Index into the roster order of the selected player.
     pub selected: Option<usize>,
+    /// The row of the Finanças list last clicked (it stays selected; the click opens the balance sheet).
+    pub balance_sel: Option<usize>,
     /// The open menu: top-level index and the highlighted entry.
     pub menu: Option<(usize, Option<usize>)>,
     /// The Vender, Contrato and Mensagem pages (see `dialogs/market.rs`).
@@ -41,6 +43,56 @@ pub fn roster_order(club: &Club) -> Vec<usize> {
 
 fn rgb(c: [u8; 3]) -> Rgb {
     Rgb(c[0], c[1], c[2])
+}
+
+/// `TThreeBalances` (`1050:2bf1` / `21d0`): the rows of the balance lists in the field encoding of `1068:0ad6`, a label column of 120
+/// pixels and a right-aligned column of 90 for each season given (the Finanças page shows this season, the balance sheet three).
+/// `seasons` holds ledgers in the order of `Finance::ledger`.
+pub fn balance_rows(year: u16, seasons: &[[i64; 7]]) -> Vec<String> {
+    const LABELS: [&str; 14] = [
+        "Época",
+        "Receitas",
+        "Bilhetes",
+        "Jogadores vendidos",
+        "Prémios",
+        "Despesas",
+        "Salários",
+        "Jogadores comprados",
+        "Bancadas",
+        "Juros",
+        " ",
+        "Total de receitas",
+        "Total de despesas",
+        "Saldo",
+    ];
+    (0..LABELS.len())
+        .map(|row| {
+            let bold = matches!(row, 0 | 1 | 5);
+            let mut s = format!("{}x{}\t", if bold { "\u{2}" } else { "" }, LABELS[row]);
+            for (k, l) in seasons.iter().enumerate() {
+                let [gate, sales, prizes, purchases, wages, works, interest] = *l;
+                let v = match row {
+                    0 => (year as i64 - k as i64).to_string(),
+                    1 | 5 | 10 => {
+                        s.push_str("Z \t");
+                        continue;
+                    }
+                    2 => text::int(gate),
+                    3 => text::int(sales),
+                    4 => text::int(prizes),
+                    6 => text::int(wages),
+                    7 => text::int(purchases),
+                    8 => text::int(works),
+                    9 => text::int(interest),
+                    11 => text::int(gate + sales + prizes),
+                    12 => text::int(purchases + wages + works + interest),
+                    _ => text::int(l.iter().sum()),
+                };
+                s.push_str(&format!("\u{6}Z{v}\t"));
+            }
+            s
+        })
+        .collect()
 }
 
 fn col(c: Rgb) -> String {
@@ -355,31 +407,14 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     }
     if page == Page::Finances {
         let f = &club.fin;
-        let revenue = f.gate + f.sales + f.prizes;
-        let expenses = f.wages + f.purchases + f.works + f.interest;
-        let rows = [
-            ("Época", c.world.year.to_string(), true),
-            ("Receitas", String::new(), true),
-            ("Bilhetes", text::int(f.gate), false),
-            ("Jogadores vendidos", text::int(f.sales), false),
-            ("Prémios", text::int(f.prizes), false),
-            ("Despesas", String::new(), true),
-            ("Salários", text::int(f.wages), false),
-            ("Jogadores comprados", text::int(f.purchases), false),
-            ("Bancadas", text::int(f.works), false),
-            ("Juros", text::int(f.interest), false),
-            ("", String::new(), false),
-            ("Total de receitas", text::int(revenue), false),
-            ("Total de despesas", text::int(expenses), false),
-            ("Saldo", text::int(revenue + expenses), false),
-        ];
         lists.insert(
             "ListBoxBalance".to_string(),
-            rows.iter()
-                .map(|(a, b, bold)| format!("{a}|{b}|{}", if *bold { "b" } else { "" }))
-                .collect(),
+            balance_rows(c.world.year, &[f.ledger()]),
         );
         t("ListBoxBalance.color", col(bg));
+        if let Some(s) = c.main.balance_sel {
+            t("ListBoxBalance.sel", s.to_string());
+        }
         let wages: i64 = club.slots.iter().map(|s| s.wage).sum();
         t("textTotalSalaries", text::int(wages));
         t(

@@ -190,6 +190,14 @@ impl Classic {
             {
                 self.main.selected = Some(i);
             }
+            // `ShowBalance` (`1018:3c45`): the list keeps the clicked row selected and opens the balance sheet
+            if let Some(i) = name
+                .strip_prefix("ListBoxBalance#")
+                .and_then(|i| i.parse().ok())
+            {
+                self.main.balance_sel = Some(i);
+                self.open(dialogs::misc::balance());
+            }
             return;
         }
         if dialogs::market::main_click(self, name) {

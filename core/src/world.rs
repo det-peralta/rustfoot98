@@ -2492,6 +2492,15 @@ impl World {
         let cup_winner = self.cup_champion.clone();
         let honours = self.honours(cup_winner.as_deref());
         self.pay_prizes(cup_winner.as_deref());
+        // the prizes close the season's ledger (checked on the original's saves on both sides of a season change)
+        for c in self
+            .divisions
+            .iter_mut()
+            .flatten()
+            .chain(self.pool.iter_mut())
+        {
+            c.fin.new_season();
+        }
         self.record_season_history();
         end_of_season(
             &mut self.rng,
@@ -3921,16 +3930,14 @@ mod tests {
                 .find(|c| c.name == n)
                 .unwrap()
         };
-        assert!(find(&champion).fin.prizes >= p1);
-        assert!(find(&cup).fin.prizes >= p2);
-        let total: i64 = w
-            .divisions
-            .iter()
-            .flatten()
-            .chain(w.pool.iter())
-            .map(|c| c.fin.prizes)
-            .sum();
+        // the prizes close the old season's ledger, which is kept as last season's; the new one starts at zero
+        const PRIZES: usize = 2;
+        assert!(find(&champion).fin.past[0][PRIZES] >= p1);
+        assert!(find(&cup).fin.past[0][PRIZES] >= p2);
+        let clubs = || w.divisions.iter().flatten().chain(w.pool.iter());
+        let total: i64 = clubs().map(|c| c.fin.past[0][PRIZES]).sum();
         assert!(total >= p1 + p2 + p3, "{total}");
+        assert!(clubs().all(|c| c.fin.ledger() == [0; 7]));
         // a new season starts with fresh scoring tallies
         assert!(w
             .divisions

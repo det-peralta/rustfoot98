@@ -37,6 +37,8 @@ pub struct Finance {
     pub interest: i64,
     pub works: i64,
     pub prizes: i64,
+    /// The ledgers of the last season and the one before (`+0x89`, `+0xa5`), in the order of [`Finance::ledger`].
+    pub past: [[i64; 7]; 2],
 }
 
 impl Default for Finance {
@@ -54,6 +56,7 @@ impl Default for Finance {
             interest: 0,
             works: 0,
             prizes: 0,
+            past: [[0; 7]; 2],
         }
     }
 }
@@ -74,6 +77,32 @@ impl Finance {
 
     pub fn capacity(&self) -> i64 {
         self.stadium as i64 * SEATS_PER_LEVEL
+    }
+
+    /// The season's ledger in the order of the original's totals (`team+0x31..0x49`): gate, sales, prizes, purchases, wages, works,
+    /// interest.
+    pub fn ledger(&self) -> [i64; 7] {
+        [
+            self.gate,
+            self.sales,
+            self.prizes,
+            self.purchases,
+            self.wages,
+            self.works,
+            self.interest,
+        ]
+    }
+
+    /// `1010:38a9` as a season starts: the ledger becomes last season's, last season's the one before, and the totals start at zero.
+    pub fn new_season(&mut self) {
+        self.past = [self.ledger(), self.past[0]];
+        self.gate = 0;
+        self.sales = 0;
+        self.prizes = 0;
+        self.purchases = 0;
+        self.wages = 0;
+        self.works = 0;
+        self.interest = 0;
     }
 
     /// `1010:58bf`: adds to the cash and to the category total.
@@ -260,5 +289,14 @@ mod tests {
         f.book(-40_500, Category::Wages);
         assert_eq!(f.cash, 1_250_000 + 47_448 - 40_500);
         assert_eq!((f.gate, f.wages), (47_448, -40_500));
+        f.book(3_000_000, Category::Prizes);
+        f.new_season();
+        assert_eq!(f.past[0], [47_448, 0, 3_000_000, 0, -40_500, 0, 0]);
+        assert_eq!(f.ledger(), [0; 7]);
+        f.book(-500_000, Category::Works);
+        f.new_season();
+        assert_eq!(f.past[1], [47_448, 0, 3_000_000, 0, -40_500, 0, 0]);
+        assert_eq!(f.past[0][5], -500_000);
+        assert_eq!(f.cash, 1_250_000 + 47_448 - 40_500 + 3_000_000 - 500_000);
     }
 }

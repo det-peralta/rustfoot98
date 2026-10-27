@@ -1038,35 +1038,6 @@ fn classification(fb: &mut Fb, font: &Font, x: i32, y: i32, w: i32, rows: &[Stri
 }
 
 /// The balance list of the finances page: rows `label|value|b` (`b` for a bold row), 16 pixels high, values right-aligned.
-fn balance_list(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32, rows: &[String]) {
-    let (Some(reg), Some(bold)) = (
-        cx.font(f),
-        cx.font(&FontSpec {
-            bold: true,
-            ..f.clone()
-        }),
-    ) else {
-        return;
-    };
-    let _ = n;
-    for (i, row) in rows.iter().enumerate() {
-        let c: Vec<&str> = row.split('|').collect();
-        let font = if c.get(2) == Some(&"b") { bold } else { reg };
-        let ty = y + i as i32 * 16;
-        text(
-            fb,
-            font,
-            x + 2,
-            ty,
-            c.first().copied().unwrap_or(""),
-            f.color,
-            false,
-        );
-        let v = c.get(1).copied().unwrap_or("");
-        text(fb, font, x + 212 - font.width(v), ty, v, f.color, false);
-    }
-}
-
 /// The squad of the team editor (`WritePlayer`, `1000:1a18` of `EDITEQ.EXE`): rows of 14 pixels with the name, the country of a
 /// foreigner (`* Escócia`) and the position, written in the club's background colour on white; the selected row is filled with that colour
 /// and written in the club's foreground; the current row has the focus rectangle. Rows are `name|country|position`;
@@ -1275,12 +1246,6 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let Some(font) = cx.font(f) else {
         return;
     };
-    if n.name == "ListBoxBalance" {
-        if let Some(rows) = cx.lists.get(&n.name) {
-            balance_list(fb, cx, n, f, x, y, rows);
-        }
-        return;
-    }
     if n.name == "PlayerList" {
         if let Some(rows) = cx.lists.get(&n.name) {
             editor_players(fb, cx, n, f, x, y, w, h, rows);
@@ -1303,6 +1268,7 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         && matches!(
             n.name.as_str(),
             "listOfItems"
+                | "ListBoxBalance"
                 | "ListBoxDivision1"
                 | "ListBoxDivision2"
                 | "ListBoxDivision3"
@@ -1317,7 +1283,12 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             } else {
                 cx.color_of(n, "bg").unwrap_or(WHITE)
             };
-            super::printlist::draw_list(fb, cx, n, f, bg, x, y, w, h, rows);
+            if n.name == "ListBoxBalance" {
+                // `bsNone` and no outline: the rows start at the control's corner (`draw_list` counts a one-pixel frame)
+                super::printlist::draw_list(fb, cx, n, f, bg, x - 1, y - 1, w + 2, h + 2, rows);
+            } else {
+                super::printlist::draw_list(fb, cx, n, f, bg, x, y, w, h, rows);
+            }
             if n.name.starts_with("ListBoxDivision") {
                 // a flat list has a plain black outline over the rows' edges
                 for (rx, ry, rw, rh) in [

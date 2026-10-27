@@ -1211,6 +1211,7 @@ fn plantel_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
                 return Outcome::Open(Box::new(l));
             }
         }
+        "balanceBtn" => return Outcome::Open(Box::new(super::misc::balance())),
         _ => {}
     }
     Outcome::Keep
@@ -1591,6 +1592,39 @@ mod flows {
     }
 
     #[test]
+    fn the_finances_list_and_the_squad_window_open_the_balance_sheet() {
+        let Some(mut c) = game() else { return };
+        c.main.page = Some(Page::Finances);
+        c.draw();
+        let h = c
+            .hits
+            .iter()
+            .find(|h| h.name == "ListBoxBalance#7")
+            .cloned()
+            .expect("the rows of the Finanças list are hit targets");
+        let (x, y) = (h.x + 2, h.y + 2);
+        c.event(Ev::Down(x, y));
+        c.event(Ev::Up(x, y));
+        assert_eq!(c.main.balance_sel, Some(7));
+        let d = c.dialogs.last().expect("the balance sheet is open");
+        assert_eq!(d.kind, Kind::Other(super::super::misc::BALANCE.into()));
+        c.draw();
+        let d = c.dialogs.last().unwrap();
+        let year = c.world.year;
+        assert!(d.lists["ListBoxBalance"][0].ends_with(&format!(
+            "Z{year}\t\x06Z{}\t\x06Z{}\t",
+            year - 1,
+            year - 2
+        )));
+        c.event(Ev::Key(Key::Enter));
+        assert!(c.dialogs.is_empty());
+        // the squad window's button opens it over the squad window
+        let mut d = Dialog::new(Kind::Plantel, "TPLANTELDLG");
+        let o = dialogs::click(&mut c, &mut d, "balanceBtn");
+        assert!(matches!(o, Outcome::Open(b) if b.form == "TBALANCEDLG"));
+    }
+
+    #[test]
     fn selling_from_the_vender_page() {
         let Some(mut c) = game() else { return };
         let before = squad(&c);
@@ -1677,20 +1711,41 @@ mod flows {
     fn bidding_in_an_auction_of_the_board() {
         let Some(mut c) = game() else { return };
         let me = c.world.human_location().unwrap();
-        let other = c.world.all_clubs().into_iter().find(|l| *l != me).unwrap();
-        let (club, player) = {
-            let cl = c.world.club_of(other);
-            (cl.name.clone(), cl.names[1].clone())
-        };
-        c.world.board.push(rustfoot_core::world::Listing {
-            seller: club,
-            player: player.clone(),
-            ask: 1000,
-            best: None,
-            round: 0,
-        });
+        // the first player of another club the user may bid for (not a foreigner over the limit)
+        let candidates: Vec<(String, String)> = c
+            .world
+            .all_clubs()
+            .into_iter()
+            .filter(|l| *l != me)
+            .flat_map(|l| {
+                let cl = c.world.club_of(l);
+                cl.names
+                    .iter()
+                    .map(|n| (cl.name.clone(), n.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let mut player = String::new();
+        c.world.board.clear(); // the save's own listings
+        for (club, name) in candidates {
+            c.world.board.push(rustfoot_core::world::Listing {
+                seller: club,
+                player: name.clone(),
+                ask: 1000,
+                best: None,
+                round: 0,
+            });
+            if c.world.listing_open_to_user(0) {
+                player = name;
+                break;
+            }
+            c.world.board.clear();
+        }
         assert!(c.world.listing_open_to_user(0));
         queue_auctions(&mut c);
+        // every human who may bid gets the auction; the active one's
+        let seat = c.world.active_seat().to_string();
+        c.queue.retain(|d| d.st.get("seat") == Some(&seat));
         assert_eq!(c.queue.len(), 1);
         let mut d = c.queue.pop_front().unwrap();
         assert_eq!(d.texts["textHumanOffer"], "");

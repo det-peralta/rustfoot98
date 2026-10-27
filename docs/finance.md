@@ -189,3 +189,14 @@ The original's own saves one league round apart (option *Gravar o jogo: Todas as
 - **Cup ties**: one price for every tie of a cup day, the league formula over that round's clubs times 1.5 (`35e1`'s flag): 30 with 32
   clubs, 36 with 16; the gate is split half and half between the two clubs.
 
+## The season change (checked 2026-10-27, `core/examples/seasonend.rs`)
+Two saves of the original, the last before the 2026 season's final round and the first of 2027:
+- **No other season-end money**: per club the cash changed by the old season's last round (its gate and wages) plus the prizes
+  (`1020:2ae6`: the champion 20 000 000, the cup winner 6 000 000, the top scorer's club 3 000 000) and nothing else: 52 of 52 clubs.
+- **The ledger rolls over** (`1010:38a9`, called for every club of the five lists by `1020:0002` as the new season starts): the season's
+  seven totals (`+0x31`) move to last season's (`+0x89`), those to the season before (`+0xa5`), and the totals, with the table, start at
+  zero. The prizes are booked before, so they show in last season's column.
+- **Balance sheet** (`TbalanceDlg`, `1028:3e64`; rows by `TThreeBalances` `1050:2bf1`/`21d0` drawn by `1068:0ad6`): a click on the
+  Finanças list (`ShowBalance`, `1018:3c45`) or the squad window's balance button (`1048:1bb7`) shows the three ledgers side by side under
+  the club's name, in the club's colours. The Finanças page draws the same rows with only this season's column.
+

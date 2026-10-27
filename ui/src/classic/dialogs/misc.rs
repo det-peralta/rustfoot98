@@ -1,5 +1,5 @@
-//! Message boxes and the small dialogs without a group of their own: options (`TOPTIONSDLG`), stadium (`TSTADIUMDLG`) and loan
-//! (`TLOANDLG`).
+//! Message boxes and the small dialogs without a group of their own: options (`TOPTIONSDLG`), stadium (`TSTADIUMDLG`), loan
+//! (`TLOANDLG`) and the balance sheet (`TBALANCEDLG`).
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::main_win::human_club;
 use crate::classic::options::{self, Options};
@@ -294,13 +294,44 @@ fn loan_click(c: &mut Classic, _d: &mut Dialog, name: &str) -> Outcome {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
+// Balance sheet
+
+/// The kind of the balance sheet (`TbalanceDlg`).
+pub const BALANCE: &str = "Balance";
+
+/// The balance sheet of the user's club: from a click on the Finanças list (`ShowBalance`, `1018:3c45`) and the squad window's
+/// balance button (`balanceBtnClick`, `1048:1bb7`).
+pub fn balance() -> Dialog {
+    Dialog::new(Kind::Other(BALANCE.into()), "TBALANCEDLG")
+}
+
+/// `1028:3e64`: the club's name as caption, the form and the list in its colours, this season's ledger and the last two (`+0x89`,
+/// `+0xa5`).
+fn balance_bind(c: &Classic, d: &mut Dialog) {
+    let Some((_, club)) = human_club(c) else {
+        return;
+    };
+    let f = &club.fin;
+    let [a, b, cc] = club.colors.0;
+    let [r, g, bl] = club.colors.1;
+    d.bg = Some(Rgb(r, g, bl));
+    d.text("@caption", club.full_name.clone());
+    d.text("ListBoxBalance.color", format!("{a},{b},{cc}"));
+    d.lists.insert(
+        "ListBoxBalance".into(),
+        crate::classic::main_win::balance_rows(c.world.year, &[f.ledger(), f.past[0], f.past[1]]),
+    );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------------
 
 pub fn bind(c: &Classic, d: &mut Dialog) {
-    match d.kind {
+    match &d.kind {
         Kind::Message => message_bind(c, d),
         Kind::Options => options_bind(c, d),
         Kind::Stadium => stadium_bind(c, d),
         Kind::Loan => loan_bind(c, d),
+        Kind::Other(n) if n == BALANCE => balance_bind(c, d),
         _ => {}
     }
 }
@@ -324,6 +355,27 @@ pub fn key(_c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn balance_rows_have_a_column_per_season() {
+        let now = [47_448, 0, 0, 0, -81_000, 0, 0];
+        let last = [
+            1_000_000, 0, 6_000_000, -500_000, -900_000, -350_000, -10_000,
+        ];
+        let rows = crate::classic::main_win::balance_rows(2027, &[now, last, [0; 7]]);
+        assert_eq!(rows.len(), 14);
+        assert_eq!(rows[0], "\u{2}xÉpoca\t\u{6}Z2027\t\u{6}Z2026\t\u{6}Z2025\t");
+        assert_eq!(rows[1], "\u{2}xReceitas\tZ \tZ \tZ \t");
+        assert_eq!(rows[4], "xPrémios\t\u{6}Z0\t\u{6}Z6 000 000\t\u{6}Z0\t");
+        // purchases are listed after wages
+        assert!(rows[7].starts_with("xJogadores comprados\t\u{6}Z0\t\u{6}Z-500 000\t"));
+        assert!(rows[11].contains("Z7 000 000\t"));
+        assert!(rows[12].contains("Z-1 760 000\t"));
+        assert!(rows[13].starts_with("xSaldo\t\u{6}Z-33 552\t\u{6}Z5 240 000\t"));
+        // the Finanças page shows this season only
+        let page = crate::classic::main_win::balance_rows(2027, &[now]);
+        assert_eq!(page[13], "xSaldo\t\u{6}Z-33 552\t");
+    }
 
     #[test]
     fn message_boxes_wrap_and_size_like_delphi() {

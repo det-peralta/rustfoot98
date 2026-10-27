@@ -34,7 +34,10 @@ printing.
 - Done: wages exact; the seven ledger totals (purchases were read from the wrong offset); cash = ledger; the league ticket price
   (43 of 43 division-rounds over a season change).
 - Done too: the cup's price (league formula over the round's clubs x 1.5) and the split gate.
-- Open: the season-end money, the market tiers `63fa`, the coach-swap side effect, the referee (`TRefereeAttr`).
+- Season change (2026-10-27, `core/examples/seasonend.rs` on saves either side of it): the only money is the three prizes; the ledger
+  then becomes last season's (`+0x89`, the one before at `+0xa5`) and starts at zero, 52 of 52 clubs. The balance sheet `TbalanceDlg`
+  shows the three seasons.
+- Open: the market tiers `63fa`, the coach-swap side effect, the referee (`TRefereeAttr`).
 
 ## 4. Hot-seat leftovers
 - Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).

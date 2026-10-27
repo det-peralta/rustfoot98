@@ -152,7 +152,7 @@ impl World {
         self.save_history(&mut out);
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -188,7 +188,14 @@ impl World {
                     .collect::<Vec<_>>()
                     .join(","),
                 clean(&c.full_name),
-                clean(&c.coach_name)
+                clean(&c.coach_name),
+                c.fin
+                    .past
+                    .iter()
+                    .flatten()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -515,7 +522,17 @@ impl World {
                             interest: int(19),
                             works: f.get(25).and_then(|x| x.parse().ok()).unwrap_or(0),
                             prizes: f.get(26).and_then(|x| x.parse().ok()).unwrap_or(0),
+                            past: [[0; 7]; 2],
                         };
+                        // the ledgers of the last two seasons (newer saves)
+                        let past: Vec<i64> = f
+                            .get(31)
+                            .map(|v| v.split(',').filter_map(|t| t.parse().ok()).collect())
+                            .unwrap_or_default();
+                        if past.len() == 14 {
+                            c.fin.past =
+                                std::array::from_fn(|y| std::array::from_fn(|i| past[7 * y + i]));
+                        }
                         has_finance = true;
                     }
                     if let Some(cc) = f.get(20) {

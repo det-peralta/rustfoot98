@@ -140,6 +140,8 @@ pub struct E98Team {
     pub factor: f64,
     /// Season totals of the ledger (`1010:58bf`, `team+0x31..0x49`), in the order of [`LEDGER`].
     pub ledger: [i64; 7],
+    /// The ledgers of the last season and the one before (`+0x89`, `+0xa5`; `1010:38a9` moves them down when a season starts).
+    pub past: [[i64; 7]; 2],
     pub players: Vec<E98Player>,
     /// The team's coach (`coach+0x0c` games coached, `+0x0e` score, `+0x07` set for the user's coaches).
     pub coach: u16,
@@ -304,7 +306,9 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
     let k = real48(c.raw(6)?);
     let k = if (0.3..=11.0).contains(&k) { k } else { 1.0 };
     let coach = c.u16()?;
-    c.raw(28 + 28)?; // two blocks of 28 bytes
+    let past = c.raw(28 + 28)?; // the ledgers of the last two seasons (`+0x89`, `+0xa5`)
+    let past: [[i64; 7]; 2] =
+        std::array::from_fn(|y| std::array::from_fn(|i| long(past, 28 * y + 4 * i)));
     let money = c.raw(4 + 4 + 4 + 10)?; // loan, cash, start-of-season cash, F
     let factor = extended(&money[12..22]);
     let factor = if (0.1..=10.0).contains(&factor) {
@@ -352,6 +356,7 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         loan: long(money, 0),
         factor,
         ledger,
+        past,
         players,
         coach,
         coach_games: 0,
@@ -597,6 +602,7 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c.fin.gate = gate;
     c.fin.sales = sales;
     c.fin.prizes = prizes;
+    c.fin.past = t.past;
     c.fin.purchases = purchases;
     c.fin.wages = wages;
     c.fin.works = works;
