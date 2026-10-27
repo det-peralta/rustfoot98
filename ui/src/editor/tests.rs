@@ -104,6 +104,11 @@ fn a_new_team_asks_its_steps_then_players_until_cancel() {
     e.press("ColorMatrix#15!r");
     e.press("OKBtn");
     assert_eq!(top(&e), "ed_country");
+    // nothing is chosen yet: OK waits, and there is no Cancel
+    e.press("CancelBtn");
+    e.press("OKBtn");
+    assert_eq!(top(&e), "ed_country");
+    e.dialogs.last_mut().unwrap().text("countryList.sel", "0");
     e.press("OKBtn");
     assert_eq!(top(&e), "ed_level");
     e.press("OKBtn");
@@ -127,6 +132,7 @@ fn a_new_team_asks_its_steps_then_players_until_cancel() {
     // the sorted country list starts with Brasil
     assert_eq!(t.country, "BRA");
     assert_eq!(t.coach, "Treinador");
+    assert_eq!(t.level, 10);
     assert_eq!(t.players.len(), 2);
     assert!(t
         .players

@@ -11,7 +11,7 @@ pub fn model(e: &Editor) -> Vec<Top> {
     let Some(form) = e.forms.get("TEDITOR_MAIN") else {
         return Vec::new();
     };
-    let open = e.open.as_ref();
+    let open = e.shown();
     let mut tops = Vec::new();
     for m in form.children.iter().filter(|n| n.class == "TMainMenu") {
         for t in &m.children {

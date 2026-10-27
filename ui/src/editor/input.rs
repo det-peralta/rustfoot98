@@ -118,7 +118,7 @@ impl Editor {
                     background: [0, 0, 0],
                     foreground: [255, 255, 255],
                     country: String::new(),
-                    level: 1,
+                    level: 10,
                     players: Vec::new(),
                     coach: String::new(),
                 };
@@ -149,6 +149,8 @@ impl Editor {
     /// Presses the named control of the dialog on top (as a click on it would).
     pub fn press(&mut self, name: &str) {
         if let Some(mut d) = self.dialogs.pop() {
+            // (bound first: the enabled buttons follow what was typed)
+            dialogs::bind(self, &mut d);
             let out = dialogs::click(self, &mut d, name);
             self.apply(d, out);
             self.dirty = true;
@@ -178,10 +180,19 @@ impl Editor {
         let Some(mut d) = self.dialogs.pop() else {
             return;
         };
+        dialogs::bind(self, &mut d);
         let out = match ev {
             Ev::Move(..) => Outcome::Keep,
             Ev::Down(x, y, right) => self.dialog_press(&mut d, x, y, right, false),
             Ev::DblClick(x, y) => self.dialog_press(&mut d, x, y, false, true),
+            // a spin edit keeps Enter for itself (checked on the level dialog: OK needs the mouse or Tab)
+            Ev::Key(Key::Enter)
+                if d.hits
+                    .iter()
+                    .any(|h| h.name == d.focus && h.class == "TSpinEdit") =>
+            {
+                Outcome::Keep
+            }
             Ev::Key(k) => match dialog::generic_key_in(&self.forms, &mut d, k) {
                 KeyAct::Press(name) => dialogs::click(self, &mut d, &name),
                 KeyAct::Done | KeyAct::None => Outcome::Keep,

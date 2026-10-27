@@ -865,8 +865,9 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if cx.focus == n.name && enabled {
         if let Some(c) = num("caret") {
             let before: String = chars[..c.min(chars.len())].iter().collect();
+            // (in the team editor's edits, `indent` 3, the caret is where the text ends)
             fb.fill(
-                tx + 1 + font.width(&before),
+                tx + i32::from(indent != 3) + font.width(&before),
                 ty,
                 1,
                 font.height() + 1,

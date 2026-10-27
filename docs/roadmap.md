@@ -49,7 +49,10 @@ printing.
   player, save (ticked and not), error and About dialogs within the mouse cursor and a few pixels; the main window within the list's
   focus rectangle and the frame. Checked on the original: *Remover* keeps the selection on the same row; after the error list the
   command is dropped; without *Gravar a equipa* the changes are dropped and the command goes on.
-- Open: a new team's default colours and level (not decoded), a team edited in the port opened in the original.
+- *Nova equipa* walked through on the original and matched step by step (`analysis/captures/editor/new_*.png`): the window stays empty
+  until the players, the colour/country/level/coach steps have no Cancel, T black / F white, no country chosen, level 10, Guarda-redes;
+  OK waits for the names, the coach, a country, the player's name; a spin edit keeps Enter.
+- Open: a team edited in the port opened in the original; hover hints (`ShowHint`) are not drawn.
 
 ## 6. Browser product and close-out
 - A full season in the browser (Playwright) at every speed; autosave, load, *Sair*, service-worker update; speed against the original.

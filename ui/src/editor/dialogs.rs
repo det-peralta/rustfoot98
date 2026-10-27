@@ -1,5 +1,5 @@
 //! The dialogs of the team editor, bound and answered as the original does (`EDITEQ.EXE`; captures in `analysis/captures/editor/`).
-use super::{Editor, Open, Request, MAX_PLAYERS};
+use super::{Editor, Request, MAX_PLAYERS};
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::dialogs::newgame::collate;
 use rustfoot_core::eft::{EftPlayer, EftTeam, Position};
@@ -108,7 +108,11 @@ pub fn open_country(e: &Editor, code: &str, player: Option<&str>) -> Dialog {
     let mut d = Dialog::new(kind("ed_country"), "TSETCOUNTRYDLG");
     let mut list: Vec<(String, String)> = e.countries.clone();
     list.sort_by_cached_key(|c| collate(&c.1));
-    let sel = list.iter().position(|(c, _)| c == code).unwrap_or(0);
+    // (a new team has no country yet: nothing is chosen and OK waits for a choice)
+    let sel = list
+        .iter()
+        .position(|(c, _)| c == code)
+        .map_or(-1, |i| i as i64);
     d.lists.insert(
         "countryList".into(),
         list.iter()
@@ -118,7 +122,7 @@ pub fn open_country(e: &Editor, code: &str, player: Option<&str>) -> Dialog {
     d.lists
         .insert("@codes".into(), list.into_iter().map(|(c, _)| c).collect());
     d.text("countryList.draw", "flag");
-    d.set_num("sel", sel as i64);
+    d.set_num("sel", sel);
     let who = match player {
         Some(p) => format!("do {p}"),
         None => format!(
@@ -310,6 +314,17 @@ pub fn bind(e: &Editor, d: &mut Dialog) {
         "teamFilename",
     ] {
         d.text(format!("{n}.indent"), "3");
+        // the caret after the text of the focused edit while nothing is selected
+        let selected = d
+            .texts
+            .get(&format!("{n}.sellen"))
+            .is_some_and(|v| v != "0");
+        if d.focus == n && !selected {
+            let len = d.texts.get(n).map_or(0, |t| t.chars().count());
+            d.text(format!("{n}.caret"), len.to_string());
+        } else {
+            d.texts.remove(&format!("{n}.caret"));
+        }
     }
     // and their long labels wrap (on the captures, although the forms do not ask for it)
     let wrap: &[&str] = match d.form.as_str() {
@@ -355,8 +370,8 @@ pub fn bind(e: &Editor, d: &mut Dialog) {
         d.text("Example.color", rgb(GRID[t % 16]));
         d.text("Example.bgcolor", rgb(GRID[f % 16]));
     } else if is(d, "ed_country") {
-        if !d.texts.contains_key("countryList.sel") {
-            let sel = d.num("sel").max(0) as usize;
+        if !d.texts.contains_key("countryList.sel") && d.num("sel") >= 0 {
+            let sel = d.num("sel") as usize;
             let list = d.lists.get("countryList").cloned().unwrap_or_default();
             d.text("countryList.sel", sel.to_string());
             d.text(
@@ -373,10 +388,23 @@ pub fn bind(e: &Editor, d: &mut Dialog) {
         } else if !open {
             d.st.remove("shown");
         }
+        d.text(
+            "OKBtn.enabled",
+            flag(d.texts.contains_key("countryList.sel")),
+        );
     } else if is(d, "ed_save") {
-        // the file name only while *Gravar a equipa* is ticked
+        // the file name only while *Gravar a equipa* is ticked, and then OK wants one (`1000:063e`)
         let on = d.texts.get("saveTheTeam.checked").is_some_and(|v| v == "1");
-        d.text("teamFilename.enabled", if on { "1" } else { "0" });
+        d.text("teamFilename.enabled", flag(on));
+        d.text("OKBtn.enabled", flag(!on || filled(d, "teamFilename")));
+    } else if is(d, "ed_name") {
+        // both names (`1008:1a3a`)
+        d.text(
+            "OKBtn.enabled",
+            flag(filled(d, "TeamLongName") && filled(d, "TeamShortName")),
+        );
+    } else if is(d, "ed_coach") {
+        d.text("OKBtn.enabled", flag(filled(d, "coachName")));
     } else if is(d, "ed_level") {
         let v = d.num("level").clamp(1, 20);
         d.text("textSkill.value", v.to_string());
@@ -403,7 +431,28 @@ pub fn bind(e: &Editor, d: &mut Dialog) {
         let nat = d.st.get("nat").cloned().unwrap_or_default();
         d.text("textCountry", e.country_name(&nat));
         d.text("bitmapCountry.image", format!("FLAGS/{nat}"));
+        // a position (always one here) and a name (`1008:1fe5`)
+        d.text("OKBtn.enabled", flag(filled(d, "textName")));
     }
+    // the steps of a new team between its name and its players cannot be cancelled
+    let step = ["ed_color", "ed_country", "ed_level", "ed_coach"]
+        .iter()
+        .any(|k| is(d, k));
+    if step && e.new_steps.is_some() && !d.st.contains_key("player") {
+        d.text("CancelBtn.visible", "0");
+    }
+}
+
+fn flag(on: bool) -> &'static str {
+    if on {
+        "1"
+    } else {
+        "0"
+    }
+}
+
+fn filled(d: &Dialog, edit: &str) -> bool {
+    d.texts.get(edit).is_some_and(|t| !t.trim().is_empty())
 }
 
 // ---- answering -----------------------------------------------------------------------------------------------------------
@@ -415,6 +464,15 @@ fn list_sel(d: &Dialog, list: &str) -> Option<usize> {
 }
 
 pub fn click(e: &mut Editor, d: &mut Dialog, name: &str) -> Outcome {
+    // a disabled or hidden button does nothing (Enter on a default button that waits for input)
+    let off = |k: &str| {
+        d.texts
+            .get(&format!("{name}.{k}"))
+            .is_some_and(|v| v == "0")
+    };
+    if off("enabled") || off("visible") {
+        return Outcome::Keep;
+    }
     let cancel = name == "CancelBtn";
     if is(d, "ed_open") {
         if let Some(i) = name
@@ -673,8 +731,10 @@ fn save_click(e: &mut Editor, d: &mut Dialog, name: &str) -> Outcome {
                     Some(slot) => slot.1 = o.team.clone(),
                     None => e.files.push((file.clone(), o.team.clone())),
                 }
-                e.open = Some(Open { file, team: o.team });
             }
+            // saved or dropped, the team is closed (`CloseTeam`, `1000:10a7`): cancelling *Abrir* then leaves the window empty
+            e.open = None;
+            e.selected = None;
             e.modified = false;
             let after = d.st.get("after").cloned().unwrap_or_default();
             e.go_on(&after)

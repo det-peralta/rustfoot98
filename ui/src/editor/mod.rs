@@ -138,6 +138,13 @@ impl Editor {
         self.dirty = true;
     }
 
+    /// The team the window shows: none while a new team is still being named, coloured, placed and given a coach (the window is
+    /// drawn again only after those steps, `1000:180e`).
+    pub fn shown(&self) -> Option<&Open> {
+        let naming = self.new_steps.as_ref().is_some_and(|s| !s.is_empty());
+        self.open.as_ref().filter(|_| !naming)
+    }
+
     /// Time passes: the *Acerca* box scrolls its banner.
     pub fn tick(&mut self, ms: u32) {
         let Some(mut d) = self.dialogs.pop() else {
@@ -217,7 +224,7 @@ impl Editor {
         let mut l = BTreeMap::new();
         let rgb = |c: [u8; 3]| format!("{},{},{}", c[0], c[1], c[2]);
         t.insert("MemoryAvailable.visible".into(), "0".into());
-        let Some(o) = &self.open else {
+        let Some(o) = self.shown() else {
             for n in [
                 "TeamShortName",
                 "TeamLongName",
@@ -275,6 +282,8 @@ impl Editor {
             .collect();
         l.insert("PlayerList".into(), rows);
         t.insert("PlayerList.ink".into(), rgb(team.foreground));
+        // (the list's ground is the text colour, T)
+        t.insert("PlayerList.bg".into(), rgb(team.background));
         t.insert("PlayerList.selink".into(), fg);
         t.insert("PlayerList.top".into(), self.top.to_string());
         if let Some(s) = self.selected {
