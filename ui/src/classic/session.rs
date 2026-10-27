@@ -1495,6 +1495,32 @@ mod tests {
         assert!(c.world.year > 1998);
     }
 
+    /// The final run of the roadmap: two humans for three seasons, the game saved and loaded back at every new season.
+    #[test]
+    fn three_seasons_with_two_humans_survive_saving_and_loading() {
+        let mut c = hot_seat(2, 5);
+        let start = c.world.year;
+        let mut year = start;
+        for _ in 0..200 {
+            if c.world.year >= start + 3 {
+                break;
+            }
+            for _ in 0..2 {
+                c.round_button();
+            }
+            play_through(&mut c);
+            assert!(matches!(c.screen, Screen::Main));
+            assert_eq!(c.world.human_count(), 2);
+            if c.world.year != year {
+                year = c.world.year;
+                let text = c.save_text();
+                c.load_text(&text).expect("the saved game loads back");
+                assert_eq!(c.save_text(), text, "a loaded game saves to the same text");
+            }
+        }
+        assert!(c.world.year >= start + 3, "three seasons played");
+    }
+
     /// Plays the round view answering what comes, until a dialog of `kind` is open.
     fn play_until(c: &mut Classic, kind: Kind) -> bool {
         for _ in 0..6000 {
