@@ -8,14 +8,13 @@ dialogs the game opens), save/load, PWA. Recorded seasons of the original (`tool
 season, the sack list, the save gauge and an unemployed human (see `docs/matchday.md`). Left out by decision: registration (no key check),
 printing.
 
-## 1. Small game gaps (no new captures needed)
-- Options dialog: *Equipas com empréstimos...* and *Equipas endividadas...* (`eqEmprestimoBtnClick`, `eqEndividadasBtnClick`) open a
-  `TPrintListDlg`.
-- Referee-aid balance picture.
-- Option *Ver os desempates por penalties nos jogos sem treinadores humanos* (kick-by-kick shootouts of computer ties).
-- Sound: the original's `MessageBeep` calls, as a WebAudio beep.
-- Forced substitution when only a goalkeeper is left: list, OK disabled until a row is chosen (seen in the original).
-- Texts: "Tem demasiados jogadores estrangeiros".
+## 1. Small game gaps: done (2026-10-27)
+- Sound: the original's beeps (`1068:11c7`) via `Request::Beep` and WebAudio; the cup draw's pace (1500 ms only while humans' clubs are left).
+- *Ver os desempates por penalties...*: every shootout kick by kick (`World::real_shootouts`).
+- Market refusals in the original's words ("Tem demasiados jogadores", "... estrangeiros").
+- Found to be registered-only, so hidden like the original's unregistered copy: the options' *Equipas com empréstimos / endividadas*
+  (the *Controle* page) and the referee aid with its balance picture (`1008:2427`).
+- Forced substitution with only a goalkeeper left: the port behaves as the original (list, OK disabled until a row is chosen).
 
 ## 2. Screens that need the original first (capture, render with `classic_shot`, diff with `tools/ui/regions.py`)
 - New game: currency (`TcurrencyDlg`, "Com que moeda vai querer jogar?") and countries (`TselectCountriesDlg`, if the free copy has it).
