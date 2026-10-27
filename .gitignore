@@ -17,6 +17,7 @@ dist/
 
 # Derived from third-party binary / large local DBs
 analysis/out/
+analysis/out-editeq/
 analysis/ghidra-proj/
 analysis/rea/
 analysis/*.log
@@ -27,7 +28,7 @@ web/rustfoot_wasm.wasm
 web/rustfoot_ui.wasm
 
 # captures of the original game and the driver's scratch files (copyrighted images, never commit)
-analysis/shots/[0-9]*.png
+analysis/shots/
 analysis/shots/guest*.png
 analysis/shots/native*.png
 analysis/shots/p[0-9]*.png
