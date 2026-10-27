@@ -105,15 +105,15 @@ pub fn rating(slots: &[Slot]) -> i64 {
     (sum as f64 / slots.len() as f64).round_ties_even() as i64
 }
 
-/// `1040:35e1` as called by `1010:0875`: the ticket price of a division's games, the whole number
-/// `round(G * E / sqrt(max(avgF, 0.1)) * avgRating / 10)`, at least `G / 2`. Fitted on consecutive saves of the original
-/// (`core/examples/daycheck.rs`): `avgRating` is the rounded mean of the clubs' ratings and `avgF` the mean factor as it was before
-/// the division's last update (`World::price_f`). The original also multiplies by `1 + 0.5 * [flag == 1]` for a flag not traced.
+/// `1040:35e1` as called by `1010:0875`: the ticket price of a division's games, always even:
+/// `2 * round(round(x) / 4)` with `x = G * E / sqrt(max(avgF, 0.1)) * avgRating / 5` (`avgF` the clubs' mean factor, `avgRating` the
+/// rounded mean of their ratings, both as the round starts), at least `G / 2`. Fitted on the original's own saves one round apart
+/// (`core/examples/daycheck.rs`): 43 of 43 division-rounds of a season. (The original also multiplies by `1 + 0.5 * [flag == 1]` for a
+/// flag not traced; it is not on in league games.)
 pub fn ticket_price(avg_f: f64, avg_rating: i64, e: f64, g: i64) -> f64 {
     let a = avg_f.max(0.1);
     let x = (g as f64 * e) / a.sqrt() * avg_rating as f64 / 5.0;
-    // a whole number (every price on consecutive saves of the original is one)
-    let price = (x / 2.0).round_ties_even();
+    let price = 2.0 * (x.round_ties_even() / 4.0).round_ties_even();
     price.max(g as f64 * 0.5)
 }
 
@@ -207,20 +207,20 @@ mod tests {
         // first division: rating 44 -> 44, third: 18 -> 18 (the sample save: ~44.8 and ~18.5)
         assert_eq!(ticket_price(1.0, 44, 2.0, 5), 44.0);
         assert_eq!(ticket_price(1.0, 18, 2.0, 5), 18.0);
-        assert_eq!(ticket_price(0.9345, 7, 2.0, 5), 7.0);
+        // the fourth division charged 8 (14 / 4 = 3.5 -> 4, doubled)
+        assert_eq!(ticket_price(0.976786, 7, 2.0, 5), 8.0);
+        assert_eq!(ticket_price(1.0, 31, 2.0, 5), 32.0);
         // never below half the currency scale
         assert_eq!(ticket_price(1.0, 0, 2.0, 5), 2.5);
     }
 
     #[test]
-    fn ticket_prices_match_a_round_of_the_original() {
-        // round 7 of the ABCDEEEE season (2026): the four divisions charged 42, 30, 18 and 6; the means of F before the last update
-        // and the rounded mean ratings of the save before the round
-        let e = 2.018778;
-        assert_eq!(ticket_price(1.083058, 43, e, 5), 42.0);
-        assert_eq!(ticket_price(1.065036, 31, e, 5), 30.0);
-        assert_eq!(ticket_price(1.019748, 18, e, 5), 18.0);
-        assert_eq!(ticket_price(0.931293, 6, e, 5), 6.0);
+    fn ticket_prices_match_rounds_of_the_original() {
+        // ABCDEEEE, 2026: rounds 7, 13 and 11 (the means of F and the rounded mean ratings of the save before each round)
+        assert_eq!(ticket_price(1.112709, 43, 2.024758, 5), 42.0);
+        assert_eq!(ticket_price(1.030323, 18, 2.024758, 5), 18.0);
+        assert_eq!(ticket_price(0.972157, 5, 2.0433, 5), 4.0);
+        assert_eq!(ticket_price(1.4116, 29, 2.0647, 5), 24.0);
     }
 
     #[test]

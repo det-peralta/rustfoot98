@@ -183,9 +183,9 @@ The original's own saves one league round apart (option *Gravar o jogo: Todas as
   where a wage was renegotiated between the games of a multi-day interval).
 - **Ledger**: seven totals at `team+0x31..0x49` (gate, sales, prizes, purchases, wages, works, interest); the cash change equals their
   sum for every club. (The import read purchases from `+0x39` until this check.)
-- **Ticket price**: a whole number, `round(G E round(meanRating) / (10 sqrt(meanF)))`, with `meanF` the division's mean factor before
-  its last update (`World::price_f`): 16 division-rounds observed (44/32/18/8, 42/30/18/6, 40/30/16/6...), all but one fit (division 3
-  of round 8 charged 16, the fit gives 17 — the rating the original averages is probably slightly different).
+- **Ticket price**: always even, `2 * round(round(x) / 4)` with `x = G E round(meanRating) / (5 sqrt(meanF))` from the division's
+  state as the round starts: 43 of 43 division-rounds of the 2026 season (prices 44/32/18/8 at the start, down to 34/24/16/6). An
+  intermediate fit with a lagged F and a whole-number price (15 of 16) was a rounding artifact.
 - **Cup ties**: one price for every tie of a cup day (30 on the 16-avos day, 36 on the next), the gate split half and half between the
   two clubs. The price is not the league formula over the cup list (52 clubs give 16); not reproduced yet.
 

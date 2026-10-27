@@ -250,9 +250,6 @@ pub struct World {
     pub currency: usize,
     /// Total cash of each division at the last `1010:7067` (the denominator of the economic-factor update).
     pub cash_ref: [i64; 4],
-    /// Mean economic factor of each division before its last update (`6e48` fixes the next round's ticket price with it); 0 when not
-    /// known yet (a new game), then the current mean is used.
-    pub price_f: [f64; 4],
     /// Rounds already played this season (0..=13); a new season starts after round 14.
     pub round: usize,
     pub rng: DelphiRng,
@@ -570,7 +567,6 @@ impl World {
             scale,
             currency,
             cash_ref: [0; 4],
-            price_f: [0.0; 4],
             round: 0,
             rng,
             last_round: Vec::new(),
@@ -616,7 +612,6 @@ impl World {
             scale: DEFAULT_SCALE,
             currency: crate::economy::REAIS,
             cash_ref: [0; 4],
-            price_f: [0.0; 4],
             round,
             rng: DelphiRng::new(seed),
             last_round: Vec::new(),
@@ -671,7 +666,6 @@ impl World {
             scale: DEFAULT_SCALE,
             currency: crate::economy::REAIS,
             cash_ref: [0; 4],
-            price_f: [0.0; 4],
             round: 0,
             rng,
             last_round: Vec::new(),
@@ -1689,8 +1683,6 @@ impl World {
                 .sum();
             let reference = self.cash_ref[d].max(1) as f64;
             let ratio = (ai as f64 / reference).max(0.1);
-            let n = self.divisions[d].len().max(1) as f64;
-            self.price_f[d] = self.divisions[d].iter().map(|c| c.fin.f).sum::<f64>() / n;
             for c in &mut self.divisions[d] {
                 c.fin.f = 0.8 * c.fin.f + 0.2 * ratio;
             }
@@ -2264,12 +2256,7 @@ impl World {
     pub fn money_ctx(&self, d: usize) -> MoneyCtx {
         let clubs = &self.divisions[d];
         let n = clubs.len().max(1) as f64;
-        // (checked on consecutive saves of the original: the price of a round uses the factors as they were before the last update)
-        let avg_f = if self.price_f[d] > 0.0 {
-            self.price_f[d]
-        } else {
-            clubs.iter().map(|c| c.fin.f).sum::<f64>() / n
-        };
+        let avg_f = clubs.iter().map(|c| c.fin.f).sum::<f64>() / n;
         let avg_rating = (clubs.iter().map(|c| finance::rating(&c.slots)).sum::<i64>() as f64 / n)
             .round_ties_even() as i64;
         MoneyCtx {
