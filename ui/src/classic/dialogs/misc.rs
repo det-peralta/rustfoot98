@@ -229,6 +229,10 @@ fn stadium_bind(c: &Classic, d: &mut Dialog) {
     d.text("loanBtn.visible", "0");
     let can = f.stadium < finance::MAX_STADIUM_LEVEL && cost <= f.cash;
     d.text("constructBtn.enabled", if can { "1" } else { "0" });
+    // a button that is disabled loses the focus, and nothing has it (*Fechar* is drawn as the default button, measured)
+    if !can && d.focus == "constructBtn" {
+        d.focus.clear();
+    }
     let built = d.st.contains_key("built");
     d.text("labelWarning.visible", if built { "1" } else { "0" });
     let Rgb(r, g, b) = WHITE;

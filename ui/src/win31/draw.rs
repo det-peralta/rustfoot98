@@ -1583,19 +1583,7 @@ fn bitbtn_glyph_left(
     if let Some(b) = bmp {
         let key = b.px[((b.h - 1) * b.w) as usize];
         let gy = y + 2 + (ch - gh + 1) / 2;
-        let gi = if !enabled && glyphs > 1 { gw } else { 0 };
-        for r in 0..b.h {
-            for c in 0..gw {
-                let p = b.px[(r * b.w + c + gi) as usize];
-                if p != key {
-                    fb.set(
-                        gx + c,
-                        gy + r,
-                        Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
-                    );
-                }
-            }
-        }
+        glyph_image(fb, b, gx, gy, gw, glyphs, key, enabled);
     }
     if let Some(font) = font {
         let (tx, ty) = (gx + gw + spacing, y + 2 + (ch - th + 1) / 2);
@@ -1655,19 +1643,7 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         let key = b.px[((b.h - 1) * b.w) as usize];
         let margin = glyph_margin(cx, n, h, gh, f);
         let (gx, gy) = (x + (w - gw) / 2, y + 2 + margin);
-        let gi = if !enabled && glyphs > 1 { gw } else { 0 };
-        for r in 0..b.h {
-            for c in 0..gw {
-                let p = b.px[(r * b.w + c + gi) as usize];
-                if p != key {
-                    fb.set(
-                        gx + c,
-                        gy + r,
-                        Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
-                    );
-                }
-            }
-        }
+        glyph_image(fb, b, gx, gy, gw, glyphs, key, enabled);
     }
     if let Some(font) = cx.font(f) {
         let label: String = cap.replace('&', "");
@@ -1725,7 +1701,53 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     }
 }
 
-/// `DrawFocusRect`: a dotted rectangle; the dots follow a checkerboard anchored at the origin `(wx, wy)` of the window it is drawn in
+/// The glyph of a `TBitBtn` at `(gx, gy)`: the first image (`gw` wide) without its transparent colour `key`; a disabled button shows
+/// the bitmap's second image, or, with only one, the one Windows makes: the dark pixels in grey with a white copy one pixel down and
+/// to the right (the yellow of the stadium's bulldozer disappears, measured).
+#[allow(clippy::too_many_arguments)]
+fn glyph_image(
+    fb: &mut Fb,
+    b: &super::skin::Bitmap,
+    gx: i32,
+    gy: i32,
+    gw: i32,
+    glyphs: i32,
+    key: u32,
+    enabled: bool,
+) {
+    let px = |r: i32, c: i32, at: i32| b.px[(r * b.w + c + at) as usize];
+    if enabled || glyphs > 1 {
+        let at = if enabled { 0 } else { gw };
+        for r in 0..b.h {
+            for c in 0..gw {
+                let p = px(r, c, at);
+                if p != key {
+                    fb.set(
+                        gx + c,
+                        gy + r,
+                        Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
+                    );
+                }
+            }
+        }
+        return;
+    }
+    let dark = |p: u32| {
+        let (r, g, bl) = ((p >> 16) & 255, (p >> 8) & 255, p & 255);
+        p != key && (r * 30 + g * 59 + bl * 11) < 128 * 100
+    };
+    for (dx, colour) in [(1, WHITE), (0, GRAY)] {
+        for r in 0..b.h {
+            for c in 0..gw {
+                if dark(px(r, c, 0)) {
+                    fb.set(gx + c + dx, gy + r + dx, colour);
+                }
+            }
+        }
+    }
+}
+
+/// `DrawFocusRect`: a dotted rectangle;/// `DrawFocusRect`: a dotted rectangle; the dots follow a checkerboard anchored at the origin `(wx, wy)` of the window it is drawn in
 /// (lit where the offsets from that origin add up to an odd number); the corners stay dark.
 pub fn focus_rect(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, wx: i32, wy: i32) {
     // the rectangle XORs the pixels: the lit ones go black; over the 16-colour green the others turn olive (index 2 ^ 1 = 3)

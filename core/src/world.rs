@@ -1440,14 +1440,16 @@ impl World {
         if c.fin.stadium >= finance::MAX_STADIUM_LEVEL {
             return Err("o estádio já tem a capacidade máxima".into());
         }
-        if !finance::wants_expansion(&c.fin) {
-            return Err("o estádio ainda não está cheio o suficiente (80 %)".into());
+        // (the user builds whenever the money is there: the 80 % filling is the computer's rule, `1010:c030`)
+        if c.fin.cash < finance::expansion_cost(&c.fin, e, g) {
+            return Err(format!(
+                "as obras custam {}",
+                finance::expansion_cost(&c.fin, e, g)
+            ));
         }
-        let cost = finance::expansion_cost(&c.fin, e, g);
-        if c.fin.cash < cost {
-            return Err(format!("as obras custam {cost}"));
-        }
+        // `ConstructBtnClick` (`1030:3036`): the stand is built, then its price is taken (`1010:c172` after `c081`)
         finance::expand(&mut c.fin);
+        let cost = finance::expansion_cost(&c.fin, e, g);
         c.fin.book(-cost, finance::Category::Works);
         Ok(cost)
     }
