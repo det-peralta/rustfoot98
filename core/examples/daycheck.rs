@@ -63,6 +63,71 @@ fn main() -> Result<(), String> {
             1.5 * x
         );
     }
+    {
+        // the clubs that played a cup tie in the interval (new cup rows in their fixture lists) and the price their gates imply
+        let mut entrants = Vec::new();
+        let mut implied = Vec::new();
+        for t1 in &after.teams {
+            let Some(t0) = before.teams.iter().find(|t| t.id == t1.id) else {
+                continue;
+            };
+            let new: Vec<&e98::E98Fixture> = t1
+                .calendar
+                .iter()
+                .filter(|f| f.cup && f.goals_a >= 0)
+                .skip(
+                    t0.calendar
+                        .iter()
+                        .filter(|f| f.cup && f.goals_a >= 0)
+                        .count(),
+                )
+                .collect();
+            if new.is_empty() {
+                continue;
+            }
+            entrants.push(t1.short_name.clone());
+            // a club with only this cup game: gate change over the tie's attendance (its half of the gate)
+            let league_new = t1
+                .calendar
+                .iter()
+                .filter(|f| !f.cup && f.goals_a >= 0)
+                .count()
+                != t0
+                    .calendar
+                    .iter()
+                    .filter(|f| !f.cup && f.goals_a >= 0)
+                    .count();
+            let att: i64 = new.iter().map(|f| f.gate).sum();
+            if !league_new && att > 0 {
+                implied.push(format!(
+                    "{:.2}",
+                    2.0 * (t1.ledger[0] - t0.ledger[0]) as f64 / att as f64
+                ));
+            }
+        }
+        let clubs: Vec<&rustfoot_core::season::Club> = w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .filter(|c| entrants.contains(&c.name))
+            .collect();
+        if !clubs.is_empty() {
+            let n = clubs.len() as f64;
+            let f = clubs.iter().map(|c| c.fin.f).sum::<f64>() / n;
+            let r = clubs.iter().map(|c| finance::rating(&c.slots)).sum::<i64>() as f64 / n;
+            let rr = r.round_ties_even() as i64;
+            println!(
+                "cup day: {} entrants, mean F {:.5}, mean rating {:.3}; league formula {} (x1.5 {}); implied whole-tie prices {:?}",
+                clubs.len(),
+                f,
+                r,
+                finance::ticket_price(f, rr, w.economy, w.scale),
+                finance::ticket_price(f, rr, w.economy * 1.5, w.scale),
+                implied
+            );
+        }
+    }
     let (mut wage_ok, mut wage_n) = (0, 0);
     for d in 0..4 {
         let ctx = w.money_ctx(d);

@@ -33,8 +33,8 @@ printing.
   checks the port's money rules on each pair (`docs/finance.md`).
 - Done: wages exact; the seven ledger totals (purchases were read from the wrong offset); cash = ledger; the league ticket price
   (43 of 43 division-rounds over a season change).
-- Open: the cup's ticket price (one price per cup day, 30 then 36; not the league formula), gate receipts of the cup split, the
-  season-end money, the market tiers `63fa`, the coach-swap side effect, the referee (`TRefereeAttr`).
+- Done too: the cup's price (league formula over the round's clubs x 1.5) and the split gate.
+- Open: the season-end money, the market tiers `63fa`, the coach-swap side effect, the referee (`TRefereeAttr`).
 
 ## 4. Hot-seat leftovers
 - Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).

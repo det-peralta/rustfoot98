@@ -2020,6 +2020,7 @@ impl World {
             .humans()
             .map(|h| (h.club.clone(), h.plan.clone()))
             .collect();
+        let cup_money = self.cup_money_ctx(&entrants);
         let mut matches = Vec::new();
         let mut losers = Vec::new();
         for pair in entrants.chunks(2) {
@@ -2028,7 +2029,7 @@ impl World {
                 continue;
             };
             ctl.checkpoint(&mut self.rng);
-            let money = self.money_ctx(hl.0.min(3));
+            let money = cup_money;
             let placeholder = || Club::new("", Vec::new());
             let mut home = std::mem::replace(self.club_at(hl), placeholder());
             let mut away = std::mem::replace(self.club_at(al), placeholder());
@@ -2261,6 +2262,26 @@ impl World {
             .round_ties_even() as i64;
         MoneyCtx {
             price: finance::ticket_price(avg_f, avg_rating, self.economy, self.scale),
+            e: self.economy,
+            g: self.scale,
+        }
+    }
+
+    /// The money constants of a cup day: one ticket price for every tie, the league formula over the clubs of the round
+    /// (`1010:0875` called from the cup with its list) times 1.5 (`1040:35e1`'s cup flag). Checked on two cup days of the original
+    /// (30 with 32 clubs, 36 with 16).
+    pub fn cup_money_ctx(&self, entrants: &[String]) -> MoneyCtx {
+        let clubs: Vec<&Club> = entrants
+            .iter()
+            .filter_map(|n| self.locate(n))
+            .map(|l| self.club_ref(l))
+            .collect();
+        let n = clubs.len().max(1) as f64;
+        let avg_f = clubs.iter().map(|c| c.fin.f).sum::<f64>() / n;
+        let avg_rating = (clubs.iter().map(|c| finance::rating(&c.slots)).sum::<i64>() as f64 / n)
+            .round_ties_even() as i64;
+        MoneyCtx {
+            price: 1.5 * finance::ticket_price(avg_f, avg_rating, self.economy, self.scale),
             e: self.economy,
             g: self.scale,
         }

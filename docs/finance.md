@@ -186,6 +186,6 @@ The original's own saves one league round apart (option *Gravar o jogo: Todas as
 - **Ticket price**: always even, `2 * round(round(x) / 4)` with `x = G E round(meanRating) / (5 sqrt(meanF))` from the division's
   state as the round starts: 43 of 43 division-rounds of the 2026 season (prices 44/32/18/8 at the start, down to 34/24/16/6). An
   intermediate fit with a lagged F and a whole-number price (15 of 16) was a rounding artifact.
-- **Cup ties**: one price for every tie of a cup day (30 on the 16-avos day, 36 on the next), the gate split half and half between the
-  two clubs. The price is not the league formula over the cup list (52 clubs give 16); not reproduced yet.
+- **Cup ties**: one price for every tie of a cup day, the league formula over that round's clubs times 1.5 (`35e1`'s flag): 30 with 32
+  clubs, 36 with 16; the gate is split half and half between the two clubs.
 
