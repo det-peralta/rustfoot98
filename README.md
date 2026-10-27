@@ -29,13 +29,14 @@ hides loans, "Procurar jogadores" and the *Controle* page in an unregistered cop
 |---|---|
 | `core/` | pure Rust rules: formats (`.e98`, `.eft`), RNG, match engine, season, finance, market, history |
 | `ui/` | `win31/` renderer (frames, widgets, fonts, list dialogs) and `classic/` (the original's windows and dialogs as a state machine) |
-| `ui-web/` | WebAssembly host of `ui/`; `web/classic.html` + `web/classic.js` drive it |
+| `ui-web/` | WebAssembly host of `ui/`; `web/classic.html` + `web/classic.js` drive the game, `web/editor.html` + `web/editor.js` the team editor (`EDITEQ.EXE`), whose saved teams the game's new games use |
 | `wasm/`, `web/legacy.html`, `web/canvas.html` | the older, simplified front ends (DOM / shared canvas UI) |
 | `tools/` | skin-pack builders, capture drivers (headless Chromium + the original under js-dos), Ghidra helpers |
 
 Native helpers: `cargo run --release -p rustfoot-ui --bin classic_shot -- game.e98|- out.bmp key=value ...` renders any window or plays scripted
 sessions (`docs/classic-dialogs.md`); `tools/ui/regions.py` lists where a render differs from a capture of the original;
-`tools/capture/classic_smoke.mjs` plays rounds in the browser build.
+`tools/capture/classic_smoke.mjs` plays rounds in the browser build. `editor_shot out.bmp team=FILE.EFT do='TeamColor;@x,y;!OKBtn'` renders
+the team editor after a script; `tools/capture/editor_web.mjs` drives its browser build.
 
 ## Docs
 | File | Content |

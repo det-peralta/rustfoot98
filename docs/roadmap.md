@@ -40,11 +40,15 @@ printing.
   Open: the auctions interleaved with the main windows per club (`3e9c` calls `5b37` before the human's window); a new game's first day.
 
 ## 5. Team editor (`EDITEQ.EXE`)
-- Decompile it with the Ghidra scripts in `tools/ghidra/`; map the menu of `TEditor_Main` (Ficheiro, Jogador, Equipa) and the save checks.
-- `core/src/eft.rs`: a writer, round-trip tested on every file of `EQUIPAS`.
-- `ui/src/editor/`: the editor's windows on the `win31` renderer and the `Dialog` model; skin pack with EDITEQ's forms; native and web hosts;
-  edited teams in browser storage, used by the game's new-game flow.
-- Verified window by window against the original under js-dos; a team edited in the port opens in the original.
+- Done: decompiled (`analysis/out-editeq/`, git-ignored; handlers in `analysis/out-editeq/published.txt`); `eft::write` round-trips every
+  shipped file; `ui/src/editor/` has the main window, menus, every dialog and the flows of `1000:10a7`..`2191` (save prompt, new-team steps,
+  *Adicionar* loop, *Remover*, *Transferir* queued until the target opens, the save check `1020:2720` with Bosman/PLOP players not
+  foreign); `editor_shot` renders scripted sessions; `web/editor.html` (+ `editor.js`, `pack.js`) runs it in the browser with the saved
+  teams in IndexedDB, used by the game's new games, and `.EFT` import/export.
+- Compared with the captures in `analysis/captures/editor/`: colour, name, coach, level, country (closed and open), transfer, open and
+  player dialogs within the mouse cursor and a few pixels; the main window within the list's focus rectangle and the frame.
+- Open: the *Acerca* box of the editor (the game's box is shown; no capture), *Gravar Equipa* / *Erro* not yet compared with a capture, a
+  new team's default colours and level (not decoded), a team edited in the port opened in the original.
 
 ## 6. Browser product and close-out
 - A full season in the browser (Playwright) at every speed; autosave, load, *Sair*, service-worker update; speed against the original.

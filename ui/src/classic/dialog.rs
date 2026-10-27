@@ -275,6 +275,30 @@ fn tab_path(form: &Node, name: &str) -> Vec<i32> {
     }
 }
 
+/// Deletes the selected characters of the focused edit (`<name>.selstart`, `.sellen`): what typing or Backspace does first; true when
+/// there was a selection.
+fn take_selection(d: &mut Dialog) -> bool {
+    let f = d.focus.clone();
+    let num = |d: &Dialog, k: &str| {
+        d.texts
+            .get(&format!("{f}.{k}"))
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0)
+    };
+    let (a, len) = (num(d, "selstart"), num(d, "sellen"));
+    d.texts.remove(&format!("{f}.sellen"));
+    d.texts.remove(&format!("{f}.selstart"));
+    if len == 0 {
+        return false;
+    }
+    let t = d.texts.entry(f).or_default();
+    let chars: Vec<char> = t.chars().collect();
+    let a = a.min(chars.len());
+    let b = (a + len).min(chars.len());
+    *t = chars[..a].iter().chain(&chars[b..]).collect();
+    true
+}
+
 /// What the generic key handling of a dialog turned a key into.
 pub enum KeyAct {
     /// Press the named control.
@@ -362,10 +386,15 @@ pub fn generic_key_in(forms: &crate::win31::Forms, d: &mut Dialog, key: Key) -> 
             KeyAct::Done
         }
         Key::Char(ch) if is_edit && !ch.is_control() => {
-            let max = forms
-                .get(&d.form)
-                .and_then(|f| f.find(&d.focus))
-                .map_or(255, |n| n.int("MaxLength", 0));
+            let node = forms.get(&d.form).and_then(|f| f.find(&d.focus));
+            let max = node.map_or(255, |n| n.int("MaxLength", 0));
+            // (`CharCase`: the edit changes the letters as they are typed)
+            let ch = match node.and_then(|n| n.ident("CharCase")) {
+                Some("ecUpperCase") => ch.to_uppercase().next().unwrap_or(ch),
+                Some("ecLowerCase") => ch.to_lowercase().next().unwrap_or(ch),
+                _ => ch,
+            };
+            take_selection(d);
             let t = d.texts.entry(d.focus.clone()).or_default();
             if max == 0 || (t.chars().count() as i32) < max {
                 t.push(ch);
@@ -373,7 +402,9 @@ pub fn generic_key_in(forms: &crate::win31::Forms, d: &mut Dialog, key: Key) -> 
             KeyAct::Done
         }
         Key::Backspace if is_edit => {
-            d.texts.entry(d.focus.clone()).or_default().pop();
+            if !take_selection(d) {
+                d.texts.entry(d.focus.clone()).or_default().pop();
+            }
             KeyAct::Done
         }
         _ => KeyAct::None,

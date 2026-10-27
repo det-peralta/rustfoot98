@@ -228,8 +228,16 @@ impl Editor {
         t.insert("TeamLongName".into(), team.full_name.clone());
         t.insert("teamCoachName".into(), team.coach.clone());
         t.insert("teamInitLevel".into(), team.level.to_string());
-        // (an AutoSize label: the run-time caption shrinks it, so its centring does not show)
-        t.insert("teamInitLevel.autosize".into(), "1".into());
+        // (AutoSize labels: the run-time caption sizes them, so the level's centring does not show and the names take clicks over
+        // their text)
+        for n in [
+            "teamInitLevel",
+            "TeamShortName",
+            "TeamLongName",
+            "teamCoachName",
+        ] {
+            t.insert(format!("{n}.autosize"), "1".into());
+        }
         for n in [
             "TeamShortName",
             "TeamLongName",

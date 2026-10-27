@@ -75,9 +75,14 @@ fn reasons_follow_the_bits_of_the_check() {
             "Não está definido o treinador",
         ]
     );
+    // Brazilians are of Portugal's group (PLOP): only the others count as foreigners
     let mut t = team("AAA");
-    for p in t.players.iter_mut().skip(2).take(6) {
+    for p in t.players.iter_mut().skip(2).take(8) {
         p.nationality = "BRA".into();
+    }
+    assert!(dialogs::reasons(&e, &t).is_empty());
+    for p in t.players.iter_mut().skip(2).take(6) {
+        p.nationality = "ARG".into();
     }
     assert_eq!(
         dialogs::reasons(&e, &t),
@@ -204,4 +209,37 @@ fn a_transferred_player_arrives_when_his_new_team_is_opened() {
     assert_eq!(t.players[16].name, "Field 0");
     assert!(e.transfers.is_empty());
     assert!(e.modified);
+}
+
+#[test]
+fn the_shipped_teams_pass_the_check_if_available() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../original/elifoot98");
+    let (Ok(rd), Ok(txe)) = (
+        std::fs::read_dir(root.join("EQUIPAS")),
+        std::fs::read(root.join("COUNTRY.TXE")),
+    ) else {
+        return;
+    };
+    let countries = rustfoot_core::txe::parse(&txe)
+        .iter()
+        .skip(1)
+        .filter_map(|l| {
+            l.split_once(' ')
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+        })
+        .collect();
+    let e = Editor::new(Skin::default(), Forms::default(), countries, Vec::new());
+    let mut bad = Vec::new();
+    for f in rd.flatten() {
+        let t = eft::parse(&std::fs::read(f.path()).unwrap()).unwrap();
+        // (two shipped files, CRUZEIRO and INTER DE LIMEIRA, have no coach: the original's editor would not save them as they are)
+        let why: Vec<_> = dialogs::reasons(&e, &t)
+            .into_iter()
+            .filter(|w| *w != "Não está definido o treinador")
+            .collect();
+        if !why.is_empty() {
+            bad.push(format!("{}: {why:?}", t.short_name));
+        }
+    }
+    assert!(bad.is_empty(), "{bad:#?}");
 }

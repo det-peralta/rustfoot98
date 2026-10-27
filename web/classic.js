@@ -1,6 +1,6 @@
 // Host of the pixel-exact classic interface (ui/src/classic) compiled to WebAssembly (ui-web/src/classic_host.rs).
-// The skin pack (fonts, glyphs, forms, team files: built from the user's own copy of the game by tools/ui/webpack.py) is read from
-// ./skin/ or, failing that, from a folder the user picks (kept in IndexedDB).
+// The skin pack and the teams (with those saved by the team editor) come from pack.js.
+import { allTeams, start } from "./pack.js";
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const msg = document.getElementById("msg");
@@ -12,74 +12,6 @@ async function wasmInstance() {
   const res = await fetch("rustfoot_ui.wasm");
   const { instance } = await WebAssembly.instantiate(await res.arrayBuffer(), {});
   return instance.exports;
-}
-
-// ---- the pack: name -> bytes ----
-const DB = "elifoot98-classic-pack";
-const idb = () => new Promise((ok, no) => {
-  const r = indexedDB.open(DB, 1);
-  r.onupgradeneeded = () => r.result.createObjectStore("files");
-  r.onsuccess = () => ok(r.result);
-  r.onerror = () => no(r.error);
-});
-async function dbGet() {
-  try {
-    const db = await idb();
-    return await new Promise((ok) => {
-      const q = db.transaction("files").objectStore("files").get("pack");
-      q.onsuccess = () => ok(q.result || null);
-      q.onerror = () => ok(null);
-    });
-  } catch { return null; }
-}
-async function dbPut(pack) {
-  try {
-    const db = await idb();
-    await new Promise((ok) => {
-      const t = db.transaction("files", "readwrite");
-      t.objectStore("files").put(pack, "pack");
-      t.oncomplete = ok; t.onerror = ok;
-    });
-  } catch { /* the pack is only a convenience */ }
-}
-
-async function fetchPack() {
-  const idx = await fetch("skin/index.json");
-  if (!idx.ok) return null;
-  const list = await idx.json();
-  const get = async (n) => new Uint8Array(await (await fetch("skin/" + n)).arrayBuffer());
-  const pack = { fonts: await get(list.fonts), glyphs: await get(list.glyphs), forms: await get(list.forms),
-                 country: await get(list.country), referee: await get(list.referee), teams: [] };
-  for (const t of list.teams || []) pack.teams.push(await get(t));
-  return pack;
-}
-
-async function packFromFiles(files) {
-  const by = {};
-  const teams = [];
-  for (const f of files) {
-    const n = f.name.toLowerCase();
-    const bytes = new Uint8Array(await f.arrayBuffer());
-    if (n === "fonts.bin") by.fonts = bytes; else if (n === "glyphs.bin") by.glyphs = bytes;
-    else if (n === "forms.json") by.forms = bytes; else if (n === "country.txe") by.country = bytes;
-    else if (n === "referee.txe") by.referee = bytes; else if (n.endsWith(".eft")) teams.push(bytes);
-  }
-  if (!(by.fonts && by.glyphs && by.forms && by.country && by.referee)) return null;
-  return { ...by, teams };
-}
-
-function askForPack() {
-  say(`<h2>Elifoot 98</h2>
-    <p>Para jogar com o aspecto exacto do original é preciso o <b>pacote de aspecto</b>, feito a partir da tua própria cópia do jogo:
-    <code>python tools/ui/skin.py</code> e <code>python tools/ui/webpack.py</code> (cria <code>web/skin/</code>).</p>
-    <p>Ou escolhe aqui a pasta <code>web/skin</code> (os ficheiros ficam só neste navegador):</p>
-    <label class="btn"><input id="pick" type="file" webkitdirectory multiple hidden>Escolher pasta…</label>`);
-  document.getElementById("pick").addEventListener("change", async (e) => {
-    const pack = await packFromFiles([...e.target.files]);
-    if (!pack) { say("Pasta inválida: faltam <code>fonts.bin</code>, <code>glyphs.bin</code>, <code>forms.json</code>, <code>COUNTRY.TXE</code> ou <code>REFEREE.TXE</code>."); setTimeout(askForPack, 3000); return; }
-    await dbPut(pack);
-    run(pack);
-  });
 }
 
 // ---- the game ----
@@ -104,7 +36,7 @@ async function run(pack) {
   w = await wasmInstance();
   put(0, pack.fonts); put(1, pack.glyphs); put(2, pack.forms); put(3, pack.country); put(4, pack.referee);
   put(6, new Uint8Array(0));
-  for (const t of pack.teams) put(5, t);
+  for (const t of await allTeams(pack)) put(5, t.bytes);
   pushSaves();
   const seed = (Date.now() & 0x7fffffff) || 1;
   if (!w.cl_start(seed)) { say("Erro ao iniciar: " + text(out())); return; }
@@ -197,9 +129,4 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-(async () => {
-  try {
-    const pack = (await fetchPack().catch(() => null)) || (await dbGet());
-    if (pack) await run(pack); else askForPack();
-  } catch (e) { say("Erro: " + e); }
-})();
+start(say, run);

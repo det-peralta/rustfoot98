@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor de Equipas</title>
+<link rel="icon" href="icon.svg">
+<style>
+  html, body { margin: 0; height: 100%; background: #004080; overflow: hidden; }
+  body { display: grid; place-items: center; grid-template-rows: 1fr auto; font: 14px system-ui, sans-serif; color: #fff; }
+  canvas { image-rendering: pixelated; touch-action: none; outline: none; background: #004080; display: none; }
+  #msg { max-width: 34rem; padding: 1.5rem; line-height: 1.5; }
+  #msg code { background: #0006; padding: 0 .3em; border-radius: 3px; }
+  #msg button, #msg label.btn { font: inherit; padding: .5rem 1rem; margin-top: .75rem; cursor: pointer; }
+  #bar { display: none; gap: .5rem; padding: .4rem; }
+  #bar button, #bar label { font: inherit; font-size: 13px; padding: .25rem .75rem; cursor: pointer; background: #c0c0c0; color: #000; border: 1px solid #000; }
+</style>
+</head>
+<body>
+<canvas id="c" width="800" height="600" tabindex="0" aria-label="Editor de Equipas"></canvas>
+<div id="msg">A carregar…</div>
+<div id="bar">
+  <label>Importar .EFT…<input id="import" type="file" accept=".eft,.EFT" multiple hidden></label>
+  <button id="export">Exportar a equipa</button>
+  <a href="classic.html"><button>Jogar</button></a>
+</div>
+<script src="editor.js" type="module"></script>
+</body>
+</html>

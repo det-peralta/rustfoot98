@@ -560,6 +560,10 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             .map(|l| font.width(l))
             .max()
             .unwrap_or(0);
+        // (and so does the place that takes its clicks, pushed just before)
+        if let Some(h) = cx.hits.borrow_mut().last_mut().filter(|h| h.name == n.name) {
+            h.w = w;
+        }
     }
     if let Some(b) = cx.color_of(n, "bgcolor") {
         fb.fill(x, y, w, n.int("Height", 0), b);

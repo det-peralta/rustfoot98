@@ -3,6 +3,7 @@ use super::{Editor, Open, Request, MAX_PLAYERS};
 use crate::classic::dialog::{Dialog, Kind, Outcome};
 use crate::classic::dialogs::newgame::collate;
 use rustfoot_core::eft::{EftPlayer, EftTeam, Position};
+use rustfoot_core::market::code;
 
 /// The 16 colours of the colour grid (`TColorGrid`), in its order (as `win31::widgets::GRID_COLORS`).
 pub const GRID: [[u8; 3]; 16] = [
@@ -242,10 +243,12 @@ pub fn reasons(e: &Editor, t: &EftTeam) -> Vec<&'static str> {
         .filter(|p| p.position == Position::Goalkeeper)
         .count();
     let field = t.players.len() - keepers;
+    // (a foreigner is of a country outside the team's group, `1020:0b78` = 2: Bosman and PLOP players do not count)
+    let class = |nat: &str| rustfoot_core::market::country_class(code(&t.country), code(nat));
     let foreign = t
         .players
         .iter()
-        .filter(|p| p.nationality != t.country)
+        .filter(|p| class(&p.nationality) == 2)
         .count();
     let mut out = Vec::new();
     if t.full_name.trim().is_empty() || t.short_name.trim().is_empty() {

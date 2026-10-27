@@ -1,6 +1,7 @@
 //! C ABI of the shared UI for the browser: `ui_new(seed)`, `ui_event(kind, a, b)`, `ui_frame()` and then the JSON command list at
 //! `frame_ptr()` / `frame_len()` (valid until the next frame). The commands are the [`rustfoot_ui::canvas::Cmd`] list of one frame.
 mod classic_host;
+mod editor_host;
 use rustfoot_ui::canvas::{Canvas, Cmd, DrawList};
 use rustfoot_ui::{App, Event, Key};
 use std::cell::RefCell;
