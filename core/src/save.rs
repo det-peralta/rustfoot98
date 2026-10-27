@@ -45,7 +45,7 @@ impl World {
         out.push_str(MAGIC);
         out.push('\n');
         out.push_str(&format!(
-            "year|{}\neconomy|{:?}\nround|{}\nseed|{}\nscale|{}\ncurrency|{}\ncashref|{}|{}|{}|{}\n",
+            "year|{}\neconomy|{:?}\nround|{}\nseed|{}\nscale|{}\ncurrency|{}\ncashref|{}|{}|{}|{}\npricef|{:?}|{:?}|{:?}|{:?}\n",
             self.year,
             self.economy,
             self.round,
@@ -55,7 +55,11 @@ impl World {
             self.cash_ref[0],
             self.cash_ref[1],
             self.cash_ref[2],
-            self.cash_ref[3]
+            self.cash_ref[3],
+            self.price_f[0],
+            self.price_f[1],
+            self.price_f[2],
+            self.price_f[3]
         ));
         // the humans in seat order, then the seat of the active one (the single-human game writes one `human` line)
         for h in self.humans() {
@@ -252,6 +256,7 @@ impl World {
         // (games saved before the currency was kept are in reais)
         let mut currency = crate::economy::REAIS;
         let mut cash_ref = [0i64; 4];
+        let mut price_f = [0f64; 4];
         let mut divisions: [Vec<Club>; 4] = Default::default();
         let mut pool: Vec<Club> = Vec::new();
         let mut current: Option<(usize, Club)> = None;
@@ -417,6 +422,11 @@ impl World {
                 "cashref" => {
                     for (i, r) in cash_ref.iter_mut().enumerate() {
                         *r = num(n, &f, 1 + i)?;
+                    }
+                }
+                "pricef" => {
+                    for (i, p) in price_f.iter_mut().enumerate() {
+                        *p = f.get(1 + i).and_then(|v| v.parse().ok()).unwrap_or(0.0);
                     }
                 }
                 "seed" => seed = Some(num(n, &f, 1)? as u32),
@@ -595,6 +605,7 @@ impl World {
             scale,
             currency,
             cash_ref,
+            price_f,
             round,
             rng: DelphiRng::new(seed.ok_or("missing seed")?),
             last_round: Vec::new(),

@@ -105,15 +105,15 @@ pub fn rating(slots: &[Slot]) -> i64 {
     (sum as f64 / slots.len() as f64).round_ties_even() as i64
 }
 
-/// `1040:35e1` as called by `1010:0875`: the ticket price of a division's games,
-/// `round(G * E / sqrt(max(avgF, 0.1)) * avgRating / 5) / 2`, at least `G / 2`.
-/// The original multiplies by `1 + 0.5 * [flag == 1]` for a flag we could not trace; applying it to the user's division gave
-/// prices 30 % too high against the sample save, so it is left out. Against the sample the formula is within 3 % for the
-/// three upper divisions (44 / 32 / 18) and about 15 % low for the fourth (7 against ~8).
+/// `1040:35e1` as called by `1010:0875`: the ticket price of a division's games, the whole number
+/// `round(G * E / sqrt(max(avgF, 0.1)) * avgRating / 10)`, at least `G / 2`. Fitted on consecutive saves of the original
+/// (`core/examples/daycheck.rs`): `avgRating` is the rounded mean of the clubs' ratings and `avgF` the mean factor as it was before
+/// the division's last update (`World::price_f`). The original also multiplies by `1 + 0.5 * [flag == 1]` for a flag not traced.
 pub fn ticket_price(avg_f: f64, avg_rating: i64, e: f64, g: i64) -> f64 {
     let a = avg_f.max(0.1);
     let x = (g as f64 * e) / a.sqrt() * avg_rating as f64 / 5.0;
-    let price = x.round_ties_even() / 2.0;
+    // a whole number (every price on consecutive saves of the original is one)
+    let price = (x / 2.0).round_ties_even();
     price.max(g as f64 * 0.5)
 }
 
@@ -210,6 +210,17 @@ mod tests {
         assert_eq!(ticket_price(0.9345, 7, 2.0, 5), 7.0);
         // never below half the currency scale
         assert_eq!(ticket_price(1.0, 0, 2.0, 5), 2.5);
+    }
+
+    #[test]
+    fn ticket_prices_match_a_round_of_the_original() {
+        // round 7 of the ABCDEEEE season (2026): the four divisions charged 42, 30, 18 and 6; the means of F before the last update
+        // and the rounded mean ratings of the save before the round
+        let e = 2.018778;
+        assert_eq!(ticket_price(1.083058, 43, e, 5), 42.0);
+        assert_eq!(ticket_price(1.065036, 31, e, 5), 30.0);
+        assert_eq!(ticket_price(1.019748, 18, e, 5), 18.0);
+        assert_eq!(ticket_price(0.931293, 6, e, 5), 6.0);
     }
 
     #[test]

@@ -176,3 +176,16 @@ The five records at `DS:0062` (101 bytes; the chosen one is copied to `DS:2d40` 
 
 The loan step is what `1010:665e` adds to the cash and the debt; `G` scales values, wages and new-game cash; the word is written after
 amounts by `1040:335a`. The dialog shows the last currency used first (`elif98.ini`, `[Options] currency`).
+
+## Checked on consecutive saves of the original (2026-10-27, `core/examples/daycheck.rs`, `tools/capture/days.sh`)
+The original's own saves one league round apart (option *Gravar o jogo: Todas as jornadas*; cup days are not saved separately):
+- **Wages**: the ledger's wage change is exactly the squad's wage bill per game (32 of 32 clubs on a clean round; differences only
+  where a wage was renegotiated between the games of a multi-day interval).
+- **Ledger**: seven totals at `team+0x31..0x49` (gate, sales, prizes, purchases, wages, works, interest); the cash change equals their
+  sum for every club. (The import read purchases from `+0x39` until this check.)
+- **Ticket price**: a whole number, `round(G E round(meanRating) / (10 sqrt(meanF)))`, with `meanF` the division's mean factor before
+  its last update (`World::price_f`): 16 division-rounds observed (44/32/18/8, 42/30/18/6, 40/30/16/6...), all but one fit (division 3
+  of round 8 charged 16, the fit gives 17 — the rating the original averages is probably slightly different).
+- **Cup ties**: one price for every tie of a cup day (30 on the 16-avos day, 36 on the next), the gate split half and half between the
+  two clubs. The price is not the league formula over the cup list (52 clubs give 16); not reproduced yet.
+

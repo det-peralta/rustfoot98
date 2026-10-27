@@ -14,7 +14,55 @@ fn main() -> Result<(), String> {
     let before = e98::parse(&std::fs::read(a).map_err(|e| e.to_string())?)?;
     let after = e98::parse(&std::fs::read(b).map_err(|e| e.to_string())?)?;
     let w = World::from_e98(1, &before)?;
+    let w1 = World::from_e98(1, &after)?;
+    // the original fixes the next round's price in `6e48`: after the F update, before the evolution of the squads
+    for d in 0..4 {
+        let n = w.divisions[d].len().max(1) as f64;
+        let avg_f = w1.divisions[d].iter().map(|c| c.fin.f).sum::<f64>() / n;
+        let r0 = (w.divisions[d]
+            .iter()
+            .map(|c| finance::rating(&c.slots))
+            .sum::<i64>() as f64
+            / n)
+            .round_ties_even() as i64;
+        let r1 = (w1.divisions[d]
+            .iter()
+            .map(|c| finance::rating(&c.slots))
+            .sum::<i64>() as f64
+            / n)
+            .round_ties_even() as i64;
+        println!(
+            "next round, division {}: F after {:.5}  price with ratings before {:.1} / after {:.1}  (port now {:.1})",
+            d + 1,
+            avg_f,
+            finance::ticket_price(avg_f, r0, w1.economy, w1.scale),
+            finance::ticket_price(avg_f, r1, w1.economy, w1.scale),
+            w1.money_ctx(d).price
+        );
+    }
     println!("E {:.4} G {}", w.economy, w.scale);
+    {
+        // the cup's clubs (the draw list of the save): their mean F and rounded mean rating
+        let clubs: Vec<&rustfoot_core::season::Club> = w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .filter(|c| w.cup.contains(&c.name))
+            .collect();
+        let n = clubs.len().max(1) as f64;
+        let f = clubs.iter().map(|c| c.fin.f).sum::<f64>() / n;
+        let r = clubs.iter().map(|c| finance::rating(&c.slots)).sum::<i64>() as f64 / n;
+        let x = w.economy * r.round_ties_even() / (2.0 * f.sqrt());
+        println!(
+            "cup: {} clubs, mean F {:.5}, mean rating {:.3} -> x/2 {:.3}, x1.5 {:.3}",
+            clubs.len(),
+            f,
+            r,
+            x,
+            1.5 * x
+        );
+    }
     let (mut wage_ok, mut wage_n) = (0, 0);
     for d in 0..4 {
         let ctx = w.money_ctx(d);
@@ -92,6 +140,56 @@ fn main() -> Result<(), String> {
         };
         println!("   starters {:?}", by_status(&[1]));
         println!("   starters+subs {:?}", by_status(&[1, 2]));
+        {
+            // variants: injured / suspended players out of the mean, or counted as 0
+            let teams: Vec<&e98::E98Team> = clubs
+                .iter()
+                .filter_map(|c| before.teams.iter().find(|t| t.short_name == c.name))
+                .collect();
+            let var = |zero: bool| -> Vec<i64> {
+                teams
+                    .iter()
+                    .map(|t| {
+                        let avail = |p: &&e98::E98Player| p.injured == 0 && p.ban == 0;
+                        let (sum, cnt) = if zero {
+                            (
+                                t.players
+                                    .iter()
+                                    .filter(avail)
+                                    .map(|p| p.strength as f64)
+                                    .sum::<f64>(),
+                                t.players.len(),
+                            )
+                        } else {
+                            let v: Vec<f64> = t
+                                .players
+                                .iter()
+                                .filter(avail)
+                                .map(|p| p.strength as f64)
+                                .collect();
+                            (v.iter().sum::<f64>(), v.len())
+                        };
+                        (sum / cnt.max(1) as f64).round_ties_even() as i64
+                    })
+                    .collect()
+            };
+            let (a, z) = (var(false), var(true));
+            println!(
+                "   VAR d{} available-only {:?} mean {:.3}; unavailable as 0 {:?} mean {:.3}",
+                d + 1,
+                a,
+                a.iter().sum::<i64>() as f64 / n,
+                z,
+                z.iter().sum::<i64>() as f64 / n
+            );
+            let rr = ratings.iter().sum::<i64>() as f64 / n;
+            let raw = mean_strength.iter().sum::<f64>() / n;
+            let k = w.scale as f64 * w.economy / avg_f.max(0.1).sqrt() / 5.0;
+            println!(
+                "   FIT d{} E {:.6} avgF {:.6} meanRounded {:.4} meanRaw {:.4} -> x/2 with meanRounded {:.4} with meanRaw {:.4}",
+                d + 1, w.economy, avg_f, rr, raw, k * rr / 2.0, k * raw / 2.0
+            );
+        }
         for c in &w.divisions[d] {
             let (Some(t0), Some(t1)) = (
                 before.teams.iter().find(|t| t.short_name == c.name),
