@@ -107,6 +107,18 @@ pub struct E98Fixture {
     pub round: u16,
 }
 
+/// The ledger categories of `1010:58bf` in the order of their totals (`team+0x31`, `+0x35`, ... `+0x49`): gate (1), sales (2),
+/// season prizes (3), purchases (`0x15`), wages (`0x16`), stadium works (`0x17`), loan interest (`0x18`).
+pub const LEDGER: [&str; 7] = [
+    "gate",
+    "sales",
+    "prizes",
+    "purchases",
+    "wages",
+    "works",
+    "interest",
+];
+
 #[derive(Clone, Debug)]
 pub struct E98Team {
     pub id: u16,
@@ -126,8 +138,8 @@ pub struct E98Team {
     pub cash: i64,
     pub loan: i64,
     pub factor: f64,
-    /// Season totals of the ledger: gate, sales, purchases, wages.
-    pub ledger: [i64; 4],
+    /// Season totals of the ledger (`1010:58bf`, `team+0x31..0x49`), in the order of [`LEDGER`].
+    pub ledger: [i64; 7],
     pub players: Vec<E98Player>,
     /// The team's coach (`coach+0x0c` games coached, `+0x0e` score, `+0x07` set for the user's coaches).
     pub coach: u16,
@@ -302,12 +314,7 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
     };
     c.raw(6 + 4 + 2 + 2)?;
     let w = |k: usize| u16::from_le_bytes([block[2 * k], block[1 + 2 * k]]);
-    let ledger = [
-        long(block, 0x31 - 0x16),
-        long(block, 0x35 - 0x16),
-        long(block, 0x39 - 0x16),
-        long(block, 0x41 - 0x16),
-    ];
+    let ledger: [i64; 7] = std::array::from_fn(|i| long(block, 0x31 + 4 * i - 0x16));
     let players = c.list(player)?;
     let events = c.list(event)?;
     c.list(|c| c.raw(8).map(|_| ()))?;
@@ -586,10 +593,14 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c.fin.cash = t.cash;
     c.fin.loan = t.loan;
     c.fin.f = t.factor;
-    c.fin.gate = t.ledger[0];
-    c.fin.sales = t.ledger[1];
-    c.fin.purchases = t.ledger[2];
-    c.fin.wages = t.ledger[3];
+    let [gate, sales, prizes, purchases, wages, works, interest] = t.ledger;
+    c.fin.gate = gate;
+    c.fin.sales = sales;
+    c.fin.prizes = prizes;
+    c.fin.purchases = purchases;
+    c.fin.wages = wages;
+    c.fin.works = works;
+    c.fin.interest = interest;
     c.country = code(&t.country);
     c.master = rank as u16;
     c
