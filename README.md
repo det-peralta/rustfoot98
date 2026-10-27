@@ -21,8 +21,14 @@ substitutions, penalties, cup draw, auctions, end of season. If `web/skin/` is m
 browser's IndexedDB; nothing is uploaded). Games are saved in the browser (autosave every 3 rounds, "Sair" saves); the original's `.e98`
 files can be read by the native tools.
 
-Not modelled yet: a second human coach on the same machine (hot seat; in progress), sound, the registered-copy features (the original
-hides loans, "Procurar jogadores" and the *Controle* page in an unregistered copy and so does the port; no key check is implemented).
+The team editor (`EDITEQ.EXE`) is at `http://localhost:8080/editor.html`: open, create and change `.EFT` teams with the original's
+windows; the teams it saves stay in the browser and new games use them (*Importar* / *Exportar* move `.EFT` files in and out).
+
+Up to six human coaches share the machine (hot seat), with the original's turn order. Not modelled: the registered-copy features (the
+original hides loans, "Procurar jogadores" and the *Controle* page in an unregistered copy and so does the port; no key check is
+implemented), the referee's influence on a game, the season-end money and the computer clubs' market tiers (approximated, see
+`docs/roadmap.md`), hover hints (`ShowHint`). The original seeds its random numbers at start-up, so its games cannot be replayed move for
+move; the money rules were checked on the original's own saves instead (`docs/finance.md`).
 
 ## How it is built
 | Crate / dir | Content |
@@ -35,7 +41,7 @@ hides loans, "Procurar jogadores" and the *Controle* page in an unregistered cop
 
 Native helpers: `cargo run --release -p rustfoot-ui --bin classic_shot -- game.e98|- out.bmp key=value ...` renders any window or plays scripted
 sessions (`docs/classic-dialogs.md`); `tools/ui/regions.py` lists where a render differs from a capture of the original;
-`tools/capture/classic_smoke.mjs` plays rounds in the browser build. `editor_shot out.bmp team=FILE.EFT do='TeamColor;@x,y;!OKBtn'` renders
+`tools/capture/classic_season.mjs` plays whole seasons in the browser build. `editor_shot out.bmp team=FILE.EFT do='TeamColor;@x,y;!OKBtn'` renders
 the team editor after a script; `tools/capture/editor_web.mjs` drives its browser build.
 
 ## Docs
