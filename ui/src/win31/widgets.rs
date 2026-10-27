@@ -453,6 +453,38 @@ fn columns(cx: &Ctx, n: &Node) -> Option<Vec<(i32, char)>> {
     )
 }
 
+/// One row of the team editor's country combo (`DrawFlagAndCountry`, `1020:0c4d`): the item rectangle filled white, the flag
+/// (`@FORM/NAME|name`) a pixel down from its corner, the name in Arial 12 (16 pixels) at 44, 5.
+fn flag_row(fb: &mut Fb, cx: &Ctx, (rx, ry, rw, rh): (i32, i32, i32, i32), s: &str) {
+    fb.fill(rx, ry, rw, rh, WHITE);
+    let (flag, name) = s.split_once('|').unwrap_or(("", s));
+    if let Some((form, bmp)) = flag.strip_prefix('@').and_then(|f| f.split_once('/')) {
+        if let Some(b) = cx.skin.bitmap(form, bmp) {
+            for r in 0..b.h {
+                for c in 0..b.w {
+                    let p = b.px[(r * b.w + c) as usize];
+                    fb.set(
+                        rx + c,
+                        ry + 1 + r,
+                        Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8),
+                    );
+                }
+            }
+        }
+    }
+    let spec = FontSpec {
+        name: "arial".into(),
+        px: 16,
+        bold: false,
+        italic: false,
+        underline: false,
+        color: BLACK,
+    };
+    if let Some(font) = cx.font(&spec) {
+        text(fb, font, rx + 44, ry + 5, name, BLACK, false);
+    }
+}
+
 /// Draws one row of a list or combo box: the cells of `s` (`a|b|c`) at the column offsets of `<name>.cols` (from `x`), or the whole
 /// text at `x + 3`. A cell that starts with `@` is a skin bitmap `FORM/NAME` (a flag), drawn at its offset and centred vertically.
 #[allow(clippy::too_many_arguments)]
@@ -671,6 +703,10 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     if n.ident("Style") == Some("csDropDownList") {
         h = h.max(font.tm_height + 7);
     }
+    if get(cx, n, "draw") == Some("flag") {
+        // an owner-drawn fixed combo is its item's height and 6
+        h = n.int("ItemHeight", font.height()) + 6;
+    }
     let enabled = is_enabled(cx, n);
     if n.flag("Ctl3D", true) {
         sunken_box(fb, x, y, w, h, WHITE);
@@ -690,6 +726,26 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     let ih_field = n.int("ItemHeight", font.height()).max(font.height());
     let ty = y + 1 + (h - 2 - ih_field) / 2;
     let focused = cx.focus == n.name && enabled && !flag(cx, n, "open");
+    if get(cx, n, "draw") == Some("flag") {
+        // the owner-drawn field: the item 3 pixels in, a navy frame and the focus rectangle around it while focused
+        let (rx, ry, rw, rh) = (x + 3, y + 3, w - 3 - 20, h - 6);
+        let old = fb.clip;
+        fb.clip = (x + 1, y + 1, x + w - 17, y + h - 1);
+        flag_row(fb, cx, (rx, ry, rw, rh), &shown);
+        if focused {
+            let (fx, fy, fw, fh) = (rx - 1, ry - 1, rw + 2, rh + 2);
+            fb.fill(fx, fy, fw, 1, NAVY);
+            fb.fill(fx, fy + fh - 1, fw, 1, NAVY);
+            fb.fill(fx, fy, 1, fh, NAVY);
+            fb.fill(fx + fw - 1, fy, 1, fh, NAVY);
+            focus_rect(fb, rx, ry, rw, rh, x, y);
+        }
+        fb.clip = old;
+        if flag(cx, n, "open") && !items.is_empty() {
+            OVERLAYS.with(|o| o.borrow_mut().push((n.name.clone(), x, y, w, h, f.clone())));
+        }
+        return;
+    }
     let list_style = n.ident("Style") != Some("csDropDown");
     let old = fb.clip;
     fb.clip = (x + 1, y + 1, x + w - 17, y + h - 1);
@@ -764,7 +820,11 @@ fn combo_dropdown(
         return;
     };
     let ih = n.int("ItemHeight", font.height()).max(font.height());
-    let rows = items.len().min(n.int("DropDownCount", 8).max(1) as usize);
+    let mut rows = items.len().min(n.int("DropDownCount", 8).max(1) as usize);
+    if get(cx, n, "draw") == Some("flag") {
+        // the list keeps the height of `DropDownCount` rows of the font: 3 of the 31-pixel flags
+        rows = rows.min((n.int("DropDownCount", 8) * font.height() / ih).max(1) as usize);
+    }
     let scrolled = items.len() > rows;
     let top = view(cx, n, items.len(), rows);
     let ly = y + h - 1;
@@ -778,6 +838,19 @@ fn combo_dropdown(
         let i = top + r;
         let ry = ly + 1 + r as i32 * ih;
         let hot = sel == Some(i);
+        if get(cx, n, "draw") == Some("flag") {
+            flag_row(fb, cx, (x + 1, ry, right - x - 1, ih), &items[i]);
+            push_hit(
+                cx,
+                format!("{}#{i}", n.name),
+                "ComboItem",
+                x + 1,
+                ry,
+                right - x - 1,
+                ih,
+            );
+            continue;
+        }
         if hot {
             fb.fill(x + 1, ry, right - x - 1, ih, NAVY);
         }
@@ -820,11 +893,22 @@ fn combo_dropdown(
 }
 
 /// `TSpinEdit` (Delphi sample component): a sunken edit with the value (`<name>.value`, else the text) and, at its right, a pair of
-/// small arrow buttons.
+/// small arrow buttons. `<name>.height` is the height the control really has when its `AutoSize` changed it; `<name>.style = editor`
+/// draws the team editor's look (measured on its level dialog): the buttons behind a black rule, split by a black line, and the
+/// value (selected) 4 pixels in.
 pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
-    let (w, h) = (n.int("Width", 60), n.int("Height", 24));
+    let w = n.int("Width", 60);
+    let h = get_num(cx, n, "height").unwrap_or(n.int("Height", 24));
     let bg = n.color("Color").unwrap_or(WHITE);
     sunken_box(fb, x, y, w, h, bg);
+    let value = match get(cx, n, "value") {
+        Some(v) => v.to_string(),
+        None => caption_text(cx, n),
+    };
+    if get(cx, n, "style") == Some("editor") {
+        spinedit_editor(fb, cx, n, f, (x, y, w, h), &value);
+        return;
+    }
     let bh = (h - 2) / 2;
     let bx = x + w - 17;
     flat_button(fb, bx, y + 1, 16, bh);
@@ -844,10 +928,6 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         BLACK,
     );
     if let Some(font) = cx.font(f) {
-        let s = match get(cx, n, "value") {
-            Some(v) => v.to_string(),
-            None => caption_text(cx, n),
-        };
         let old = fb.clip;
         fb.clip = (x + 1, y + 1, bx, y + h - 1);
         text(
@@ -855,7 +935,7 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
             font,
             x + 2,
             y + (h - font.height()) / 2,
-            &s,
+            &value,
             f.color,
             false,
         );
@@ -871,6 +951,64 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         16,
         h - 2 - bh,
     );
+}
+
+/// The team editor's spin edit: a black rule left of two 13-pixel buttons (white top and left, a 1-pixel grey shadow) split by a black
+/// line, and the value selected, 4 pixels in.
+fn spinedit_editor(
+    fb: &mut Fb,
+    cx: &Ctx,
+    n: &Node,
+    f: &FontSpec,
+    (x, y, w, h): (i32, i32, i32, i32),
+    value: &str,
+) {
+    let rule = x + w - 15;
+    let (bx, bw) = (rule + 1, 13);
+    let bh = (h - 2) / 2 - 1;
+    fb.fill(rule, y + 1, 1, h - 2, BLACK);
+    // a button: white top and left, a grey right column and a grey bottom row that also covers the rule
+    let button = |fb: &mut Fb, by: i32, bh: i32| {
+        fb.fill(bx, by, bw, bh, SILVER);
+        fb.fill(bx, by, bw, 1, WHITE);
+        fb.fill(bx, by, 1, bh - 1, WHITE);
+        fb.fill(bx + bw - 1, by, 1, bh, GRAY);
+        fb.fill(rule, by + bh - 1, bw + 1, 1, GRAY);
+    };
+    button(fb, y + 1, bh);
+    fb.fill(rule, y + 1 + bh, bw + 1, 1, BLACK);
+    let (y2, bh2) = (y + 2 + bh, h - 3 - bh);
+    button(fb, y2, bh2);
+    glyph(
+        fb,
+        bx + 2,
+        y + 1 + (bh - 4) / 2,
+        &["....#....", "...###...", "..#####..", ".#######."],
+        BLACK,
+    );
+    glyph(
+        fb,
+        bx + 2,
+        y2 + (bh2 - 4) / 2,
+        &[".#######.", "..#####..", "...###...", "....#...."],
+        BLACK,
+    );
+    if let Some(font) = cx.font(f) {
+        let (tx, ty) = (x + 4, y + (h - font.height()) / 2 - 1);
+        let old = fb.clip;
+        fb.clip = (x + 1, y + 1, rule, y + h - 1);
+        if cx.focus == n.name {
+            // (the highlight stops 4 pixels short of the text's advance: measured with "12" in MS Sans Serif 32 bold)
+            let hw = font.width(value) - 4;
+            fb.fill(tx, ty, hw, font.height(), NAVY);
+            text(fb, font, tx, ty, value, WHITE, false);
+        } else {
+            text(fb, font, tx, ty, value, f.color, false);
+        }
+        fb.clip = old;
+    }
+    push_hit(cx, format!("{}#up", n.name), "SpinUp", bx, y + 1, bw, bh);
+    push_hit(cx, format!("{}#down", n.name), "SpinDown", bx, y2, bw, bh2);
 }
 
 fn caption_text(cx: &Ctx, n: &Node) -> String {
@@ -1127,48 +1265,56 @@ pub(super) fn speedbutton(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32,
     }
 }
 
-/// `TColorGrid`: 16 colour cells (4 x 4) with the foreground (`F`) and background (`B`) marks; `<name>.index` is the foreground,
-/// `<name>.bgindex` the background colour.
+/// The 16 colours of a `TColorGrid`, in its order (as the team editor's grid shows them).
+pub const GRID_COLORS: [Rgb; 16] = [
+    Rgb(0, 0, 0),
+    Rgb(128, 0, 0),
+    Rgb(0, 128, 0),
+    Rgb(128, 128, 0),
+    Rgb(0, 0, 128),
+    Rgb(128, 0, 128),
+    Rgb(0, 128, 128),
+    Rgb(192, 192, 192),
+    Rgb(128, 128, 128),
+    Rgb(255, 0, 0),
+    Rgb(0, 255, 0),
+    Rgb(255, 255, 0),
+    Rgb(0, 0, 255),
+    Rgb(255, 0, 255),
+    Rgb(0, 255, 255),
+    Rgb(255, 255, 255),
+];
+
+/// `TColorGrid`: 16 colour cells (4 x 4), each sunken in a 2-pixel frame with a 2-pixel gap, the foreground and background cells
+/// marked (`<name>.fgmark` / `.bgmark`, default `FG` / `BG`) in the inverse of their colour; `<name>.index` is the foreground,
+/// `<name>.bgindex` the background colour. Measured on the team editor's colour dialog.
 pub(super) fn colorgrid(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
-    const COLORS: [Rgb; 16] = [
-        Rgb(0, 0, 0),
-        Rgb(128, 0, 0),
-        Rgb(0, 128, 0),
-        Rgb(128, 128, 0),
-        Rgb(0, 0, 128),
-        Rgb(128, 0, 128),
-        Rgb(0, 128, 128),
-        Rgb(128, 128, 128),
-        Rgb(192, 192, 192),
-        Rgb(255, 0, 0),
-        Rgb(0, 255, 0),
-        Rgb(255, 255, 0),
-        Rgb(0, 0, 255),
-        Rgb(255, 0, 255),
-        Rgb(0, 255, 255),
-        Rgb(255, 255, 255),
-    ];
     let (w, h) = (n.int("Width", 100), n.int("Height", 100));
     let (cw, ch) = (w / 4, h / 4);
     let fg = get_num(cx, n, "index").unwrap_or(0);
     let bg = get_num(cx, n, "bgindex").unwrap_or(15);
-    fb.fill(x, y, w, h, BLACK);
-    for (i, c) in COLORS.iter().enumerate() {
+    let fgmark = get(cx, n, "fgmark").unwrap_or("FG");
+    let bgmark = get(cx, n, "bgmark").unwrap_or("BG");
+    for (i, c) in GRID_COLORS.iter().enumerate() {
         let (gx, gy) = (x + (i as i32 % 4) * cw, y + (i as i32 / 4) * ch);
-        fb.fill(gx + 1, gy + 1, cw - 1, ch - 1, *c);
+        // the sunken frame: two dark lines top and left, two white lines bottom and right (the lower one a pixel longer to the left)
+        fb.fill(gx + 1, gy + 1, cw - 3, 1, GRAY);
+        fb.fill(gx + 1, gy + 2, cw - 4, 1, GRAY);
+        fb.fill(gx + 1, gy + 3, 2, ch - 6, GRAY);
+        fb.fill(gx + cw - 2, gy + 1, 1, ch - 3, WHITE);
+        fb.fill(gx + cw - 3, gy + 2, 1, ch - 4, WHITE);
+        fb.fill(gx + 1, gy + ch - 3, cw - 2, 1, WHITE);
+        fb.fill(gx, gy + ch - 2, cw - 1, 1, WHITE);
+        fb.fill(gx + 3, gy + 3, cw - 6, ch - 6, *c);
         let mark = if i as i32 == fg {
-            Some("F")
+            Some(fgmark)
         } else if i as i32 == bg {
-            Some("B")
+            Some(bgmark)
         } else {
             None
         };
         if let (Some(m), Some(font)) = (mark, cx.font(f)) {
-            let ink = if c.0 as u32 + c.1 as u32 + c.2 as u32 > 300 {
-                BLACK
-            } else {
-                WHITE
-            };
+            let ink = Rgb(255 - c.0, 255 - c.1, 255 - c.2);
             text(
                 fb,
                 font,
@@ -1181,10 +1327,7 @@ pub(super) fn colorgrid(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y
         }
         push_hit(cx, format!("{}#{i}", n.name), "ColorCell", gx, gy, cw, ch);
     }
-    if cx.focus == n.name {
-        let (gx, gy) = (x + (fg % 4) * cw, y + (fg / 4) * ch);
-        focus_rect(fb, gx + 2, gy + 2, cw - 3, ch - 3, x, y);
-    }
+    // (with the focus it shows nothing more: checked on the team editor's colour dialog)
 }
 
 /// `TPaintBox`: only the stadium's (`PaintBoxStadium`) is known; `<name>.level` is the stadium level (0..24, one stand of 5000 seats

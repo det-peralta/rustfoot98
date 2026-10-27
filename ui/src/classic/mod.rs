@@ -80,6 +80,8 @@ pub enum Key {
     Right,
     /// Function key `F1..F12`.
     F(u8),
+    Insert,
+    Delete,
     Char(char),
 }
 

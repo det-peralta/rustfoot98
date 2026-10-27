@@ -4,7 +4,8 @@
 //! has to react to the new state; it is called with the control's name (list rows and combo items arrive as `Name#row` after
 //! `.sel` was set).
 use super::dialog::{Dialog, KeyAct};
-use super::{Classic, Key};
+use super::Key;
+use crate::win31::Forms;
 use crate::win31::Node;
 
 /// What the generic handling of a mouse press decided.
@@ -29,8 +30,8 @@ fn set(d: &mut Dialog, name: &str, key: &str, v: impl ToString) {
     d.texts.insert(format!("{name}.{key}"), v.to_string());
 }
 
-fn node<'a>(c: &'a Classic, d: &Dialog, name: &str) -> Option<&'a Node> {
-    c.forms.get(&d.form)?.find(name)
+fn node<'a>(c: &'a Forms, d: &Dialog, name: &str) -> Option<&'a Node> {
+    c.get(&d.form)?.find(name)
 }
 
 fn parent_of<'a>(n: &'a Node, name: &str) -> Option<&'a Node> {
@@ -44,7 +45,7 @@ fn parent_of<'a>(n: &'a Node, name: &str) -> Option<&'a Node> {
 }
 
 /// The items of a combo box, list box or radio group.
-fn items(c: &Classic, d: &Dialog, name: &str) -> Vec<String> {
+fn items(c: &Forms, d: &Dialog, name: &str) -> Vec<String> {
     if let Some(v) = get(d, name, "items") {
         return v.split('\n').map(str::to_string).collect();
     }
@@ -69,7 +70,7 @@ fn split(name: &str) -> (&str, Option<i32>) {
     }
 }
 
-fn is_checked(c: &Classic, d: &Dialog, name: &str) -> bool {
+fn is_checked(c: &Forms, d: &Dialog, name: &str) -> bool {
     match get(d, name, "checked") {
         Some(v) => v != "0",
         None => node(c, d, name).is_some_and(|n| n.flag("Checked", false)),
@@ -87,7 +88,7 @@ fn reveal(d: &mut Dialog, name: &str, row: i32, fit: i32) {
 }
 
 /// A mouse press on the control called `name` of class `class` (a `Hit` of the last frame).
-pub fn mouse(c: &Classic, d: &mut Dialog, name: &str, class: &str) -> MouseAct {
+pub fn mouse(c: &Forms, d: &mut Dialog, name: &str, class: &str) -> MouseAct {
     let (base, idx) = split(name);
     match class {
         "TCheckBox" => {
@@ -99,7 +100,6 @@ pub fn mouse(c: &Classic, d: &mut Dialog, name: &str, class: &str) -> MouseAct {
         "TRadioButton" => {
             // the radio buttons of the same parent form a group
             let mates: Vec<String> = c
-                .forms
                 .get(&d.form)
                 .and_then(|f| parent_of(f, name).or(Some(f)))
                 .map(|p| {
@@ -202,7 +202,7 @@ pub fn mouse(c: &Classic, d: &mut Dialog, name: &str, class: &str) -> MouseAct {
 }
 
 /// Keys for the focused widget (before the generic Enter / Escape / Tab handling). `None` when the key is not for a widget.
-pub fn key(c: &Classic, d: &mut Dialog, key: Key) -> Option<KeyAct> {
+pub fn key(c: &Forms, d: &mut Dialog, key: Key) -> Option<KeyAct> {
     let name = d.focus.clone();
     let class = d.hits.iter().find(|h| h.name == name)?.class.clone();
     let open = get(d, &name, "open").is_some_and(|v| v == "1");

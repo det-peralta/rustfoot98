@@ -7,6 +7,7 @@
 pub mod canvas;
 pub mod classic;
 mod dialogs;
+pub mod editor;
 mod screens;
 pub mod win31;
 

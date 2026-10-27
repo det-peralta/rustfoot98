@@ -114,6 +114,16 @@ impl Dialog {
         let Classic {
             skin, forms, fb, ..
         } = c;
+        self.render(fb, skin, forms);
+    }
+
+    /// Draws the dialog as its texts and lists stand (bound by its owner: the game or the team editor).
+    pub fn render(
+        &mut self,
+        fb: &mut crate::win31::fb::Fb,
+        skin: &crate::win31::Skin,
+        forms: &crate::win31::Forms,
+    ) {
         let Some(form) = forms.get(&self.form) else {
             return;
         };
@@ -230,11 +240,19 @@ fn find_button(n: &Node, want_default: bool) -> Option<String> {
 
 /// The default button of a form (answers Enter) and its cancel button (answers Escape).
 pub fn default_button(c: &Classic, d: &Dialog) -> Option<String> {
-    c.forms.get(&d.form).and_then(|f| find_button(f, true))
+    default_button_in(&c.forms, d)
+}
+
+pub fn default_button_in(forms: &crate::win31::Forms, d: &Dialog) -> Option<String> {
+    forms.get(&d.form).and_then(|f| find_button(f, true))
 }
 
 pub fn cancel_button(c: &Classic, d: &Dialog) -> Option<String> {
-    c.forms.get(&d.form).and_then(|f| find_button(f, false))
+    cancel_button_in(&c.forms, d)
+}
+
+pub fn cancel_button_in(forms: &crate::win31::Forms, d: &Dialog) -> Option<String> {
+    forms.get(&d.form).and_then(|f| find_button(f, false))
 }
 
 /// The `TabOrder` of a control and of its containers, from the form down (controls the form does not know sort last).
@@ -270,6 +288,11 @@ pub enum KeyAct {
 /// Enter presses the default button, Escape the cancel button, Tab moves the focus and typing edits the focused `TEdit` (its text is
 /// `texts[name]`, at most `MaxLength` characters).
 pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
+    generic_key_in(&c.forms, d, key)
+}
+
+/// `generic_key` for a dialog of any program (the game or the team editor), with its forms.
+pub fn generic_key_in(forms: &crate::win31::Forms, d: &mut Dialog, key: Key) -> KeyAct {
     // a radio button is a tab stop only while it is the chosen one (Delphi sets `TabStop` with `Checked`)
     let focusable = |h: &Hit, texts: &std::collections::BTreeMap<String, String>| {
         h.enabled
@@ -295,7 +318,7 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
         .hits
         .iter()
         .any(|h| h.name == d.focus && h.class == "TEdit");
-    if let Some(act) = super::widget_input::key(c, d, key) {
+    if let Some(act) = super::widget_input::key(forms, d, key) {
         return act;
     }
     match key {
@@ -308,20 +331,20 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
             match focused {
                 Some(h) if h.enabled => KeyAct::Press(h.name.clone()),
                 Some(_) => KeyAct::Done,
-                None => match default_button(c, d) {
+                None => match default_button_in(forms, d) {
                     Some(b) => KeyAct::Press(b),
                     None => KeyAct::None,
                 },
             }
         }
-        Key::Escape => match cancel_button(c, d) {
+        Key::Escape => match cancel_button_in(forms, d) {
             Some(b) => KeyAct::Press(b),
             None => KeyAct::None,
         },
         Key::Tab | Key::BackTab => {
             let mut names: Vec<&Hit> = d.hits.iter().filter(|h| focusable(h, &d.texts)).collect();
             // Tab follows the `TabOrder` of the form (among the children of each container), then the drawing order
-            if let Some(form) = c.forms.get(&d.form) {
+            if let Some(form) = forms.get(&d.form) {
                 names.sort_by_cached_key(|h| tab_path(form, &h.name));
             }
             names.dedup_by(|a, b| a.name == b.name);
@@ -339,8 +362,7 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
             KeyAct::Done
         }
         Key::Char(ch) if is_edit && !ch.is_control() => {
-            let max = c
-                .forms
+            let max = forms
                 .get(&d.form)
                 .and_then(|f| f.find(&d.focus))
                 .map_or(255, |n| n.int("MaxLength", 0));

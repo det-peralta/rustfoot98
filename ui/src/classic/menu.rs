@@ -1,7 +1,8 @@
 //! The menu bar of the main window and its drop-down menus.
 use super::Classic;
 use crate::win31::draw::{text, text_dithered};
-use crate::win31::fb::{Rgb, BLACK, GRAY, NAVY, SILVER, WHITE};
+use crate::win31::fb::{Fb, Rgb, BLACK, GRAY, NAVY, SILVER, WHITE};
+use crate::win31::Skin;
 use rustfoot_core::season::{plan_for_formation, Club, FORMATIONS};
 
 pub struct Entry {
@@ -16,6 +17,8 @@ pub struct Top {
     pub name: String,
     pub label: String,
     pub entries: Vec<Entry>,
+    /// A disabled title is written in silver and does not open.
+    pub enabled: bool,
 }
 
 /// Frame position of the main window (client 632x434 with a menu bar).
@@ -84,6 +87,7 @@ pub fn model(c: &Classic, club: &Club) -> Vec<Top> {
                 name: t.name.clone(),
                 label: t.str("Caption").unwrap_or("").replace('&', ""),
                 entries,
+                enabled: true,
             });
         }
     }
@@ -92,10 +96,31 @@ pub fn model(c: &Classic, club: &Club) -> Vec<Top> {
 
 /// The horizontal extents `(left, right)` of the top-level items in the bar.
 pub fn bar_items(c: &Classic, tops: &[Top]) -> Vec<(i32, i32)> {
-    let Some(f) = c.skin.font("system", 13, false, false) else {
+    bar_items_at(&c.skin, FRAME, tops)
+}
+
+/// The box of a drop-down menu: `(x, y, w, h)`.
+pub fn dropdown_rect(c: &Classic, tops: &[Top], open: usize) -> (i32, i32, i32, i32) {
+    dropdown_rect_at(&c.skin, FRAME, tops, open)
+}
+
+/// The entry under `(px, py)` of the open drop-down menu.
+pub fn entry_at(c: &Classic, tops: &[Top], open: usize, px: i32, py: i32) -> Option<usize> {
+    entry_at_in(&c.skin, FRAME, tops, open, px, py)
+}
+
+/// Draws the open menu: the title in the bar highlighted and the drop-down box under it.
+pub fn draw_open(c: &mut Classic, tops: &[Top], open: usize, hl: Option<usize>) {
+    let Classic { fb, skin, .. } = c;
+    draw_open_at(fb, skin, FRAME, tops, open, hl);
+}
+
+/// `bar_items` for a window whose frame is at `frame` (the main window of the game or of the team editor).
+pub fn bar_items_at(skin: &Skin, frame: (i32, i32), tops: &[Top]) -> Vec<(i32, i32)> {
+    let Some(f) = skin.font("system", 13, false, false) else {
         return Vec::new();
     };
-    let mut pen = FRAME.0 + 1 + 8;
+    let mut pen = frame.0 + 1 + 8;
     tops.iter()
         .map(|t| {
             let w = f.width(&t.label);
@@ -109,12 +134,16 @@ pub fn bar_items(c: &Classic, tops: &[Top]) -> Vec<(i32, i32)> {
 const ITEM_H: i32 = 18;
 const SEP_H: i32 = 7;
 
-/// The box of a drop-down menu: `(x, y, w, h)`.
-pub fn dropdown_rect(c: &Classic, tops: &[Top], open: usize) -> (i32, i32, i32, i32) {
-    let bar = bar_items(c, tops);
-    let (x, _) = bar.get(open).copied().unwrap_or((FRAME.0, 0));
-    let y = FRAME.1 + 38;
-    let Some(f) = c.skin.font("system", 13, false, false) else {
+pub fn dropdown_rect_at(
+    skin: &Skin,
+    frame: (i32, i32),
+    tops: &[Top],
+    open: usize,
+) -> (i32, i32, i32, i32) {
+    let bar = bar_items_at(skin, frame, tops);
+    let (x, _) = bar.get(open).copied().unwrap_or((frame.0, 0));
+    let y = frame.1 + 38;
+    let Some(f) = skin.font("system", 13, false, false) else {
         return (x, y, 0, 0);
     };
     let t = &tops[open];
@@ -143,9 +172,15 @@ pub fn dropdown_rect(c: &Classic, tops: &[Top], open: usize) -> (i32, i32, i32, 
     (x, y, w, h)
 }
 
-/// The entry under `(px, py)` of the open drop-down menu.
-pub fn entry_at(c: &Classic, tops: &[Top], open: usize, px: i32, py: i32) -> Option<usize> {
-    let (x, y, w, _) = dropdown_rect(c, tops, open);
+pub fn entry_at_in(
+    skin: &Skin,
+    frame: (i32, i32),
+    tops: &[Top],
+    open: usize,
+    px: i32,
+    py: i32,
+) -> Option<usize> {
+    let (x, y, w, _) = dropdown_rect_at(skin, frame, tops, open);
     if px <= x || px >= x + w - 1 {
         return None;
     }
@@ -160,28 +195,26 @@ pub fn entry_at(c: &Classic, tops: &[Top], open: usize, px: i32, py: i32) -> Opt
     None
 }
 
-/// Draws the open menu: the title in the bar highlighted and the drop-down box under it.
-pub fn draw_open(c: &mut Classic, tops: &[Top], open: usize, hl: Option<usize>) {
-    let Some(f) = c.skin.font("system", 13, false, false) else {
+pub fn draw_open_at(
+    fb: &mut Fb,
+    skin: &Skin,
+    frame: (i32, i32),
+    tops: &[Top],
+    open: usize,
+    hl: Option<usize>,
+) {
+    let Some(f) = skin.font("system", 13, false, false) else {
         return;
     };
-    let bar = bar_items(c, tops);
+    let bar = bar_items_at(skin, frame, tops);
     if let Some(&(l, r)) = bar.get(open) {
-        c.fb.fill(l, FRAME.1 + 20, r - l, 18, NAVY);
-        text(
-            &mut c.fb,
-            f,
-            l + 8,
-            FRAME.1 + 20,
-            &tops[open].label,
-            WHITE,
-            false,
-        );
+        fb.fill(l, frame.1 + 20, r - l, 18, NAVY);
+        text(fb, f, l + 8, frame.1 + 20, &tops[open].label, WHITE, false);
     }
-    let (x, y, w, h) = dropdown_rect(c, tops, open);
-    c.fb.fill(x + 1, y + 1, w, h, SILVER); // the shadow
-    c.fb.fill(x, y, w, h, BLACK);
-    c.fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
+    let (x, y, w, h) = dropdown_rect_at(skin, frame, tops, open);
+    fb.fill(x + 1, y + 1, w, h, SILVER); // the shadow
+    fb.fill(x, y, w, h, BLACK);
+    fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
     let t = &tops[open];
     let sc_x = x
         + 16
@@ -194,13 +227,13 @@ pub fn draw_open(c: &mut Classic, tops: &[Top], open: usize, hl: Option<usize>) 
     let mut top = y + 1;
     for (i, e) in t.entries.iter().enumerate() {
         if e.separator {
-            c.fb.fill(x + 1, top + 3, w - 2, 1, BLACK);
+            fb.fill(x + 1, top + 3, w - 2, 1, BLACK);
             top += SEP_H;
             continue;
         }
         let on = hl == Some(i);
         if on {
-            c.fb.fill(x + 1, top, w - 2, ITEM_H.min(y + h - 1 - top), NAVY);
+            fb.fill(x + 1, top, w - 2, ITEM_H.min(y + h - 1 - top), NAVY);
         }
         let color: Rgb = match (on, e.enabled) {
             (true, _) => WHITE,
@@ -208,11 +241,11 @@ pub fn draw_open(c: &mut Classic, tops: &[Top], open: usize, hl: Option<usize>) 
             (false, false) => SILVER,
         };
         if on && !e.enabled {
-            text_dithered(&mut c.fb, f, x + 16, top, &e.label, color, 0);
-            text_dithered(&mut c.fb, f, sc_x, top, &e.shortcut, color, 0);
+            text_dithered(fb, f, x + 16, top, &e.label, color, 0);
+            text_dithered(fb, f, sc_x, top, &e.shortcut, color, 0);
         } else {
-            text(&mut c.fb, f, x + 16, top, &e.label, color, false);
-            text(&mut c.fb, f, sc_x, top, &e.shortcut, color, false);
+            text(fb, f, x + 16, top, &e.label, color, false);
+            text(fb, f, sc_x, top, &e.shortcut, color, false);
         }
         top += ITEM_H;
     }

@@ -246,6 +246,21 @@ pub fn dialog_frame_menu(
     bg: Rgb,
     items: &[String],
 ) -> (i32, i32) {
+    let items: Vec<(String, bool)> = items.iter().map(|i| (i.clone(), true)).collect();
+    dialog_frame_menu_states(fb, skin, caption, cw, ch, bg, &items)
+}
+
+/// `dialog_frame_menu` with the state of every item of the bar: a disabled one is written in silver (the team editor's *Jogador* and
+/// *Equipa* before a team is open, measured).
+pub fn dialog_frame_menu_states(
+    fb: &mut Fb,
+    skin: &Skin,
+    caption: &str,
+    cw: i32,
+    ch: i32,
+    bg: Rgb,
+    items: &[(String, bool)],
+) -> (i32, i32) {
     let (ow, oh) = (cw + 2, ch + 40);
     let (x, y) = ((super::fb::W - ow) / 2, (super::fb::H - oh) / 2);
     let (bar, ink) = caption_colors();
@@ -259,10 +274,18 @@ pub fn dialog_frame_menu(
     }
     if let Some(f) = skin.font("system", 13, false, false) {
         let mut pen = x + 1 + 8;
-        for it in items {
+        for (it, on) in items {
             let label = it.replace('&', "");
             let w = f.width(&label);
-            text(fb, f, pen, y + 20, &label, BLACK, false);
+            text(
+                fb,
+                f,
+                pen,
+                y + 20,
+                &label,
+                if *on { BLACK } else { SILVER },
+                false,
+            );
             pen += w + 16;
         }
     }
@@ -548,7 +571,13 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         .unwrap_or(0);
     let (x, w) = (x + pad, w - pad);
     let s = caption(cx, n);
-    let lines = if n.flag("WordWrap", false) {
+    // (`<name>.wrap` = 1: the program turned word wrap on)
+    let wrapped = n.flag("WordWrap", false)
+        || cx
+            .texts
+            .get(&format!("{}.wrap", n.name))
+            .is_some_and(|v| v == "1");
+    let lines = if wrapped {
         wrap(font, s, w)
     } else {
         s.split('\n').map(str::to_string).collect()
@@ -789,7 +818,9 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         return;
     };
     let s = caption_or(cx, n, "Text");
-    let (tx, ty) = (x + 2, y + (h - font.height()) / 2);
+    // (`<name>.indent`: the text's distance from the left edge, 3 in the team editor's edits)
+    let indent = widgets::get_num(cx, n, "indent").unwrap_or(2);
+    let (tx, ty) = (x + indent, y + (h - font.height()) / 2);
     let old = fb.clip;
     fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
     // selected characters: `<name>.selstart` and `<name>.sellen` are character positions
@@ -812,7 +843,12 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     pen += text(fb, font, pen, ty, &pre, ink, false);
     if !mid.is_empty() {
         let mw = font.width(&mid);
-        fb.fill(pen + 1, ty, mw, font.height(), NAVY);
+        // (the team editor's edits, `indent` 3: the highlight starts at the text and is a pixel wider and taller)
+        if indent == 3 {
+            fb.fill(pen, ty, mw + 1, font.height() + 1, NAVY);
+        } else {
+            fb.fill(pen + 1, ty, mw, font.height(), NAVY);
+        }
         text(fb, font, pen, ty, &mid, WHITE, false);
         pen += mw;
     }
@@ -1022,6 +1058,83 @@ fn balance_list(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32, r
     }
 }
 
+/// The squad of the team editor (`WritePlayer`, `1000:1a18` of `EDITEQ.EXE`): rows of 14 pixels with the name, the country of a
+/// foreigner (`* Escócia`) and the position, written in the club's background colour on white; the selected row is filled with that colour
+/// and written in the club's foreground; the current row has the focus rectangle. Rows are `name|country|position`;
+/// `<name>.ink`, `.selink`, `.top`, `.sel`.
+#[allow(clippy::too_many_arguments)]
+fn editor_players(
+    fb: &mut Fb,
+    cx: &Ctx,
+    n: &Node,
+    f: &FontSpec,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    rows: &[String],
+) {
+    const ROW: i32 = 14;
+    let Some(font) = cx.font(f) else {
+        return;
+    };
+    let get = |k: &str| cx.texts.get(&format!("{}.{k}", n.name));
+    let colour = |k: &str, d: Rgb| {
+        get(k)
+            .and_then(|v| {
+                let p: Vec<u8> = v.split(',').filter_map(|c| c.parse().ok()).collect();
+                (p.len() == 3).then(|| Rgb(p[0], p[1], p[2]))
+            })
+            .unwrap_or(d)
+    };
+    let (ink, selink) = (colour("ink", BLACK), colour("selink", WHITE));
+    let num = |k: &str| get(k).and_then(|v| v.parse::<i64>().ok());
+    let top = num("top").unwrap_or(0).max(0) as usize;
+    let sel = num("sel");
+    let (rx, rw) = (x + 2, w - 4);
+    let fit = ((h - 4) / ROW) as usize;
+    let old = fb.clip;
+    fb.clip = (rx, y + 2, rx + rw, y + h - 2);
+    if rows.is_empty() {
+        focus_rect(fb, rx, y + 2, rw, ROW, rx, y + 2);
+    }
+    for (k, row) in rows.iter().enumerate().skip(top).take(fit + 1) {
+        let c: Vec<&str> = row.split('|').collect();
+        let ry = y + 2 + (k - top) as i32 * ROW;
+        let on = sel == Some(k as i64);
+        if on {
+            fb.fill(rx, ry, rw, ROW, ink);
+        }
+        let colour = if on { selink } else { ink };
+        let ty = ry + (ROW - font.height()) / 2 - 1;
+        for (i, dx) in [(0, 1), (1, 121), (2, 221)] {
+            text(
+                fb,
+                font,
+                rx + dx,
+                ty,
+                c.get(i).copied().unwrap_or(""),
+                colour,
+                false,
+            );
+        }
+        // the focus rectangle: on the selected row, or on the first one before any is chosen
+        if sel.map_or(k == top, |s| s == k as i64) {
+            focus_rect(fb, rx, ry, rw, ROW, rx, ry);
+        }
+        cx.hits.borrow_mut().push(Hit {
+            name: format!("{}#{k}", n.name),
+            class: "ListRow".into(),
+            x: rx,
+            y: ry,
+            w: rw,
+            h: ROW,
+            enabled: true,
+        });
+    }
+    fb.clip = old;
+}
+
 /// The owner-drawn list of *Selecção de Países* (`DrawCountry` `1028:171d`): rows of 31 pixels with the flag (`FLAGS/<code>`) at the
 /// left, the name 43 pixels in and the number of teams right-aligned 20 pixels before the scroll bar; a chosen country is yellow and
 /// bold, the current row has the focus rectangle. Rows are `code|name|count|chosen` (`1` or `0`); `<name>.top`, `<name>.sel`.
@@ -1156,6 +1269,12 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if n.name == "ListBoxBalance" {
         if let Some(rows) = cx.lists.get(&n.name) {
             balance_list(fb, cx, n, f, x, y, rows);
+        }
+        return;
+    }
+    if n.name == "PlayerList" {
+        if let Some(rows) = cx.lists.get(&n.name) {
+            editor_players(fb, cx, n, f, x, y, w, h, rows);
         }
         return;
     }
@@ -1466,6 +1585,19 @@ fn gauge(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         .get(&format!("{}.progress", n.name))
         .and_then(|s| s.parse().ok())
         .unwrap_or(n.int("Progress", 0));
+    if let Some(fore) = n.color("ForeColor") {
+        // a coloured bar (the team editor's level): a black frame, white inside, filled from the left by `PaintAsBar`, whose
+        // rectangle ends at the fill size (so a pixel short)
+        fb.fill(x, y, w, h, BLACK);
+        fb.fill(x + 1, y + 1, w - 2, h - 2, WHITE);
+        let filled = (w - 2) * p.clamp(0, 100) / 100 - 1;
+        if filled > 0 {
+            fb.fill(x + 1, y + 1, filled, h - 2, fore);
+        }
+        if !n.flag("ShowText", true) {
+            return;
+        }
+    }
     let bw = w - 10;
     let filled = bw * p.clamp(0, 100) / 100;
     fb.fill(x, y, w, h, SILVER);
@@ -1577,7 +1709,9 @@ fn bitbtn_glyph_left(
             margin = (cw - (gw + spacing + tw) + 1) / 2;
         }
     } else if spacing == -1 {
-        spacing = (cw - (margin + gw) - tw) / 2;
+        // (rounded up; GDI's text extent of the emboldened raster MS Sans Serif counts its 1-pixel overhang)
+        let overhang = font.map_or(0, |t| i32::from(t.bold && t.face == "ms sans serif"));
+        spacing = (cw + 1 - (margin + gw) - tw - overhang) / 2;
     }
     let gx = x + 2 + margin;
     if let Some(b) = bmp {
@@ -1609,15 +1743,16 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let kind = n.ident("Kind").unwrap_or("bkCustom");
     let std = match kind {
         "bkOK" => Some(("BBOK", "OK")),
-        "bkCancel" => Some(("BBCANCEL", "Cancelar")),
-        "bkYes" => Some(("BBYES", "&Sim")),
-        "bkNo" => Some(("BBNO", "&Não")),
-        "bkHelp" => Some(("BBHELP", "&Ajuda")),
-        "bkClose" => Some(("BBCLOSE", "&Fechar")),
-        "bkAbort" => Some(("BBABORT", "&Abortar")),
-        "bkRetry" => Some(("BBRETRY", "&Repetir")),
-        "bkIgnore" => Some(("BBIGNORE", "&Ignorar")),
-        "bkAll" => Some(("BBALL", "&Todos")),
+        // (the captions of the VCL's string table, English in both programs: "Cancel" checked on the team editor)
+        "bkCancel" => Some(("BBCANCEL", "Cancel")),
+        "bkYes" => Some(("BBYES", "&Yes")),
+        "bkNo" => Some(("BBNO", "&No")),
+        "bkHelp" => Some(("BBHELP", "&Help")),
+        "bkClose" => Some(("BBCLOSE", "&Close")),
+        "bkAbort" => Some(("BBABORT", "Abort")),
+        "bkRetry" => Some(("BBRETRY", "&Retry")),
+        "bkIgnore" => Some(("BBIGNORE", "&Ignore")),
+        "bkAll" => Some(("BBALL", "&All")),
         _ => None,
     };
     let bmp = cx

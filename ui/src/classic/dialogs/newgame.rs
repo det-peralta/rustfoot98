@@ -265,9 +265,9 @@ pub const CURRENCIES: [&str; 5] = ["Escudos (contos)", "Euros", "Dólares", "Rea
 /// Fewest teams a game needs, and what *Selecção de Países* asks for (`1028:18d9` enables OK from 34).
 const MIN_TEAMS: usize = rustfoot_core::world::MIN_TEAMS;
 
-/// A sort key for the names of the sorted list (`Sorted`: the order of Windows 3.1's string comparison, where an accented letter comes
-/// just before the same letter without accent: "África", "Áustria", "Alemanha").
-fn collate(s: &str) -> Vec<(char, u8)> {
+/// A sort key for the names of a sorted list (`Sorted`: the order of Windows 3.1's string comparison, where an accented letter comes
+/// before every letter without accent: "África", "Áustria", "Alemanha"; the team editor's "BÉTIS", "BAHIA").
+pub(crate) fn collate(s: &str) -> Vec<(u8, char)> {
     s.chars()
         .map(|ch| {
             let low = ch.to_lowercase().next().unwrap_or(ch);
@@ -280,7 +280,7 @@ fn collate(s: &str) -> Vec<(char, u8)> {
                 'ç' => 'c',
                 other => other,
             };
-            (base, (base == low) as u8)
+            ((base == low) as u8, base)
         })
         .collect()
 }

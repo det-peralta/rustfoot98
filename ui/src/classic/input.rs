@@ -83,7 +83,7 @@ impl Classic {
                 .map(|h| (h.name.clone(), h.class.clone(), h.enabled))
             {
                 Some((name, class, true)) => {
-                    match super::widget_input::mouse(self, &mut d, &name, &class) {
+                    match super::widget_input::mouse(&self.forms, &mut d, &name, &class) {
                         super::widget_input::MouseAct::Click(n) => dialogs::click(self, &mut d, &n),
                         super::widget_input::MouseAct::Done => Outcome::Keep,
                         super::widget_input::MouseAct::Default => {
