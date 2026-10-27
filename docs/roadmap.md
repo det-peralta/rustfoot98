@@ -1,43 +1,55 @@
 # Roadmap to a finished port
 
-Goal: the whole game playable in the browser with the original's screens, rules and flow, verified against the original running in DOSBox.
-Done so far: rules core (match, season, finance, market, cup, hot seat), the classic interface (all windows and dialogs), save/load, PWA.
+Goal: the whole game (`ELIFOOT.EXE`) and its team editor (`EDITEQ.EXE`) usable in the browser with the original's screens, rules and flow,
+verified against the original running under js-dos.
 
-## Phase 1: record the original (evidence first)
-Everything below is checked against captures, so the captures come first.
-- Keep captures out of `/tmp` (reboots wipe it): use `analysis/captures/` (git-ignored) with a driver script kept in `tools/capture/`.
-- Play one human season of the original in Rápido (about 27 s per day, 80 rounds): per-day frames plus a log of dialog kinds.
-- Targets: end-of-season screens (titles, promotion/relegation), invitations, sack list, start-of-day auctions, cup-day market, new season hand-over.
-- Exit: a frame list per dialog kind, each tagged with the port dialog it maps to.
+Done: rules core (match, season, finance, market, cup, hot seat, unemployed humans), the classic interface (every main-menu command, the 25
+dialogs the game opens), save/load, PWA. Recorded seasons of the original (`tools/capture/season.sh`, `analysis/captures/`) cover the end of a
+season, the sack list, the save gauge and an unemployed human (see `docs/matchday.md`). Left out by decision: registration (no key check),
+printing.
 
-## Phase 2: close the screen gaps (by evidence)
-1. End of season, invitation and sack-list dialogs: compare with Phase 1 frames, fix with `tools/ui/regions.py`.
-2. Auction timing: auctions at the start of a day (inside `3e9c`, before the human's main window) and the cup-day market.
-3. Stadium levels above 2, TSpinEdit/speed button/colour grid, TCheckPlayerDlg, observed and acquisitions dialogs.
-4. Referee-aid dialog balance drawing; "view computer penalties" option.
-5. Referee shown (display-only guess today), turn order after a round with several humans.
+## 1. Small game gaps (no new captures needed)
+- Options dialog: *Equipas com empréstimos...* and *Equipas endividadas...* (`eqEmprestimoBtnClick`, `eqEndividadasBtnClick`) open a
+  `TPrintListDlg`.
+- Referee-aid balance picture.
+- Option *Ver os desempates por penalties nos jogos sem treinadores humanos* (kick-by-kick shootouts of computer ties).
+- Sound: the original's `MessageBeep` calls, as a WebAudio beep.
+- Forced substitution when only a goalkeeper is left: list, OK disabled until a row is chosen (seen in the original).
+- Texts: "Tem demasiados jogadores estrangeiros".
 
-## Phase 3: rules still approximated
-- Fees calibrated on one save: check against a second save and a played season (market tiers `63fa`, gate receipts `35e1`, salaries).
-- Coach swap partner choice (`5343`), half-time logic, core sort comparer `1050:1d59` direction.
-- Method: for each item decode the function, add a core test with values taken from the original, then compare a played day with the original.
+## 2. Screens that need the original first (capture, render with `classic_shot`, diff with `tools/ui/regions.py`)
+- New game: currency (`TcurrencyDlg`, "Com que moeda vai querer jogar?") and countries (`TselectCountriesDlg`, if the free copy has it).
+- Invitation of a human who has a club (`TinviteCoachDlg`).
+- Stadium levels above 2, spin edit / speed button / colour grid, `TCheckPlayerDlg`, observed and acquisitions dialogs.
 
-## Phase 4: browser product
-- Play a full season in the browser (Playwright) at every speed setting; check autosave, load, "Sair", service-worker update.
-- Performance: a round at "Médio" takes about 3 minutes in the original's timing; check it matches the original rather than being slower.
-- Sound: the original only uses `MessageBeep`; add the same beep via WebAudio.
-- Mobile/touch is out of scope unless asked.
+## 3. Rules: until played days match
+- Record days of the original from `ABCDEEEE` with the recorder (its inputs are fixed), replay the same inputs in the port from
+  `original/saves/snap2.e98`, and diff the *Finanças* page day by day (the renderer is pixel-exact, so equal numbers give equal pixels).
+- In order: gate receipts `1040:35e1`, salaries (`7ff4` / `+0x31`), market tiers `63fa`, the coach-swap side effect (`core/src/season.rs`),
+  half-time logic, the sort direction of `1068:0e0d`; candidates in `docs/decompilation-map.md`.
+- The referee: decode whether `TRefereeAttr` affects a game; replace the display-only choice (`ui/src/classic/main_win.rs`).
+- Done when cash, receipts and wages match for one season (14 rounds) within rounding.
 
-## Phase 5: close out
-- Update docs: analysis-plan checklist (stale items), decompilation-map work queue, README "Not modelled" list.
-- Final run: two-human season, three seasons, in native and browser, no panics; CI green.
-- Registration features stay hidden (no key check, by decision).
+## 4. Hot-seat leftovers
+- One coach profile per human; the unemployed state kept in saves; the turn order after a round decoded (`13e1` / `3e9c`).
 
-## Order and size
-| Phase | Size | Depends on |
-|---|---|---|
-| 1 record | one background run, a few hours | none |
-| 2 screens | about 1 to 2 sessions | 1 |
-| 3 rules | open ended; stop when played days match | 1 |
-| 4 browser | about 1 session | 2 |
-| 5 close | short | all |
+## 5. Team editor (`EDITEQ.EXE`)
+- Decompile it with the Ghidra scripts in `tools/ghidra/`; map the menu of `TEditor_Main` (Ficheiro, Jogador, Equipa) and the save checks.
+- `core/src/eft.rs`: a writer, round-trip tested on every file of `EQUIPAS`.
+- `ui/src/editor/`: the editor's windows on the `win31` renderer and the `Dialog` model; skin pack with EDITEQ's forms; native and web hosts;
+  edited teams in browser storage, used by the game's new-game flow.
+- Verified window by window against the original under js-dos; a team edited in the port opens in the original.
+
+## 6. Browser product and close-out
+- A full season in the browser (Playwright) at every speed; autosave, load, *Sair*, service-worker update; speed against the original.
+- Final run: two humans, three seasons, native and browser, no panics; CI green; README "Not modelled" and this file updated.
+
+## Size
+| Step | Sessions |
+|---|---|
+| 1 | 1 |
+| 2 | 1-2 |
+| 3 | 2-3 |
+| 4 | 1 |
+| 5 | 3-4 |
+| 6 | 1 |

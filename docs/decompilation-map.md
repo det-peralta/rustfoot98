@@ -39,6 +39,12 @@ Library code (VCL, Delphi RTL, thunks): 2246 functions, 170662 bytes — replace
 
 ## Work queue (application functions not yet named, by size and use of core helpers)
 
+Status (2026-10-27): 33 of these are used by the port (their addresses appear in `core/`, `ui/` or the docs). Of the rest, sampled by their
+calls: `1050:21d0` registers the Ctl3d library (UI glue), `1048:0200` and segment `1058` belong to the registration code (hidden by decision),
+`1010:9ecd` / `1010:c25e` read and write the save file through the stream unit (segment `1090`; the port has its own formats), `1040:246f` /
+`299e` / `3046` are VCL helpers. Candidates still worth a look for rules: `1010:2bca`, `305a`, `66dc`, `7184`, `8382`, `8f74`, `91cf`, `15d6`
+(sale), `25e5` (see `docs/roadmap.md`, rules calibration).
+
 | address | bytes | uses |
 |---|---|---|
 | `1018:11f3` | 4186 |  |

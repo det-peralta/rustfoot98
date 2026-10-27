@@ -148,41 +148,31 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * Shootouts of ties without a human are shown only when the core played them with kicks (human tie or the final); the option *Ver os
   desempates por penalties nos jogos sem treinadores humanos* is not honoured by the core.
 * Mid-game substitutions by clicking on the user's club (mode 1 with `Substituir`) are applied from the next minute by a replay.
-* `TSorteioDlg` shows the left list in one column (the form asks for three); the balance picture of the referee aid is missing; no sounds.
+* The balance picture of the referee aid is missing; no sounds.
 
-## Seen in a played season of the original (recorder `tools/capture/season.sh`, frames in `analysis/captures/`, 2026-10-24)
-* **Sack list** (`TPrintListDlg`, 3 rows: the form is 148 high, list 52): `<coach> foi despedido do <CLUB>` (normal), the second line (bold in the
-  capture) and an empty row. The lines come from the coach swap `1010:5343` (three `0x3ac` event objects): the second is `Troca com <coach> (<CLUB>)`
-  when the coach taken over has a club, **`Para o seu lugar foi contratado <coach>`** when he has none (`1010:d55c` finds no club): in the capture
-  a human coach (joga1) without a club was hired by PONTE PRETA. In the port the free coaches are the clubs of the pool (division 4 of the save, `World::pool`):
-  `World::coach_changes_free` records that the coach taken over came from it, and the list then writes the bold second text (bold seen only for
-  this text; `Troca com` stays normal). Open: how a human becomes free in the original (the capture shows joga1 without a club after the season end).
-* The port's sack list now uses `tables::bind_list` (height from the rows, rows in the field encoding: the first letters were being eaten before)
-  and the list is the active control (the capture has no focus rectangle on OK); checked against `season4/1693`.
-* **Progress boxes**: the original shows `A gravar o jogo...` (the `TProgressDlg` gauge, over the backdrop of the round) while saving after a
-  round. The port now does too: `finish_round` opens the gauge (`open_progress("save")`, `State::saving`), and the save request and the main window
-  follow when it is full (same duration as the loading gauge, 1.2 s: the original's duration is not measured).
-* **Cup draw** (`Sorteio dos jogos da taça`) at the round of 32: same form, fonts and column layout as the port's render (three columns of 25 rows; the capture is
-  taken mid-draw, so fewer clubs are left). The 'one column' remark under *Not done* is stale.
-* **Injury substitution** (`TForceSubstitutionDlg`) can show a list with a single goalkeeper for an injured midfielder and OK stays disabled until
-  a row is selected; the recorder could not select it (keys and the relative mouse do nothing). What the port offers in that case is unchecked.
-* The recorder: after an auction the original sometimes stops answering keys on the main form (Windows still answers Alt+Tab); roughly 1 in 300 to
-  1 in 2000 steps. `tools/capture/season_retry.sh` restarts from the save.
+## Seen in played seasons of the original (recorder `tools/capture/season.sh`, frames in `analysis/captures/`, git-ignored)
+Runs: `season4` (first season end, partly kept), `probe1` and `probe3` (every frame kept; `probe3` holds the 2027 -> 2028 season end at steps
+1000-1021 and the unemployed human at 1020-1224). A season is 14 league rounds, about 1000 recorder steps.
 
-### Second season end (recorder `probe3`, 2027 -> 2028; a season is 14 league rounds, the end comes about 1000 steps after the previous one)
-* **Order at the end of the last day (round 14 + cup final)**: standings (`Classificação - 14ª jornada`), the cup final view, the shootout (`Desempate por
-  Penalis`), the sack list, **`Fim de Época`** (champion, cup winner, best scorer, prizes; layout equal to the port's, only the focus rectangle on
-  *Fechar* was ours and is gone), then the main window of the next season's first round of the humans who have a club. The gauge `A gravar o jogo...`
-  comes **after Jogar of the next day**, on the bare desktop, before its round view (not at the end of a round): the port now opens it in `play_round`.
-* **Bold in the sack list marks the human coach's line**: `joga1 foi despedido do BAHIA` (bold) / `Para o seu lugar foi contratado Amado Bucar`;
-  and in the first capture `Pardal foi despedido do PONTE PRETA` / **`Para o seu lugar foi contratado joga1`** (bold). The port follows that now.
-* **A sacked human becomes unemployed** (joga1 at BAHIA, replaced by a free coach): after the sack list he has **no main window** and the next
-  league day is played with the other human only (`probe3` steps 1020-1085). The port still swaps the sacked human to another club at once
-  (`World::replace_coach`, `seats.moves`). Open: when and how an unemployed human is hired again (invitations; the recorder keeps playing to see it).
-* **The recorder's old "freeze"** was F5 (formation 4-4-2) greyed out for the squad: the recorder presses A (*Automático*) now.
-* **How the unemployed human came back** (`probe3` steps 1150-1224): joga1 had no main window for rounds 1-3 of 2028; right after the standings of round 3
-  the next main window is joga1's **at CRUZEIRO EC** (4ª Divisão, a different club from the one he was sacked from) with no invitation, sack list or
-  other dialog in between. So the free human is placed by the sack/hire step of the round (candidates of `1010:5343` with flag 0x200 include the
-  unemployed coach), without asking. Modelled (hot seat only): a human replaced by a pool coach is unemployed (`World::is_unemployed`), has no turn and his club plays
-  for itself; a club rated below 15 that sacks its coach takes him without a dialog (`replace_coach`, free candidates of the pool). Not
-  verified against more captures: which club takes him and after how many rounds (the capture: 3 rounds, a 4ª Divisão club); not kept in saves.
+* **Order at the end of the last day** (round 14 + cup final): standings (`Classificação - 14ª jornada`), the cup final view, the shootout,
+  the sack list, **`Fim de Época`** (champion, cup winner, best scorer, prizes; same layout as the port's, no focus rectangle on *Fechar*),
+  then the main window of the next season's first round for the humans who have a club.
+* **Save gauge**: `A gravar o jogo...` (the `TProgressDlg` gauge) comes **after Jogar**, on the bare desktop, before the day's round view.
+  The port opens it in `Classic::play_round` (`State::saving`, `open_progress("save")`); the save request and the day follow when it is full
+  (1.2 s, as the loading gauge; the original's duration is not measured).
+* **Sack list** (`TPrintListDlg` sized by its rows: 3 rows give a form 148 high, list 52; no focus rectangle on OK). Each sacking is three
+  rows from the coach swap `1010:5343` (three `0x3ac` event objects): `<coach> foi despedido do <CLUB>`; then `Troca com <coach> (<CLUB>)` when
+  the coach taken over has a club, or `Para o seu lugar foi contratado <coach>` when he has none (`1010:d55c` finds no club); then an empty row.
+  **Bold marks the line that names a human coach** (`joga1 foi despedido do BAHIA`; `Para o seu lugar foi contratado joga1`).
+  The port: `World::coach_changes_free` (the coach came from the pool), rows in the field encoding via `tables::bind_list`.
+* **Unemployed humans**: when a sacked human is replaced by a free coach he takes that coach's place at the pool: no main window, his old club
+  plays for itself, the days are played by the other humans. In `probe3` joga1 (sacked at BAHIA) had no turn for rounds 1-3 of 2028 and came
+  back at CRUZEIRO EC (4ª Divisão) right after the round-3 standings, with no dialog: a club that sacks its coach takes him from the free
+  candidates (`5343` flag 0x200, clubs rated below 15). The port (hot seat only; a single human stays where he is): `World::is_unemployed`,
+  `employed_seats`; his pool club is not a human club (`human_clubs`, `is_human_club`, `humans_in_cup_tie`). Not verified beyond this one case;
+  not kept in saves (loading picks a club).
+* **Cup draw** (`Sorteio dos jogos da taça`): same form, fonts and three columns of 25 rows as the port's render.
+* **Injury substitution** (`TForcedSubstitutionDlg`) can list a single goalkeeper for an injured midfielder; OK stays disabled until a row is
+  selected (the recorder cannot select it).
+* **Recorder**: on main windows it presses A (*Automático*) and Enter. F5 is the formation 4-4-2, greyed out when the squad cannot play it, which
+  looked like a freeze. It bids 1 at auctions and keeps every frame.

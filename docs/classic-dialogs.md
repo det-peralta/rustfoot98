@@ -73,7 +73,8 @@ new game `TGetTeamsDlg` ("Sortear equipas" shows the club the rule gave, OK ente
 Host API: `cl_start`, `Classic::load_text(text)` (answer to `Request::Load`), `Classic::save_text()` (answer to `Request::Save`), `Classic.clock`
 (`dd/mm/yy hh:mm`, for the description of saves) and `Data::set_saves("NAME\tfirst line of the text\n...")`. The first line of a saved text is a header
 (`#elifoot-classic|coach=..|stamp=..|opts=..`) holding the coach and the options; texts without it load with defaults.
-The game saves after a round according to the option "Gravar o jogo" (`Options::saves_after`), on "Sair" (and then quits) but not on "Sair sem gravar".
+The game saves when a day starts (after *Jogar*, with the `A gravar o jogo...` gauge) according to the option "Gravar o jogo"
+(`Options::saves_after`, `Classic::play_round`), on "Sair" (and then quits) but not on "Sair sem gravar".
 `Classic.opts` (`Options`) is read by the other dialogs: `show_lashes(human)`, `show_cup_draw(humans_in_cup)`, `view_computer_penalties`; the match speed and the
 half-time substitutions are already applied in `input.rs`. Options texts: combos use `<name>.items/.sel/.text/.open`, the notebook `TabbedNotebook1.tabs` and `.page`.
 `dialogs::paint_under` lets a dialog paint under its controls (the stadium's `TPaintBox`).

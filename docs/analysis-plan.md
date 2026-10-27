@@ -1,18 +1,20 @@
 # Analysis plan
 
+What is left to finish the port is tracked in `docs/roadmap.md`.
+
 - [x] Identify target: 16-bit Windows NE, Delphi 1 (TGauge/TGaugeKind classes, VBX gauges)
 - [x] Install Ghidra 12.1.2, `rea doctor --provider ghidra` healthy (REA's `analyze` rejects NE, so Ghidra headless is used directly)
 - [x] Load `ELIFOOT.EXE` with Ghidra NE loader (x86:LE:16:Protected Mode), auto-analysis done, 3007 functions
 - [x] Delphi class table (195 classes) and 49 form resources (DFM) extracted
 - [ ] Map event handlers -> functions (published method tables); name functions in Ghidra
 - [ ] Field layout of TPlayer(56)/TTeam(203)/TGame(81)/TCoach(35) from Load/Save methods
-- [ ] Extract form resources (TForm layouts, strings) → UI spec
+- [x] Extract form resources (TForm layouts, strings) → UI spec (`analysis/out/skin/forms.json`, read by the classic UI)
 - [x] File formats: `.EFT` team, `.TXE` (done, see findings)
 - [~] File formats: `.e98` save (layout documented in docs/e98-format.md; fixtures/cup/news not imported), `DRLIST.ELI`
 - [x] Locate RNG and match simulation (see docs/match-engine.md); partly decoded
 - [ ] Decode attack-value computation (+0x4c/+0x4e) and the Real math in 46df
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI
-- [ ] Registration check: understand shareware limits (no keygen use)
+- [x] Registration check: the unregistered copy hides loans' extras, *Procurar* and the *Controle* page; the port hides them too (no key check, by decision)
 - [x] `core/` in Rust (cipher, Delphi RNG, EFT/TXE, sectors, chance generator, outcome, evolution, Match v0)
 - [x] Decoded `aa11`/`ac72`, penalties, subs, `100b` weights, `c95c`, rating accumulator, per-round evolution, `K` morale
 - [x] Season fixtures (8-team double round-robin table), round driver, cup alternation, standings comparer (see docs/season.md)
