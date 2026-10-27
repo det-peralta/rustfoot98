@@ -88,6 +88,31 @@ pub fn parse(data: &[u8]) -> Result<EftTeam, EftError> {
     })
 }
 
+/// Writes a team in the file layout `parse` reads (the team editor's *Gravar*): the 50-byte header, the names and the country as
+/// enciphered Pascal strings, the colours with their pad bytes, level and squad size, the players and the coach.
+pub fn write(t: &EftTeam) -> Vec<u8> {
+    // the strings are Latin-1, one byte a character (as `read_pstr` reads them)
+    let encode = |s: &str| {
+        let b: Vec<u8> = s.chars().map(|c| u32::from(c).min(255) as u8).collect();
+        crate::cipher::encode(&b)
+    };
+    let mut d = vec![0u8; 0x32];
+    d[..3].copy_from_slice(b"EFa");
+    d.extend(encode(&t.full_name));
+    d.extend(encode(&t.short_name));
+    d.extend([t.background[0], t.background[1], t.background[2], 0]);
+    d.extend([t.foreground[0], t.foreground[1], t.foreground[2], 0]);
+    d.extend(encode(&t.country));
+    d.extend([t.level, t.players.len() as u8, 0]);
+    for p in &t.players {
+        d.extend(encode(&p.nationality));
+        d.extend(encode(&p.name));
+        d.extend([p.position as u8, 0]);
+    }
+    d.extend(encode(&t.coach));
+    d
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,9 +168,18 @@ mod tests {
         let mut n = 0;
         for e in rd.flatten() {
             let d = std::fs::read(e.path()).unwrap();
-            parse(&d).unwrap_or_else(|err| panic!("{:?}: {err:?}", e.path()));
+            let t = parse(&d).unwrap_or_else(|err| panic!("{:?}: {err:?}", e.path()));
+            // and the writer gives the same bytes back
+            assert!(write(&t) == d, "{:?} does not round-trip", e.path());
             n += 1;
         }
         assert!(n > 100);
+    }
+
+    #[test]
+    fn a_written_team_reads_back() {
+        let t = parse(&build()).unwrap();
+        assert_eq!(write(&t), build());
+        assert_eq!(parse(&write(&t)).unwrap(), t);
     }
 }
