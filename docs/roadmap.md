@@ -28,12 +28,13 @@ printing.
   also the options' *Controle* page and the referee aid.
 
 ## 3. Rules: until played days match
-- Record days of the original from `ABCDEEEE` with the recorder (its inputs are fixed), replay the same inputs in the port from
-  `original/saves/snap2.e98`, and diff the *Finanças* page day by day (the renderer is pixel-exact, so equal numbers give equal pixels).
-- In order: gate receipts `1040:35e1`, salaries (`7ff4` / `+0x31`), market tiers `63fa`, the coach-swap side effect (`core/src/season.rs`),
-  half-time logic, the sort direction of `1068:0e0d`; candidates in `docs/decompilation-map.md`.
-- The referee: decode whether `TRefereeAttr` affects a game; replace the display-only choice (`ui/src/classic/main_win.rs`).
-- Done when cash, receipts and wages match for one season (14 rounds) within rounding.
+- The original seeds its random numbers at start-up, so its days cannot be replayed; instead `tools/capture/days.sh` pulls the
+  original's own save after every round (js-dos `persist`, option *Gravar o jogo: Todas as jornadas*) and `core/examples/daycheck.rs`
+  checks the port's money rules on each pair (`docs/finance.md`).
+- Done: wages exact; the seven ledger totals (purchases were read from the wrong offset); cash = ledger; the league ticket price
+  (43 of 43 division-rounds over a season change).
+- Open: the cup's ticket price (one price per cup day, 30 then 36; not the league formula), gate receipts of the cup split, the
+  season-end money, the market tiers `63fa`, the coach-swap side effect, the referee (`TRefereeAttr`).
 
 ## 4. Hot-seat leftovers
 - Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).
