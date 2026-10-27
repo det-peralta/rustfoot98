@@ -617,15 +617,27 @@ impl World {
         }
         for seat in 0..w.human_count() {
             w.switch_human(seat);
-            if w.human_location().is_none() {
+            // a human without a club sits at a club of the pool (and stays there); one whose club is gone gets a new one
+            if w.human_location().is_none() && !w.is_unemployed(seat) {
                 w.pick_human();
             }
         }
-        w.switch_human(if active_seat < w.human_count() {
+        if w.employed_seats().is_empty() {
+            // (a game needs a human with a club: the first one gets one)
+            w.switch_human(0);
+            w.pick_human();
+        }
+        let active = if active_seat < w.human_count() {
             active_seat
         } else {
             0
-        });
+        };
+        let active = if w.is_unemployed(active) {
+            w.employed_seats().first().copied().unwrap_or(active)
+        } else {
+            active
+        };
+        w.switch_human(active);
         Ok(w)
     }
 }

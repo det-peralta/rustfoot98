@@ -4327,6 +4327,10 @@ mod tests {
             0,
             "the window stays with a human who has a club"
         );
+        // a saved game keeps him without a club
+        let back = World::load(&w.save()).unwrap();
+        assert!(back.is_unemployed(1) && !back.is_unemployed(0));
+        assert_eq!(back.human_at(1).unwrap().club, pool_name);
         // a weak club (rating below 15) sacks its coach: the pool human is the only free coach, so he is taken, without asking
         w.pool.truncate(1);
         let (d, i) = w.locate(&clubs[0]).unwrap();
