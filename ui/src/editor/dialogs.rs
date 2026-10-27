@@ -79,8 +79,9 @@ pub fn open_team(e: &Editor) -> Dialog {
     );
     d.lists
         .insert("@files".into(), teams.into_iter().map(|t| t.1).collect());
-    // (no focus rectangle on the list until it is used: as the captures show it)
-    d.focus = "-".into();
+    // (the list has the keyboard but shows no focus rectangle until a row is chosen: as the captures show it)
+    d.focus = "listBoxOfTeams".into();
+    d.text("listBoxOfTeams.caret", "-1");
     d
 }
 
@@ -211,8 +212,9 @@ pub fn open_transfer(e: &Editor, index: usize) -> Dialog {
         .map_or(String::new(), |p| p.name.clone());
     d.text("textPlayerName", name);
     d.set_num("index", index as i64);
-    // (no focus rectangle on the list until it is used: as the captures show it)
-    d.focus = "-".into();
+    // (the list has the keyboard but shows no focus rectangle until a row is chosen: as the captures show it)
+    d.focus = "listBoxOfTeams".into();
+    d.text("listBoxOfTeams.caret", "-1");
     d
 }
 

@@ -193,6 +193,17 @@ impl Editor {
             {
                 Outcome::Keep
             }
+            // type-ahead in a list box: the next row that starts with the letter
+            Ev::Key(Key::Char(c))
+                if c.is_alphanumeric()
+                    && d.hits
+                        .iter()
+                        .any(|h| h.name == d.focus && h.class == "TListBox") =>
+            {
+                let list = d.focus.clone();
+                type_ahead(&mut d, &list, c);
+                Outcome::Keep
+            }
             Ev::Key(k) => match dialog::generic_key_in(&self.forms, &mut d, k) {
                 KeyAct::Press(name) => dialogs::click(self, &mut d, &name),
                 KeyAct::Done | KeyAct::None => Outcome::Keep,
@@ -414,5 +425,48 @@ impl Editor {
             (Some(i), true) => i.saturating_sub(1),
             (Some(i), false) => (i + 1).min(n - 1),
         });
+    }
+}
+
+/// Selects the next row of `list` (after the selected one, wrapping) whose text starts with `c`, ignoring case, and scrolls to it.
+fn type_ahead(d: &mut Dialog, list: &str, c: char) {
+    let rows = d.lists.get(list).cloned().unwrap_or_default();
+    if rows.is_empty() {
+        return;
+    }
+    let up = |s: &str| {
+        s.chars()
+            .next()
+            .map(|f| f.to_uppercase().collect::<String>())
+    };
+    let want = Some(c.to_uppercase().collect::<String>());
+    let cur = d
+        .texts
+        .get(&format!("{list}.sel"))
+        .and_then(|v| v.parse::<usize>().ok());
+    let start = cur.map_or(0, |i| i + 1);
+    let n = rows.len();
+    if let Some(i) = (0..n)
+        .map(|k| (start + k) % n)
+        .find(|&i| up(&rows[i]) == want)
+    {
+        d.text(format!("{list}.sel"), i.to_string());
+        // (the list scrolls so that the row is the last one shown, as the original's did; rows of 13 pixels)
+        let fit = d
+            .hits
+            .iter()
+            .find(|h| h.name == list && h.class == "TListBox")
+            .map_or(1, |h| ((h.h - 2) / 13).max(1) as usize);
+        let top = d
+            .texts
+            .get(&format!("{list}.top"))
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+        if i < top || i >= top + fit {
+            d.text(
+                format!("{list}.top"),
+                (i + 1).saturating_sub(fit).to_string(),
+            );
+        }
     }
 }

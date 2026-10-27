@@ -646,11 +646,9 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
             fb.fill(x + 1, ry, right - x - 1, ih, b);
         }
         row_cells(fb, cx, n, f, x, ry, ih, &items[i], fg, bold_all || st.bold);
-        // the focus rectangle sits on the selected row, or on the first one while nothing is selected
-        if focused
-            && (selected
-                || (sel.is_none() && i == get_num(cx, n, "caret").unwrap_or(0).max(0) as usize))
-        {
+        // the focus rectangle sits on the selected row, or on the first one while nothing is selected (`caret`; none when negative)
+        let caret = get_num(cx, n, "caret").unwrap_or(0);
+        if focused && (selected || (sel.is_none() && caret >= 0 && i == caret as usize)) {
             focus_rect_not(fb, x + 1, ry, right - x - 1, ih, x, y, false);
         }
         push_hit(
