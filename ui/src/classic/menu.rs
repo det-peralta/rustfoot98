@@ -53,11 +53,28 @@ pub fn model(c: &Classic, club: &Club) -> Vec<Top> {
                     en.shortcut = format!("F{f_key}");
                     en.enabled = plan_for_formation(&club.slots, FORMATIONS[k]).is_some();
                 }
+                // the shortcut the form declares ("Alt+F4" for *Sair*, "C" for *Classificação*)
+                if let Some(s) = e.str("ShortCutText") {
+                    en.shortcut = s.to_string();
+                }
                 match e.name.as_str() {
                     "Automtico1" => en.shortcut = "A".into(),
                     "Melhores1" => en.shortcut = "M".into(),
-                    // printing is not available; borrowing is offered only to a club in the red or with a loan
+                    // printing is not available
                     "opcoesImprimir" => continue,
+                    // the main window's refresh (`1018:11f3`) shows these only to a registered copy (features `0xe`, `0x13`, `0x46`,
+                    // `0xc`, `0x10` of `1050:30bc`; checked on the original)
+                    "TreinadorGestao"
+                    | "Pediremprestimo1"
+                    | "Sairsemgravar1"
+                    | "Jogadoressobobservao1"
+                    | "JogadorProcurar1"
+                    | "EquipaAquisicoes1"
+                        if !c.main.market.registered =>
+                    {
+                        continue
+                    }
+                    // borrowing is offered only to a club in the red or with a loan
                     "Pediremprestimo1" if club.fin.cash >= 0 && club.fin.loan == 0 => continue,
                     _ => {}
                 }

@@ -21,7 +21,11 @@ printing.
   `World::currency`) gives `G`, the loan step, the prizes and the word after amounts; kept in saves, read from `.e98` headers. Open: the ticket
   price's display for small units (`1018:11f3` uses `+75` and the factor), the player-search value `+67`.
 - Invitation of a human who has a club (`TinviteCoachDlg`).
-- Stadium levels above 2, spin edit / speed button / colour grid, `TCheckPlayerDlg`, observed and acquisitions dialogs.
+- Stadium: checked at 10 000 to 25 000 seats (`analysis/captures/stadium/`); the user may build whenever the money is there. The stands'
+  geometry is still approximate (about 500 pixels per picture).
+- Registered-only in the original's free copy, hidden in the port too (`1018:11f3`, features of `1050:30bc`): *Gestão de treinadores*,
+  *Pedir/pagar empréstimo*, *Sair sem gravar*, *Jogadores sob observação*, *Procurar* (`TCheckPlayerDlg`, the spin edits), *Aquisições*;
+  also the options' *Controle* page and the referee aid.
 
 ## 3. Rules: until played days match
 - Record days of the original from `ABCDEEEE` with the recorder (its inputs are fixed), replay the same inputs in the port from

@@ -154,3 +154,10 @@ caption) unless the form's `BorderIcons` leave it out (the list dialogs of the g
 shortcuts, buttons, market, finances) acts on the active human (`Classic::switch_human` swaps the window, resets the page and keeps the line-up
 marks per human). Bold in the coach ranking, the winners list and the club history marks every human coach; transfers of any human club are blue.
 `classic_shot` opens `snap2.e98` with both humans (`seat=N` or `human=CLUB` select the active one; `season:N` presses F5/Enter once per human).
+
+## Menus of the unregistered copy
+The main window's refresh (`1018:11f3`) sets the visibility of menu items by registration features (`1050:30bc`), found through the
+form's published field table: `TreinadorGestao` (`0x224`, feature `0xe`), `Pediremprestimo1` (`0x278`, `0x13`), `Sairsemgravar1` (`0x288`,
+`0x46`), `Jogadoressobobservao1` (`0x2ac`, `0xc`), `JogadorProcurar1` (`0x2fc`, `0xc`), `EquipaAquisicoes1` (`0x30c`, `0x10`). The free copy
+shows none of them (checked on the original, all six menus); `menu::model` hides them unless `MarketState::registered`. Shortcuts come from
+the form's `ShortCutText` (*Sair* `Alt+F4`, *Classificação* `C`).
