@@ -997,7 +997,8 @@ fn click_squad(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     match name {
         "checkViewRedCards" => c.md.view_red = !c.md.view_red,
         "checkViewInjuries" => c.md.view_injuries = !c.md.view_injuries,
-        "textReferee" => {
+        // `textRefereeClick` (`1008:2427`) opens the referee aid only in a registered copy (features `0x23` / `0x0a` of `1050:30bc`)
+        "textReferee" if c.main.market.registered => {
             let mut r = Dialog::new(Kind::RefereeAid, "TREFEREEAIDDLG");
             r.set_num("cup", cup as i64);
             r.set_num("src", src as i64);

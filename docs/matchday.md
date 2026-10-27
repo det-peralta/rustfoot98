@@ -149,7 +149,9 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
   every shootout kick by kick and shows it (the core's `World::real_shootouts`, set from the option for each cup day); off, ties without a
   human before the final use the automatic draw and show nothing.
 * Mid-game substitutions by clicking on the user's club (mode 1 with `Substituir`) are applied from the next minute by a replay.
-* The balance picture of the referee aid is missing.
+* The referee aid (`TRefereeAidDlg`, a click on the referee's name in the break dialog) belongs to registered copies: `textRefereeClick`
+  (`1008:2427`) returns at once unless features `0x23` / `0x0a` of `1050:30bc` are on (checked in the original: the click does nothing). The
+  port opens it only with `MarketState::registered`; its balance picture (`FormPaint` `1028:2951`) is not drawn (registered feature).
 
 ## Seen in played seasons of the original (recorder `tools/capture/season.sh`, frames in `analysis/captures/`, git-ignored)
 Runs: `season4` (first season end, partly kept), `probe1` and `probe3` (every frame kept; `probe3` holds the 2027 -> 2028 season end at steps

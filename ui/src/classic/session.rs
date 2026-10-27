@@ -1043,6 +1043,21 @@ mod tests {
         assert!(gaps[first_fast + 1..].iter().all(|&(g, _)| g == 400));
     }
 
+    /// The referee's name on the break dialog opens the referee aid only in a registered copy (`1008:2427`).
+    #[test]
+    fn the_referee_aid_belongs_to_the_registered_copy() {
+        for registered in [false, true] {
+            let mut c = classic(2);
+            c.main.market.registered = registered;
+            c.play_round();
+            run(&mut c);
+            assert_eq!(top_kind(&c), Some(Kind::Halftime));
+            press(&mut c, "textReferee");
+            let aid = top_kind(&c) == Some(Kind::RefereeAid);
+            assert_eq!(aid, registered);
+        }
+    }
+
     #[test]
     fn many_rounds_with_a_user_who_answers_everything_stay_consistent() {
         let mut c = classic(2);
