@@ -517,6 +517,8 @@ impl Classic {
                         side,
                     } => {
                         self.mark(cup, src, minute, PRIMARY);
+                        // (`1038:328b`: the penalty dialog beeps when it opens)
+                        self.beep();
                         dialogs::matchday::penalty(self, cup, src, minute, side, attack)
                     }
                     Pending::RedKeeper { minute, side } => {
@@ -557,7 +559,19 @@ impl Classic {
                 }
             }
         }
-        rv.advance(ms);
+        if rv.advance(ms) {
+            // a goal, a red card, an injury or an annulled goal in a game of a human's club beeps (`46df`, `aa11`, `ac72`, `aea7`)
+            let minute = rv.minute;
+            let n = rv
+                .shown()
+                .filter(|g| g.human)
+                .flat_map(|g| g.events.iter())
+                .filter(|e| e.minute as i32 == minute)
+                .count();
+            for _ in 0..n {
+                self.beep();
+            }
+        }
         if rv.over() {
             Tick::Over
         } else {
@@ -938,6 +952,93 @@ mod tests {
         }
         let _ = (d, i, before);
         play_through(&mut c);
+    }
+
+    /// With "Habilitar som" on, the events of the user's game beep as the clock reaches them; with it off nothing does.
+    #[test]
+    fn the_events_of_a_humans_game_beep_only_with_the_sound_on() {
+        for on in [true, false] {
+            let mut c = classic(2);
+            c.opts.sound_off = !on;
+            let mut beeps = 0;
+            let mut events = 0;
+            for _ in 0..4 {
+                c.play_round();
+                if let Screen::Round(rv) = &c.screen {
+                    events += rv
+                        .shown()
+                        .filter(|g| g.human)
+                        .map(|g| g.events.len())
+                        .sum::<usize>();
+                }
+                play_through(&mut c);
+                beeps += c
+                    .requests
+                    .iter()
+                    .filter(|r| **r == crate::classic::Request::Beep)
+                    .count();
+                c.requests.clear();
+            }
+            if on {
+                assert!(events > 0, "the user's games had events");
+                assert!(beeps >= events, "{beeps} beeps for {events} events");
+            } else {
+                assert_eq!(beeps, 0);
+            }
+        }
+    }
+
+    /// The cup draw names a team every 1500 ms while humans' clubs are left to be drawn (each beeps), then every 400 ms (`1020:3232`).
+    #[test]
+    fn the_cup_draw_slows_down_for_the_humans_clubs_and_beeps_for_them() {
+        let mut c = classic(2);
+        c.opts.sound_off = false;
+        for _ in 0..30 {
+            if c.world.cup_draw.is_some() && !c.world.humans_in_cup_tie().is_empty() {
+                break;
+            }
+            c.play_round();
+            play_through(&mut c);
+        }
+        let pairs = c
+            .world
+            .cup_draw
+            .as_ref()
+            .expect("a cup round was drawn")
+            .pairs
+            .clone();
+        let humans = pairs
+            .iter()
+            .flat_map(|(h, a)| [h, a])
+            .filter(|n| c.world.is_human_club(n))
+            .count();
+        assert!(humans > 0);
+        c.requests.clear();
+        let mut d = dialogs::matchday::cup_draw(&c).unwrap();
+        let mut gaps = Vec::new();
+        let (mut ms, mut last, mut ticks) = (0, 0, 0);
+        loop {
+            let out = dialogs::tick(&mut c, &mut d, 100);
+            ms += 100;
+            if d.num("ticks") != ticks {
+                ticks = d.num("ticks");
+                gaps.push((ms - last, d.num("left")));
+                last = ms;
+            }
+            if matches!(out, crate::classic::dialog::Outcome::Close) {
+                break;
+            }
+        }
+        let beeps = c
+            .requests
+            .iter()
+            .filter(|r| **r == crate::classic::Request::Beep)
+            .count();
+        assert_eq!(beeps, humans, "one beep per human club named");
+        assert_eq!(gaps.len(), pairs.len() * 2 + 5);
+        let first_fast = gaps.iter().position(|&(_, left)| left == 0).unwrap();
+        assert!(gaps[..=first_fast].iter().all(|&(g, _)| g == 1500));
+        assert!(gaps[first_fast + 1..].iter().all(|&(g, _)| g == 400));
     }
 
     #[test]

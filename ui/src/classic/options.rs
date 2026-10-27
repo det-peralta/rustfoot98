@@ -13,7 +13,8 @@ pub struct Options {
     pub save_when: u8,
     /// "Ver sorteio da taça": 0 never, 1 when there are humans, 2 always.
     pub cup_draw: u8,
-    /// "Habilitar som": false is "Sim" (index 0), true is "Não" (index 1, the original's default). The port has no audio.
+    /// "Habilitar som": false is "Sim" (index 0), true is "Não" (index 1, the original's default). On, the game asks the host for
+    /// the original's beeps (`Classic::beep`, `Request::Beep`).
     pub sound_off: bool,
     /// "Tempo de jogo": index into [`PROFILES`].
     pub profile: u8,

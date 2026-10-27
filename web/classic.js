@@ -144,11 +144,27 @@ addEventListener("keydown", (e) => {
   else if (e.key.length === 1) { w.cl_event(4, e.key.codePointAt(0), 0); e.preventDefault(); }
 });
 
+// the original's MessageBeep(0): a short tone (WebAudio; browsers allow it after the first key or click)
+let audio = null;
+function beep() {
+  try {
+    audio = audio || new AudioContext();
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = "square";
+    o.frequency.value = 880;
+    g.gain.value = 0.05;
+    o.connect(g).connect(audio.destination);
+    o.start();
+    o.stop(audio.currentTime + 0.12);
+  } catch { /* no audio */ }
+}
+
 function requests() {
   for (;;) {
     const r = w.cl_request();
     if (!r) return;
     if (r === 1) { say("Jogo terminado. Recarrega a página para jogar outra vez."); w = null; return; }
+    if (r === 4) { beep(); continue; }
     const name = text(out());
     if (r === 2) {
       pushClock();

@@ -148,7 +148,7 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * Shootouts of ties without a human are shown only when the core played them with kicks (human tie or the final); the option *Ver os
   desempates por penalties nos jogos sem treinadores humanos* is not honoured by the core.
 * Mid-game substitutions by clicking on the user's club (mode 1 with `Substituir`) are applied from the next minute by a replay.
-* The balance picture of the referee aid is missing; no sounds.
+* The balance picture of the referee aid is missing.
 
 ## Seen in played seasons of the original (recorder `tools/capture/season.sh`, frames in `analysis/captures/`, git-ignored)
 Runs: `season4` (first season end, partly kept), `probe1` and `probe3` (every frame kept; `probe3` holds the 2027 -> 2028 season end at steps
@@ -176,3 +176,12 @@ Runs: `season4` (first season end, partly kept), `probe1` and `probe3` (every fr
   selected (the recorder cannot select it).
 * **Recorder**: on main windows it presses A (*Automático*) and Enter. F5 is the formation 4-4-2, greyed out when the squad cannot play it, which
   looked like a freeze. It bids 1 at auctions and keeps every frame.
+
+## Sound and the pace of the cup draw
+* The original's only sound is `MessageBeep(0)` from `1068:11c7`, when the option *Habilitar som* is on (`10c8:2c6c`). It beeps for a goal
+  (`46df`), a red card (`aa11`), an injury (`ac72`) and an annulled goal (`aea7`) in a game with a human's club, when the penalty dialog
+  opens (`1038:328b`) and when the cup draw names a human's club (`1020:3232`). The port: `Classic::beep` -> `Request::Beep` (the web host
+  plays a short WebAudio tone; the clock ticks the events of the round view, `round_step`).
+* The cup draw names a team every 1500 ms while humans' clubs are still to be named (`+0x194`, counted down at each one), then every 400 ms
+  (`1080:2692`); the port keeps that count in the dialog (`left`, `ticks`).
+* The spin edits of the original also beep on invalid input (`1030:13ce`, VCL sample component); not ported.

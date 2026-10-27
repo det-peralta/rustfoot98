@@ -101,6 +101,8 @@ pub enum Request {
     Save(String),
     /// Load the saved game of this name.
     Load(String),
+    /// The original's `MessageBeep` (`1068:11c7`, only when the option "Habilitar som" is on).
+    Beep,
 }
 
 /// The notebook pages of the main window, in the order of its tab set.
@@ -324,7 +326,15 @@ impl Classic {
         self.dirty = true;
     }
 
-    /// Asks the host to store the game under its name (after a round, on exit).
+    /// `1068:11c7`: a beep when the option "Habilitar som" is on (goals, red cards, injuries and annulled goals in a game of a human's
+    /// club, the penalty dialog, a human's club named by the cup draw).
+    pub fn beep(&mut self) {
+        if !self.opts.sound_off {
+            self.requests.push(Request::Beep);
+        }
+    }
+
+    /// Asks the host to store the game under its name (when a day starts, on exit).
     pub fn save_now(&mut self) {
         if self.started && !self.game_name.is_empty() {
             self.requests.push(Request::Save(self.game_name.clone()));

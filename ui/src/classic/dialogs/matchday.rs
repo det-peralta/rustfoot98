@@ -653,8 +653,16 @@ pub fn cup_draw(c: &Classic) -> Option<Dialog> {
         return None;
     }
     let mut d = Dialog::new(Kind::CupDraw, "TSORTEIODLG");
-    d.set_num("ms", 0);
-    d.set_num("human", human_drawn as i64);
+    // `+0x194`: the humans' clubs still to be named; the timer runs at 1500 ms while there are any, then at 400 (`1080:2692`)
+    let left = draw
+        .pairs
+        .iter()
+        .flat_map(|(h, a)| [h, a])
+        .filter(|n| c.world.is_human_club(n))
+        .count();
+    d.set_num("left", left as i64);
+    d.set_num("ticks", 0);
+    d.set_num("acc", 0);
     Some(d)
 }
 
@@ -662,9 +670,8 @@ fn bind_cup_draw(c: &Classic, d: &mut Dialog) {
     let Some(draw) = c.world.cup_draw.as_ref() else {
         return;
     };
-    let tick = if d.num("human") != 0 { 1500 } else { 400 };
     // two timer ticks per game: the home team is named, then the away team and the game goes into the list
-    let ticks = (d.num("ms") / tick) as usize;
+    let ticks = d.num("ticks") as usize;
     let (done, home_only) = (ticks / 2, ticks % 2 == 1);
     let games = draw.pairs.len();
     // the teams already drawn leave the list
@@ -925,11 +932,29 @@ pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {
             Outcome::Keep
         }
         Kind::CupDraw => {
-            let games = c.world.last_cup.as_ref().map_or(0, |r| r.matches.len()) as i64;
-            let tick = if d.num("human") != 0 { 1500 } else { 400 };
-            d.set_num("ms", d.num("ms") + ms as i64);
+            let pairs: Vec<(String, String)> = c
+                .world
+                .cup_draw
+                .as_ref()
+                .map(|dr| dr.pairs.clone())
+                .unwrap_or_default();
+            let interval = if d.num("left") > 0 { 1500 } else { 400 };
+            d.set_num("acc", d.num("acc") + ms as i64);
+            if d.num("acc") >= interval {
+                d.set_num("acc", d.num("acc") - interval);
+                // the team named by this tick: a human's club beeps (`1020:3232`)
+                let k = d.num("ticks");
+                d.set_num("ticks", k + 1);
+                if let Some((h, a)) = pairs.get((k / 2) as usize) {
+                    let name = if k % 2 == 0 { h } else { a };
+                    if c.world.is_human_club(name) {
+                        d.set_num("left", (d.num("left") - 1).max(0));
+                        c.beep();
+                    }
+                }
+            }
             // two ticks per game, then five more before the window closes
-            if d.num("ms") / tick >= games * 2 + 5 {
+            if d.num("ticks") >= pairs.len() as i64 * 2 + 5 {
                 return Outcome::Close;
             }
             Outcome::Keep

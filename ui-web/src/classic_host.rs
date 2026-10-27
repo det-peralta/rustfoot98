@@ -234,6 +234,7 @@ pub extern "C" fn cl_request() -> i32 {
                 h.out = n.into_bytes();
                 3
             }
+            Request::Beep => 4,
         }
     })
 }
