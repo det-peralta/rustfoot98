@@ -117,8 +117,9 @@ fn country_name(c: &Classic, code: &[u8; 3]) -> String {
     c.data.countries.get(&k).cloned().unwrap_or(k)
 }
 
-fn money(v: i64) -> String {
-    text::money_words(v, "reais")
+/// An amount in words in the game's currency.
+fn money(c: &Classic, v: i64) -> String {
+    text::money_words(v, c.world.currency_info().unit)
 }
 
 fn suspended_text(n: u8) -> String {
@@ -154,7 +155,7 @@ fn sale_sentence(c: &Classic, sold: Result<i64, String>) -> String {
                 .last()
                 .map(|t| t.to.clone())
                 .unwrap_or_default();
-            format!("Vendido ao {to} por {}", money(fee))
+            format!("Vendido ao {to} por {}", money(c, fee))
         }
         Err(e) => e,
     }
@@ -376,13 +377,14 @@ pub fn ask_more_salary(c: &Classic, slot: usize, amount: i64, can_sell: bool) ->
     d.text("textCoachName", c.coach.clone());
     d.text("textCoachName.color", fg.clone());
     d.text("textMessage.color", fg);
+    let unit = c.world.currency_info().unit;
     let body = if can_sell {
         format!(
-            "Nem pensar! Exijo {amount} reais!\nSe não aceitar o aumento, o jogador será posto à venda em leilão.\n\nAceita o aumento?"
+            "Nem pensar! Exijo {amount} {unit}!\nSe não aceitar o aumento, o jogador será posto à venda em leilão.\n\nAceita o aumento?"
         )
     } else {
         format!(
-            "Nem pensar! Exijo {amount} reais!\n\nUma vez que este jogador não pode ser vendido, tem de aceitar o aumento."
+            "Nem pensar! Exijo {amount} {unit}!\n\nUma vez que este jogador não pode ser vendido, tem de aceitar o aumento."
         )
     };
     d.text("textMessage", body);
@@ -444,8 +446,11 @@ pub fn auction_dialog(c: &Classic, club: &str, player: &str, base: i64) -> Optio
     d.text("textPlayerName", player);
     d.text("textPlayerPosition", text::POSITIONS[s.position as usize]);
     d.text("textPlayerSkill", s.strength.to_string());
-    d.text("textDesiredSalary", format!("{value} reais"));
-    d.text("textBasePrice", money(base));
+    d.text(
+        "textDesiredSalary",
+        format!("{value} {}", c.world.currency_info().unit),
+    );
+    d.text("textBasePrice", money(c, base));
     d.text("textPlayerCountry", country_name(c, &s.nat));
     d.text(
         "bitmapTeamCountry.image",
@@ -464,12 +469,15 @@ pub fn auction_dialog(c: &Classic, club: &str, player: &str, base: i64) -> Optio
     d.text("textTransferred", "");
     d.text("textHumanOffer", "");
     d.text("Panel1", "");
-    d.text("Label7", "Oferta (milhares de reais):");
+    d.text(
+        "Label7",
+        format!("Oferta (milhares de {}):", c.world.currency_info().unit),
+    );
     d.text("textCoachName", c.coach.clone());
     if let Some((_, mine)) = main_win::human_club(c) {
         d.text(
             "textCash",
-            format!("Dinheiro em caixa: {}", money(mine.fin.cash)),
+            format!("Dinheiro em caixa: {}", money(c, mine.fin.cash)),
         );
         d.text("PanelHumanOffer.bgcolor", rgb_s(mine.colors.1));
         d.text("PanelHumanOffer.color", rgb_s(mine.colors.0));
@@ -548,7 +556,7 @@ fn auction_click(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
             let me = main_win::human_club(c)
                 .map(|(_, m)| m.name)
                 .unwrap_or_default();
-            show_result(d, &format!("Vendido ao {me} por {}", money(amount)));
+            show_result(d, &format!("Vendido ao {me} por {}", money(c, amount)));
             Outcome::Keep
         }
         Err(e) => {
@@ -710,7 +718,7 @@ fn search_bind(c: &Classic, d: &mut Dialog) {
         d.lists.insert(combo.to_string(), items);
     }
     if let Some((_, me)) = main_win::human_club(c) {
-        d.texts.insert("textMoney".into(), money(me.fin.cash));
+        d.texts.insert("textMoney".into(), money(c, me.fin.cash));
     }
     let found = found_of(d);
     let rows: Vec<String> = found
@@ -1102,7 +1110,7 @@ fn plantel_bind(c: &Classic, d: &mut Dialog) {
                 );
                 d.text(
                     "textDesiredSalary",
-                    format!("Salário pretendido:\n{v} reais"),
+                    format!("Salário pretendido:\n{v} {}", c.world.currency_info().unit),
                 );
             }
             d.texts.insert(

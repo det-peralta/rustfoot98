@@ -149,6 +149,8 @@ pub struct E98 {
     pub year: u16,
     /// Economy index (extended at header offset `0x28`; 2.0 in a new game).
     pub economy: f64,
+    /// The currency of the header's currency record (offset `0x3c`, found by its name; `None` when unknown).
+    pub currency: Option<usize>,
     pub human_id: u16,
     pub teams: Vec<E98Team>,
     /// Ids of the clubs in the cup draw (`26f2`).
@@ -460,10 +462,22 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
     } else {
         crate::economy::INITIAL_INDEX
     };
+    let currency = d.get(0x3c).and_then(|&n| {
+        let name = d.get(0x3d..0x3d + n as usize)?;
+        let name: String = name.iter().map(|&b| b as char).collect();
+        crate::economy::CURRENCIES.iter().position(|c| {
+            c.name
+                .chars()
+                .map(|ch| if (ch as u32) < 256 { ch } else { '?' })
+                .collect::<String>()
+                == name
+        })
+    });
     Ok(E98 {
         description,
         year,
         economy,
+        currency,
         human_id,
         teams,
         cup,
@@ -726,6 +740,10 @@ impl World {
             .unwrap_or(0);
         let mut w = World::empty(seed, divisions, pool, save.year, round.min(13));
         w.economy = save.economy;
+        if let Some(c) = save.currency {
+            w.currency = c;
+            w.scale = crate::economy::CURRENCIES[c].scale;
+        }
         w.history = history_of(save, &club_names);
         w.transfers = transfers_of(save, &club_names);
         w.refresh_cash_ref();

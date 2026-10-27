@@ -783,9 +783,18 @@ fn bind_end_of_season(c: &Classic, d: &mut Dialog) {
             .collect(),
     );
     let [p1, p2, p3] = s.honours.prizes;
-    d.text("textPrizeLeagueWinner", text::money_words(p1, "reais"));
-    d.text("textPrizeCupWinner", text::money_words(p2, "reais"));
-    d.text("textPrizeBestScorer", text::money_words(p3, "reais"));
+    d.text(
+        "textPrizeLeagueWinner",
+        text::money_words(p1, c.world.currency_info().unit),
+    );
+    d.text(
+        "textPrizeCupWinner",
+        text::money_words(p2, c.world.currency_info().unit),
+    );
+    d.text(
+        "textPrizeBestScorer",
+        text::money_words(p3, c.world.currency_info().unit),
+    );
 }
 
 fn bind_invitation(_c: &Classic, d: &mut Dialog) {

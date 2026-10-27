@@ -203,8 +203,9 @@ fn options_key(d: &mut Dialog, key: Key) -> Option<Outcome> {
 // ---------------------------------------------------------------------------------------------------------------------------------
 // Stadium
 
-fn money(v: i64) -> String {
-    text::money_words(v, "reais")
+/// An amount in words in the game's currency.
+fn money(c: &Classic, v: i64) -> String {
+    text::money_words(v, c.world.currency_info().unit)
 }
 
 fn stadium_bind(c: &Classic, d: &mut Dialog) {
@@ -221,7 +222,7 @@ fn stadium_bind(c: &Classic, d: &mut Dialog) {
         format!(
             "Preço de uma bancada com\n{} lugares: {}",
             finance::SEATS_PER_LEVEL,
-            money(cost)
+            money(c, cost)
         ),
     );
     // the loan button belongs to the registered versions (`1030:28a3`)
@@ -257,13 +258,13 @@ fn loan_bind(c: &Classic, d: &mut Dialog) {
     };
     let f = &club.fin;
     let (e, g) = (c.world.economy, c.world.scale);
-    let step = finance::loan_step(g);
-    let max = finance::max_loan(finance::rating(&club.slots), club.k, e, g).max(f.loan);
-    d.text("textLoan", money(f.loan));
-    d.text("textInterest", money(finance::loan_interest(f.loan)));
-    d.text("textMoney", money(f.cash));
-    d.text("borrowBtn", money(step));
-    d.text("payBtn", money(step));
+    let step = finance::loan_step(c.world.currency_info());
+    let max = finance::max_loan(finance::rating(&club.slots), club.k, e, g, step).max(f.loan);
+    d.text("textLoan", money(c, f.loan));
+    d.text("textInterest", money(c, finance::loan_interest(f.loan)));
+    d.text("textMoney", money(c, f.cash));
+    d.text("borrowBtn", money(c, step));
+    d.text("payBtn", money(c, step));
     d.text("borrowBtn.enabled", if f.loan < max { "1" } else { "0" });
     d.text(
         "payBtn.enabled",

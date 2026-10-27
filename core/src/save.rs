@@ -45,12 +45,13 @@ impl World {
         out.push_str(MAGIC);
         out.push('\n');
         out.push_str(&format!(
-            "year|{}\neconomy|{:?}\nround|{}\nseed|{}\nscale|{}\ncashref|{}|{}|{}|{}\n",
+            "year|{}\neconomy|{:?}\nround|{}\nseed|{}\nscale|{}\ncurrency|{}\ncashref|{}|{}|{}|{}\n",
             self.year,
             self.economy,
             self.round,
             self.rng.seed(),
             self.scale,
+            self.currency,
             self.cash_ref[0],
             self.cash_ref[1],
             self.cash_ref[2],
@@ -237,6 +238,8 @@ impl World {
         let mut transfers: Vec<Transfer> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
+        // (games saved before the currency was kept are in reais)
+        let mut currency = crate::economy::REAIS;
         let mut cash_ref = [0i64; 4];
         let mut divisions: [Vec<Club>; 4] = Default::default();
         let mut pool: Vec<Club> = Vec::new();
@@ -392,6 +395,10 @@ impl World {
                     fee: num(n, &f, 8)?,
                 }),
                 "scale" => scale = num(n, &f, 1)?.max(1),
+                "currency" => {
+                    currency =
+                        (num(n, &f, 1)?.max(0) as usize).min(crate::economy::CURRENCIES.len() - 1)
+                }
                 "cashref" => {
                     for (i, r) in cash_ref.iter_mut().enumerate() {
                         *r = num(n, &f, 1 + i)?;
@@ -555,6 +562,7 @@ impl World {
             year: year.ok_or("missing year")?,
             economy,
             scale,
+            currency,
             cash_ref,
             round,
             rng: DelphiRng::new(seed.ok_or("missing seed")?),

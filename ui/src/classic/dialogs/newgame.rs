@@ -576,7 +576,12 @@ pub fn build_world(c: &Classic) -> Result<World, String> {
     if c.teams.is_empty() {
         Ok(World::synthetic(c.seed))
     } else if !c.new_game.countries.is_empty() {
-        World::from_countries(c.seed, &c.teams, &c.new_game.countries)
+        World::from_countries(
+            c.seed,
+            &c.teams,
+            &c.new_game.countries,
+            c.new_game.currency.unwrap_or(rustfoot_core::economy::REAIS),
+        )
     } else {
         World::from_teams(c.seed, &c.teams)
     }

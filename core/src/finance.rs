@@ -147,10 +147,10 @@ pub fn expand(f: &mut Finance) {
     f.fill = 0.6;
 }
 
-/// The season-end prizes of the sample save's currency record (`10c8:2d8f..2d97`): 20 000 000 for the first division's
-/// champion, 6 000 000 for the cup winner and 3 000 000 for the club of each top scorer, with `G = 5`; scaled with `G`.
-pub fn season_prizes(g: i64) -> [i64; 3] {
-    [4_000_000 * g, 1_200_000 * g, 600_000 * g]
+/// The season-end prizes of the currency record (`10c8:2d8f..2d97`): the first division's champion, the cup winner and the club of
+/// each top scorer (20 000 000, 6 000 000 and 3 000 000 reais).
+pub fn season_prizes(c: &crate::economy::Currency) -> [i64; 3] {
+    c.prizes
 }
 
 /// `1040:3865`: interest per game, 5 % of the loan.
@@ -158,14 +158,13 @@ pub fn loan_interest(loan: i64) -> i64 {
     (loan as f64 * 0.05).round_ties_even() as i64
 }
 
-/// The loan step (`10c8:2d7f`): the header of the sample saves holds 500 000 with `G = 5`.
-pub fn loan_step(g: i64) -> i64 {
-    100_000 * g
+/// The loan step of the currency record (`10c8:2d7f`): 500 000 reais.
+pub fn loan_step(c: &crate::economy::Currency) -> i64 {
+    c.loan_step
 }
 
-/// `1040:3899`: the bank's limit, `rating * K * E * G * 20000` rounded down to a whole step (at least one step).
-pub fn max_loan(rating: i64, k: f64, e: f64, g: i64) -> i64 {
-    let step = loan_step(g);
+/// `1040:3899`: the bank's limit, `rating * K * E * G * 20000` rounded down to a whole loan step (at least one step).
+pub fn max_loan(rating: i64, k: f64, e: f64, g: i64, step: i64) -> i64 {
     let raw = (rating as f64 * k * e * g as f64 * 20_000.0).round_ties_even() as i64;
     (raw / step * step).max(step)
 }
@@ -227,8 +226,8 @@ mod tests {
     #[test]
     fn loans_and_stadium_follow_the_decoded_formulas() {
         assert_eq!(loan_interest(1_000_000), 50_000);
-        assert_eq!(max_loan(5, 1.0, 2.0, 5), 1_000_000);
-        assert_eq!(max_loan(0, 1.0, 2.0, 5), 500_000);
+        assert_eq!(max_loan(5, 1.0, 2.0, 5, 500_000), 1_000_000);
+        assert_eq!(max_loan(0, 1.0, 2.0, 5, 500_000), 500_000);
         let mut f = Finance::new_game(5, 5);
         assert_eq!(expansion_cost(&f, 2.0, 5), 350_000);
         assert!(!wants_expansion(&f));

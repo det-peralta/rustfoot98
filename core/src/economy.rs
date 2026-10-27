@@ -6,6 +6,87 @@ use crate::rng::DelphiRng;
 pub const INITIAL_INDEX: f64 = 2.0;
 /// `10c8:2d87`: currency scale `G` (a long). The sample saves use `Reais` with `G = 5`; new-game cash is `base * 50_000 * G`.
 pub const DEFAULT_SCALE: i64 = 5;
+/// A currency of *Dinheiro* (`TCurrencyDlg`): the five 101-byte records at `DS:0062` of the original, one of which is copied to
+/// `DS:2d40` for the game (and into the `.e98` header): name, the word written after amounts, an abbreviation, the loan step (`+63`,
+/// `2d7f`), a value used by the player-search dialog (`+67`), the scale `G` (`+71`, `2d87`), the unit of the ticket price shown
+/// (`+75`, 1000 for escudos counted in contos), the season prizes (`+79..+87`: champion, cup winner, top scorer) and a factor of the
+/// ticket price (`+91`, extended).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Currency {
+    pub name: &'static str,
+    /// Written after amounts (`1040:335a`), without the original's leading space.
+    pub unit: &'static str,
+    pub short: &'static str,
+    pub loan_step: i64,
+    pub search: i64,
+    pub scale: i64,
+    pub price_unit: i64,
+    pub prizes: [i64; 3],
+    pub factor: f64,
+}
+
+/// The currencies in the order of the dialog.
+pub const CURRENCIES: [Currency; 5] = [
+    Currency {
+        name: "Escudos (contos)",
+        unit: "contos",
+        short: "esc.",
+        loan_step: 100_000,
+        search: 1,
+        scale: 1,
+        price_unit: 1000,
+        prizes: [3_000_000, 1_000_000, 500_000],
+        factor: 0.5,
+    },
+    Currency {
+        name: "Euros",
+        unit: "euros",
+        short: "",
+        loan_step: 500_000,
+        search: 4,
+        scale: 4,
+        price_unit: 1,
+        prizes: [15_000_000, 5_000_000, 3_000_000],
+        factor: 2.0,
+    },
+    Currency {
+        name: "Dólares",
+        unit: "dólares",
+        short: "",
+        loan_step: 500_000,
+        search: 4,
+        scale: 5,
+        price_unit: 1,
+        prizes: [20_000_000, 6_000_000, 3_000_000],
+        factor: 2.0,
+    },
+    Currency {
+        name: "Reais",
+        unit: "reais",
+        short: "",
+        loan_step: 500_000,
+        search: 4,
+        scale: 5,
+        price_unit: 1,
+        prizes: [20_000_000, 6_000_000, 3_000_000],
+        factor: 2.0,
+    },
+    Currency {
+        name: "Libras",
+        unit: "libras",
+        short: "",
+        loan_step: 250_000,
+        search: 4,
+        scale: 4,
+        price_unit: 1,
+        prizes: [10_000_000, 4_000_000, 2_000_000],
+        factor: 2.0,
+    },
+];
+
+/// Index of *Reais* in [`CURRENCIES`] (the sample saves' currency and the default).
+pub const REAIS: usize = 3;
+
 /// Clamp of the index (`1020:0c3d` / `1020:0c39`).
 pub const INDEX_MIN: f64 = 0.5;
 pub const INDEX_MAX: f64 = 10.0;

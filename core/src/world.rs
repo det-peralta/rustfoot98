@@ -240,8 +240,10 @@ pub struct World {
     pub year: u16,
     /// Global economy index (`10c8:2b46`), random-walked every round.
     pub economy: f64,
-    /// Currency scale `G` (`10c8:2d87`).
+    /// Currency scale `G` (`10c8:2d87`), the scale of [`World::currency`].
     pub scale: i64,
+    /// The currency of the game (index into [`crate::economy::CURRENCIES`], chosen in *Dinheiro*).
+    pub currency: usize,
     /// Total cash of each division at the last `1010:7067` (the denominator of the economic-factor update).
     pub cash_ref: [i64; 4],
     /// Rounds already played this season (0..=13); a new season starts after round 14.
@@ -402,6 +404,7 @@ fn club_from_eft(
     name: String,
     base: i32,
     master: usize,
+    scale: i64,
 ) -> Result<Club, String> {
     let mut slots = Vec::new();
     let mut names = Vec::new();
@@ -424,7 +427,7 @@ fn club_from_eft(
         );
         slot.nat = code(&p.nationality);
         slot.foreign = country_class(code(&t.country), slot.nat);
-        slot.wage = player_value(strength, 1.0, INITIAL_INDEX, DEFAULT_SCALE);
+        slot.wage = player_value(strength, 1.0, INITIAL_INDEX, scale);
         slots.push(slot);
         names.push(p.name.clone());
     }
@@ -436,7 +439,7 @@ fn club_from_eft(
     }
     let mut club = Club::new(&name, slots);
     club.names = names;
-    club.fin = Finance::new_game(base, DEFAULT_SCALE);
+    club.fin = Finance::new_game(base, scale);
     club.country = code(&t.country);
     club.colors = (t.background, t.foreground);
     club.full_name = t.full_name.clone();
@@ -460,7 +463,7 @@ impl World {
         let mut order: Vec<usize> = (0..teams.len()).collect();
         order.sort_by_key(|&i| std::cmp::Reverse(teams[i].level)); // stable: ties keep the given (directory) order
         order.truncate(MAX_TEAMS);
-        World::from_order(DelphiRng::new(seed), teams, &order)
+        World::from_order(DelphiRng::new(seed), teams, &order, crate::economy::REAIS)
     }
 
     /// A new game with the countries chosen in *Selecção de Países* (`TSelectCountriesDlg`). `list` is the dialog's list, in its
@@ -473,6 +476,7 @@ impl World {
         seed: u32,
         teams: &[EftTeam],
         list: &[(String, bool)],
+        currency: usize,
     ) -> Result<World, String> {
         let mut rng = DelphiRng::new(seed);
         let mut left: Vec<usize> = list
@@ -515,11 +519,18 @@ impl World {
                 }
             }
         }
-        World::from_order(rng, teams, &order)
+        World::from_order(rng, teams, &order, currency)
     }
 
     /// The world of the teams `order` (indices into `teams`, master-list order): the first 32 fill the divisions.
-    fn from_order(mut rng: DelphiRng, teams: &[EftTeam], order: &[usize]) -> Result<World, String> {
+    fn from_order(
+        mut rng: DelphiRng,
+        teams: &[EftTeam],
+        order: &[usize],
+        currency: usize,
+    ) -> Result<World, String> {
+        let currency = currency.min(crate::economy::CURRENCIES.len() - 1);
+        let scale = crate::economy::CURRENCIES[currency].scale;
         let mut used = std::collections::HashSet::new();
         let mut clubs = Vec::new();
         for (pos, &i) in order.iter().enumerate() {
@@ -535,6 +546,7 @@ impl World {
                 name,
                 base_strength(pos),
                 pos,
+                scale,
             )?);
         }
         let mut it = clubs.into_iter();
@@ -548,7 +560,8 @@ impl World {
             pool,
             year: 1998,
             economy: INITIAL_INDEX,
-            scale: DEFAULT_SCALE,
+            scale,
+            currency,
             cash_ref: [0; 4],
             round: 0,
             rng,
@@ -593,6 +606,7 @@ impl World {
             year,
             economy: INITIAL_INDEX,
             scale: DEFAULT_SCALE,
+            currency: crate::economy::REAIS,
             cash_ref: [0; 4],
             round,
             rng: DelphiRng::new(seed),
@@ -646,6 +660,7 @@ impl World {
             year: 1998,
             economy: INITIAL_INDEX,
             scale: DEFAULT_SCALE,
+            currency: crate::economy::REAIS,
             cash_ref: [0; 4],
             round: 0,
             rng,
@@ -961,6 +976,11 @@ impl World {
             c.fin = Finance::new_game(base_strength(32 + j), self.scale);
         }
         self.refresh_cash_ref();
+    }
+
+    /// The record of the game's currency (scale, loan step, prizes, the word written after amounts).
+    pub fn currency_info(&self) -> &'static crate::economy::Currency {
+        &crate::economy::CURRENCIES[self.currency.min(crate::economy::CURRENCIES.len() - 1)]
     }
 
     /// All clubs as `(division, index)`, divisions 0..=3 then the outside pool as division 4, ordered by the master list.
@@ -1384,9 +1404,9 @@ impl World {
     pub fn human_borrow(&mut self) -> Result<i64, String> {
         let loc = self.human_location().ok_or("sem clube")?;
         let (e, g) = (self.economy, self.scale);
+        let step = finance::loan_step(self.currency_info());
         let c = self.club_mut(loc);
-        let step = finance::loan_step(g);
-        let max = finance::max_loan(finance::rating(&c.slots), c.k, e, g);
+        let max = finance::max_loan(finance::rating(&c.slots), c.k, e, g, step);
         if c.fin.loan + step > max {
             return Err(format!("o banco não empresta mais: limite {max}"));
         }
@@ -1398,7 +1418,7 @@ impl World {
     /// The user repays one loan step (`1010:668d`).
     pub fn human_repay(&mut self) -> Result<i64, String> {
         let loc = self.human_location().ok_or("sem clube")?;
-        let step = finance::loan_step(self.scale);
+        let step = finance::loan_step(self.currency_info());
         let c = self.club_mut(loc);
         if c.fin.loan <= 0 {
             return Err("não tens empréstimos".into());
@@ -2287,7 +2307,7 @@ impl World {
     /// `1020:2ae6`: the champion of the first division, the cup winner and the club of every top scorer get their prizes
     /// (category 3); the scorers' tallies then start again.
     fn pay_prizes(&mut self, cup_winner: Option<&str>) {
-        let [p1, p2, p3] = finance::season_prizes(self.scale);
+        let [p1, p2, p3] = finance::season_prizes(self.currency_info());
         if let Some(&i) = standings(&self.divisions[0]).first() {
             self.divisions[0][i].fin.book(p1, finance::Category::Prizes);
         }
@@ -2359,7 +2379,7 @@ impl World {
             cup_coach: coach(cup_winner),
             top_scorers,
             top_goals: top,
-            prizes: finance::season_prizes(self.scale),
+            prizes: finance::season_prizes(self.currency_info()),
         }
     }
 
@@ -2879,9 +2899,13 @@ mod tests {
             ]
         };
         // too few
-        assert!(World::from_countries(1, &teams, &list(false, false, true)).is_err());
+        assert!(
+            World::from_countries(1, &teams, &list(false, false, true), crate::economy::REAIS)
+                .is_err()
+        );
         // 70 teams: no cut, the same world as the old builder of those teams
-        let w = World::from_countries(3, &teams, &list(false, true, true)).unwrap();
+        let w = World::from_countries(3, &teams, &list(false, true, true), crate::economy::REAIS)
+            .unwrap();
         let only: Vec<EftTeam> = teams
             .iter()
             .filter(|t| t.country != "BRA")
@@ -2898,7 +2922,8 @@ mod tests {
         };
         assert_eq!(names(&w), names(&v));
         // 160 teams: cut to 128, every country keeps teams, the bigger ones lose more
-        let w = World::from_countries(7, &teams, &list(true, true, true)).unwrap();
+        let w = World::from_countries(7, &teams, &list(true, true, true), crate::economy::REAIS)
+            .unwrap();
         let all = names(&w);
         assert_eq!(all.len(), MAX_TEAMS);
         let count = |c: &str| {
@@ -2919,6 +2944,40 @@ mod tests {
             .map(|n| teams.iter().find(|t| &t.short_name == n).unwrap().level)
             .collect();
         assert!(levels.windows(2).all(|x| x[0] >= x[1]));
+    }
+
+    /// The currency chosen in *Dinheiro* sets the scale `G` (wages, new-game cash), the loan step and the prizes, and is kept in
+    /// a saved game.
+    #[test]
+    fn a_new_game_in_euros_uses_the_euro_record() {
+        let teams: Vec<EftTeam> = (0..40)
+            .map(|i| {
+                let mut t = fake_team(i, (i % 20 + 1) as u8);
+                t.short_name = format!("T{i}");
+                t
+            })
+            .collect();
+        let list = vec![("POR".to_string(), true)];
+        let mut teams = teams;
+        for t in teams.iter_mut() {
+            t.country = "POR".into();
+        }
+        let euros = 1;
+        let w = World::from_countries(2, &teams, &list, euros).unwrap();
+        let r = World::from_countries(2, &teams, &list, crate::economy::REAIS).unwrap();
+        assert_eq!((w.currency, w.scale), (euros, 4));
+        assert_eq!(w.currency_info().unit, "euros");
+        assert_eq!(finance::loan_step(w.currency_info()), 500_000);
+        assert_eq!(
+            finance::season_prizes(w.currency_info()),
+            [15_000_000, 5_000_000, 3_000_000]
+        );
+        // money scales with G: 4 against the reais' 5
+        let (a, b) = (&w.divisions[0][0], &r.divisions[0][0]);
+        assert_eq!(a.fin.cash * 5, b.fin.cash * 4);
+        assert_eq!(a.slots[0].wage * 5, b.slots[0].wage * 4);
+        let back = World::load(&w.save()).unwrap();
+        assert_eq!((back.currency, back.scale), (euros, 4));
     }
 
     #[test]
@@ -3382,7 +3441,7 @@ mod tests {
         let mut w = World::synthetic(3);
         let (d, i) = w.human_location().unwrap();
         let cash = w.divisions[d][i].fin.cash;
-        let step = finance::loan_step(w.scale);
+        let step = finance::loan_step(w.currency_info());
         assert_eq!(w.human_borrow().unwrap(), step);
         assert_eq!(w.divisions[d][i].fin.cash, cash + step);
         w.play_round();
@@ -3740,7 +3799,7 @@ mod tests {
             w.play_round();
         }
         let s = w.last_season.as_ref().unwrap();
-        assert_eq!(s.honours.prizes, finance::season_prizes(w.scale));
+        assert_eq!(s.honours.prizes, finance::season_prizes(w.currency_info()));
         assert!(s.honours.top_goals > 0 && !s.honours.top_scorers.is_empty());
         assert!(!s.honours.league_coach.is_empty() || w.divisions[0][0].coach_name.is_empty());
     }
@@ -3778,7 +3837,7 @@ mod tests {
         let s = w.last_season.as_ref().unwrap();
         let champion = s.tables[0][0].name.clone();
         let cup = s.cup_winner.clone().unwrap();
-        let [p1, p2, p3] = finance::season_prizes(w.scale);
+        let [p1, p2, p3] = finance::season_prizes(w.currency_info());
         let find = |n: &str| {
             w.divisions
                 .iter()

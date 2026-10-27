@@ -162,3 +162,17 @@ port keeps the same rules but makes it asynchronous, because every game runs in 
   Header record (offsets of the `.e98`): `0x7b` loan step 500 000, `0x7f` 4, `0x83` `G`, `0x87` 1, `0x8b` the three prizes, `0x32` the ticket
   rounding unit (extended 1.0), `0x28` economy index.
 
+
+## Currencies (`TCurrencyDlg`, `economy::CURRENCIES`)
+The five records at `DS:0062` (101 bytes; the chosen one is copied to `DS:2d40` and into the `.e98` header at `0x3c`):
+
+| Currency | word | loan step | `+67` | `G` | `+75` | prizes (champion / cup / scorer) | factor |
+|---|---|---|---|---|---|---|---|
+| Escudos (contos) | contos (` esc.`) | 100 000 | 1 | 1 | 1000 | 3 000 000 / 1 000 000 / 500 000 | 0.5 |
+| Euros | euros | 500 000 | 4 | 4 | 1 | 15 000 000 / 5 000 000 / 3 000 000 | 2.0 |
+| Dólares | dólares | 500 000 | 4 | 5 | 1 | 20 000 000 / 6 000 000 / 3 000 000 | 2.0 |
+| Reais | reais | 500 000 | 4 | 5 | 1 | 20 000 000 / 6 000 000 / 3 000 000 | 2.0 |
+| Libras | libras | 250 000 | 4 | 4 | 1 | 10 000 000 / 4 000 000 / 2 000 000 | 2.0 |
+
+The loan step is what `1010:665e` adds to the cash and the debt; `G` scales values, wages and new-game cash; the word is written after
+amounts by `1040:335a`. The dialog shows the last currency used first (`elif98.ini`, `[Options] currency`).

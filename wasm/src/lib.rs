@@ -153,8 +153,8 @@ fn human_json(w: &World) -> String {
         wage,
         money.price,
         w.scale,
-        rustfoot_core::finance::loan_step(w.scale),
-        rustfoot_core::finance::max_loan(rustfoot_core::finance::rating(&club.slots), club.k, w.economy, w.scale),
+        rustfoot_core::finance::loan_step(w.currency_info()),
+        rustfoot_core::finance::max_loan(rustfoot_core::finance::rating(&club.slots), club.k, w.economy, w.scale, w.currency_info().loan_step),
         fin.fill,
         rustfoot_core::finance::wants_expansion(fin),
         rustfoot_core::finance::expansion_cost(fin, w.economy, w.scale)

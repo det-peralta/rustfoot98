@@ -271,7 +271,7 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         "textMoney2",
         format!(
             "Dinheiro em caixa\n{}",
-            text::money_words(club.fin.cash, "reais")
+            text::money_words(club.fin.cash, c.world.currency_info().unit)
         ),
     );
     t(
@@ -388,7 +388,10 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
         );
         t("textMoney", text::int(f.cash));
         let price = c.world.money_ctx(d).price;
-        t("textTicketPrice", format!("{price:.0} reais"));
+        t(
+            "textTicketPrice",
+            format!("{price:.0} {}", c.world.currency_info().unit),
+        );
     }
     super::dialogs::market::page_texts(c, page, &mut texts);
     View { texts, lists }
