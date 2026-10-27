@@ -104,7 +104,7 @@ teams**; the 54 entries of the save's first list are the 52 clubs' coaches plus 
   club of the outside pool is dismissed at once; the pool never plays here.)
 * **Replacement** (`4f40` -> `5343`): candidates are the coaches of clubs with `K >= 1.25` (constant at `1010:565d`, a
   32-bit float) whose rating (`4ec3`) is **11..19 below** the sacked club's (`5661`). Teams rated below 15 also accept unemployed
-  coaches (none exist here) and rank computer coaches before the user's (`1050:1e3b`); otherwise the comparator `1050:1d59` ranks
+  coaches (the coaches of the outside pool, without the K and rating-window checks; flag `0x200`) and rank computer coaches before the user's (`1050:1e3b`); otherwise the comparator `1050:1d59` ranks
   by `+0x16`, `+0x18` (both 0 in every save seen) and then **by score, lowest first**; the sort is the stable bubble sort `1068:0e0d`.
   The head of the list is taken; the user's coach would first be asked in a dialog (`3bf9`), and is never a candidate in round 14
   or for cup sackings (`0x400`). **Without a candidate nothing happens** and the check repeats after every lost game.
@@ -112,6 +112,7 @@ teams**; the 54 entries of the save's first list are the 52 clubs' coaches plus 
   1.0. A user whose coach is swapped *takes over the other club* (so a sacked user is moved to a weaker club in form; an accepted
   invitation takes them to the sacked club). When the user leaves a club for a computer coach, `6a08` caps that club's wages at
   the players' values and lifts a negative cash balance to 0.
+**Unemployed humans** (observed in the original, `docs/matchday.md`): when the coach taken over is a free one (a club of the pool) the sacked coach takes his place at the pool, so a sacked *human* has no club: no main window, no turns, his club plays for itself, until a club rated below 15 sacks its coach and takes him (no dialog). The port: `World::is_unemployed` / `employed_seats` (a human whose club is a pool club); only when another human still has a club (a single human stays where he is). A saved game does not keep the state (loading picks a club, `pick_human`).
 In the port `World::accept_invitations` (default off; `world_set_accept_invitations` in the wasm ABI) decides about invitations;
 `coach_changes` / `human_moved` report what happened in the last round. About 3.5 swaps per season occur in a synthetic world.
 

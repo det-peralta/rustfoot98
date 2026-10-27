@@ -671,9 +671,13 @@ impl World {
         self.seats.active
     }
 
-    /// The clubs of the humans in seat order.
+    /// The clubs the humans manage, in seat order (a human without a club, whose coach sits at the pool, is not in the list: the
+    /// club plays for itself).
     pub fn human_clubs(&self) -> Vec<String> {
-        self.humans().map(|h| h.club.clone()).collect()
+        self.humans()
+            .filter(|h| !self.pool.iter().any(|c| c.name == h.club))
+            .map(|h| h.club.clone())
+            .collect()
     }
 
     /// Every human in seat order (the active one included).
@@ -687,6 +691,20 @@ impl World {
             .collect();
         v.sort_by_key(|&(s, _)| s);
         v.into_iter().map(|(_, h)| h)
+    }
+
+    /// Whether the human of `seat` has no club: his coach sits at a club of the outside pool (the original keeps unemployed
+    /// coaches there; a sacked human is replaced by a free coach and takes his place, `1010:5343`).
+    pub fn is_unemployed(&self, seat: usize) -> bool {
+        self.human_at(seat)
+            .is_some_and(|h| self.pool.iter().any(|c| c.name == h.club))
+    }
+
+    /// The seats of the humans who have a club: only they take turns on the main window and play.
+    pub fn employed_seats(&self) -> Vec<usize> {
+        (0..self.human_count())
+            .filter(|&s| !self.is_unemployed(s))
+            .collect()
     }
 
     /// The seat of the human who manages `club`.
@@ -714,7 +732,7 @@ impl World {
 
     /// Whether `club` is managed by a human (any seat).
     pub fn is_human_club(&self, club: &str) -> bool {
-        self.seat_of(club).is_some()
+        self.seat_of(club).is_some_and(|s| !self.is_unemployed(s))
     }
 
     /// The human of `seat`, active or not.
@@ -1602,7 +1620,8 @@ impl World {
         let me = (d, i);
         let t = cur[i].clone();
         let rating_t = crate::cup::team_rating(&t.slots) as i32;
-        let human_names = self.human_clubs();
+        // (humans without a club count: they sit at the pool and are candidates there)
+        let human_names: Vec<String> = self.humans().map(|h| h.club.clone()).collect();
         let declined = self.seats.declined.clone();
         let is_human = |c: &Club| human_names.contains(&c.name);
         let exclude_humans = no_humans;
@@ -1614,7 +1633,12 @@ impl World {
             }
             let c = get(self, cur, l);
             let diff = rating_t - crate::cup::team_rating(&c.slots) as i32;
-            if c.k >= 1.25 && (11..20).contains(&diff) && !(exclude_humans && is_human(&c)) {
+            // a coach without a club (the pool) is taken by a club rated below 15 (flag 0x200 of `5343`); the others need the
+            // morale and the rating window (flag 0x100)
+            let free = l.0 == 4 && rating_t < 15;
+            if (free || (l.0 != 4 && c.k >= 1.25 && (11..20).contains(&diff)))
+                && !(exclude_humans && is_human(&c))
+            {
                 cands.push((l, c));
             }
         }
@@ -1639,8 +1663,10 @@ impl World {
                 }
             }
         }
+        // (a human without a club, at the pool, takes the job without being asked)
         let Some(&pick) = v.iter().find(|&&k| {
             !is_human(&cands[k].1)
+                || cands[k].0 .0 == 4
                 || (self.accept_invitations && !declined.contains(&cands[k].1.name))
         }) else {
             return;
@@ -1697,11 +1723,28 @@ impl World {
             .collect();
         let back = self.seats.active;
         for (seat, to) in moves {
-            if let Some((d, i)) = self.locate(&to).filter(|l| l.0 < 4) {
-                self.switch_human(seat);
-                self.set_human(d, i);
+            match self.locate(&to) {
+                Some((d, i)) if d < 4 => {
+                    self.switch_human(seat);
+                    self.set_human(d, i);
+                }
+                // replaced by a free coach: the human has no club (and no turn) until a club hires him. With no other human to
+                // play the days he stays where he is (nothing is known of a game without any human coach).
+                Some(_) if self.employed_seats().iter().any(|&s| s != seat) => {
+                    self.switch_human(seat);
+                    if let Some(h) = self.human.as_mut() {
+                        h.club = to.clone();
+                    }
+                }
+                _ => {}
             }
         }
+        // the window never rests on a human without a club
+        let back = if self.is_unemployed(back) {
+            self.employed_seats().first().copied().unwrap_or(back)
+        } else {
+            back
+        };
         self.switch_human(back);
     }
 
@@ -1797,7 +1840,8 @@ impl World {
         let Some(draw) = self.cup_draw.as_ref() else {
             return Vec::new();
         };
-        (0..self.human_count())
+        self.employed_seats()
+            .into_iter()
             .filter(|&s| {
                 self.human_at(s)
                     .is_some_and(|h| draw.pairs.iter().any(|(a, b)| *a == h.club || *b == h.club))
@@ -4017,16 +4061,83 @@ mod tests {
     }
 
     #[test]
-    fn many_rounds_with_several_humans_keep_every_seat_in_the_league() {
+    fn many_rounds_with_several_humans_keep_every_seat_in_the_league_or_unemployed() {
         let mut w = hot_seat_world(4);
+        let mut unemployed = 0;
         for _ in 0..30 {
             w.play_round();
             assert_eq!(w.human_count(), 4);
-            let mut clubs = w.human_clubs();
-            assert!(clubs.iter().all(|c| w.locate(c).is_some_and(|l| l.0 < 4)));
+            let mut clubs: Vec<String> = w.humans().map(|h| h.club.clone()).collect();
+            assert!(clubs.iter().all(|c| w.locate(c).is_some()));
+            // a human without a club sits at a club of the pool; at least one human always has a club
+            assert!(!w.employed_seats().is_empty());
+            for seat in 0..4 {
+                let c = &w.human_at(seat).unwrap().club;
+                assert_eq!(w.is_unemployed(seat), w.locate(c).unwrap().0 == 4);
+                unemployed += w.is_unemployed(seat) as usize;
+            }
+            assert!(w.employed_seats().contains(&w.active_seat()));
             clubs.sort();
             clubs.dedup();
             assert_eq!(clubs.len(), 4, "two humans never share a club");
         }
+        let _ = unemployed;
+    }
+
+    /// A human replaced by a free coach has no club (and no turn) while another human plays; a club rated below 15 that sacks
+    /// its coach hires him without asking (`5343`, flag 0x200).
+    #[test]
+    fn a_sacked_human_waits_at_the_pool_until_a_weak_club_hires_him() {
+        let mut w = hot_seat_world(2);
+        let clubs = w.human_clubs();
+        let (d0, i0) = w.locate(&clubs[1]).unwrap();
+        let pool_name = w.pool[0].name.clone();
+        // the second human's coach is swapped with the free coach of the pool
+        w.seats.moves.push((clubs[1].clone(), pool_name.clone()));
+        w.apply_human_move();
+        assert_eq!(w.human_at(1).unwrap().club, pool_name);
+        assert!(w.is_unemployed(1) && !w.is_unemployed(0));
+        assert_eq!(w.employed_seats(), vec![0]);
+        assert_eq!(
+            w.active_seat(),
+            0,
+            "the window stays with a human who has a club"
+        );
+        // a weak club (rating below 15) sacks its coach: the pool human is the only free coach, so he is taken, without asking
+        w.pool.truncate(1);
+        let (d, i) = w.locate(&clubs[0]).unwrap();
+        let (d, i) = if (d, i) == (d0, i0) {
+            (d0, (i0 + 1) % 8)
+        } else {
+            (d, i)
+        };
+        let weak = w.divisions[d][i].name.clone();
+        for s in w.divisions[d][i].slots.iter_mut() {
+            s.strength = 1;
+        }
+        w.divisions[d][i].k = 0.5;
+        w.divisions[d][i].coach_games = 12;
+        w.accept_invitations = false;
+        let mut cur = std::mem::take(&mut w.divisions[d]);
+        w.replace_coach(d, &mut cur, i, false);
+        w.divisions[d] = cur;
+        assert_eq!(w.coach_changes.last(), Some(&(weak.clone(), pool_name)));
+        assert_eq!(w.coach_changes_free.last(), Some(&true));
+        w.apply_human_move();
+        assert_eq!(w.human_at(1).unwrap().club, weak);
+        assert!(!w.is_unemployed(1));
+        assert_eq!(w.employed_seats(), vec![0, 1]);
+    }
+
+    /// With no other human who has a club, a replaced human stays where he is.
+    #[test]
+    fn the_only_human_is_never_left_without_a_club() {
+        let mut w = hot_seat_world(1);
+        let club = w.human_clubs()[0].clone();
+        let pool_name = w.pool[0].name.clone();
+        w.seats.moves.push((club.clone(), pool_name));
+        w.apply_human_move();
+        assert_eq!(w.human_clubs()[0], club);
+        assert!(!w.is_unemployed(0));
     }
 }

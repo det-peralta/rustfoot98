@@ -187,7 +187,7 @@ impl Classic {
     fn referees_of_next_games(&mut self) -> HashMap<String, String> {
         let mut out = HashMap::new();
         let back = self.world.active_seat();
-        for seat in 0..self.world.human_count() {
+        for seat in self.world.employed_seats() {
             self.world.switch_human(seat);
             if let Some(h) = self.world.human.as_ref() {
                 out.insert(h.club.clone(), self.referee_of_next_game());
@@ -203,7 +203,7 @@ impl Classic {
         if self.world.cup_day_due() {
             self.world.humans_in_cup_tie()
         } else {
-            (0..self.world.human_count()).collect()
+            self.world.employed_seats()
         }
     }
 
@@ -689,6 +689,8 @@ impl Classic {
             .find(|(from, to)| {
                 !sess.answered.contains(from)
                     && sess.snapshot.is_human_club(from)
+                    // (a human without a club, at the pool, is hired without being asked)
+                    && !self.world.pool.iter().any(|c| c.name == *from)
                     && self
                         .world
                         .coach_changes
@@ -1384,5 +1386,63 @@ mod tests {
             }
         }
         false
+    }
+
+    /// A hot-seat game played for many days: a human who was replaced by a free coach has no turn, and the main window never
+    /// rests on him.
+    #[test]
+    fn a_human_without_a_club_takes_no_turn() {
+        let mut unemployed_days = 0;
+        for seed in 1..=6 {
+            let mut c = hot_seat(2, seed);
+            for _ in 0..70 {
+                // every human with a club presses the round button, then the day is played with its dialogs
+                let turns = c.turn_seats().len().max(1);
+                for _ in 0..turns {
+                    c.round_button();
+                }
+                for _ in 0..6000 {
+                    run(&mut c);
+                    match top_kind(&c) {
+                        Some(Kind::Halftime) => press(&mut c, "OKBtn"),
+                        Some(Kind::Invitation) => press(&mut c, "yesBtn"),
+                        Some(Kind::ForcedSubstitution) => {
+                            press(&mut c, "ListBoxOfSubstitutePlayers#0");
+                            press(&mut c, "OKBtn");
+                        }
+                        Some(Kind::Penalty) => {
+                            if c.dialogs.last().unwrap().num("attack") != 0 {
+                                press(&mut c, "ListBoxOfPlayers#0");
+                                press(&mut c, "shootBtn");
+                            }
+                            c.dialogs.clear();
+                        }
+                        Some(_) => {
+                            c.dialogs.pop();
+                        }
+                        None if matches!(c.screen, Screen::Main) => break,
+                        None => c.tick(20),
+                    }
+                }
+                assert!(
+                    matches!(c.screen, Screen::Main),
+                    "the day ended on the main window (seed {seed}, round {}, dialogs {}, top {:?}, todo {}, queue {}, cup due {}, employed {:?})",
+                    c.world.round,
+                    c.dialogs.len(),
+                    top_kind(&c),
+                    c.md.todo.len(),
+                    c.queue.len(),
+                    c.world.cup_day_due(),
+                    c.world.employed_seats()
+                );
+                let active = c.world.active_seat();
+                assert!(
+                    !c.world.is_unemployed(active) || c.world.employed_seats().is_empty(),
+                    "seed {seed}: the window is on a human without a club (active {active}, unemployed {:?}, clubs {:?}, round {}, moves {:?})", (0..2).map(|s| c.world.is_unemployed(s)).collect::<Vec<_>>(), c.world.human_clubs(), c.world.round, c.world.seats.moves
+                );
+                unemployed_days += (0..2).filter(|&s| c.world.is_unemployed(s)).count();
+            }
+        }
+        eprintln!("days with an unemployed human: {unemployed_days}");
     }
 }

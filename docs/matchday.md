@@ -183,5 +183,6 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * **How the unemployed human came back** (`probe3` steps 1150-1224): joga1 had no main window for rounds 1-3 of 2028; right after the standings of round 3
   the next main window is joga1's **at CRUZEIRO EC** (4ª Divisão, a different club from the one he was sacked from) with no invitation, sack list or
   other dialog in between. So the free human is placed by the sack/hire step of the round (candidates of `1010:5343` with flag 0x200 include the
-  unemployed coach), without asking. Not modelled: the port has no unemployed humans. To do: decode which club takes him and when (`1010:4f40`
-  calls with the club's rating below 15), then add an unemployed state to `Seats`, skip his turn, and hire him in that step.
+  unemployed coach), without asking. Modelled (hot seat only): a human replaced by a pool coach is unemployed (`World::is_unemployed`), has no turn and his club plays
+  for itself; a club rated below 15 that sacks its coach takes him without a dialog (`replace_coach`, free candidates of the pool). Not
+  verified against more captures: which club takes him and after how many rounds (the capture: 3 rounds, a 4ª Divisão club); not kept in saves.
