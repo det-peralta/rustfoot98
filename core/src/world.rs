@@ -204,6 +204,10 @@ pub struct Human {
     /// Index into `FORMATIONS`.
     pub formation: usize,
     pub plan: Plan,
+    /// His profile (`TCoachOptionsDlg`, `coach+0x1a`): every coach has his own.
+    pub options: crate::history::CoachOptions,
+    /// On holiday the computer picks his line-up (`TCoachManagerDlg`, `coach+6`).
+    pub holiday: bool,
 }
 
 /// What belongs to one human coach besides the [`Human`] itself: the market lists of his club.
@@ -730,12 +734,19 @@ impl World {
             subs: Vec::new(),
         };
         let name = c.name.clone();
-        let coach = self.human.take().map(|h| h.coach).unwrap_or_default();
+        // the coach (his name, profile and holiday) stays; the club, formation and plan are the new club's
+        let (coach, options, holiday) = self
+            .human
+            .take()
+            .map(|h| (h.coach, h.options, h.holiday))
+            .unwrap_or_default();
         self.human = Some(Human {
             club: name,
             coach,
             formation,
             plan,
+            options,
+            holiday,
         });
     }
 
@@ -978,6 +989,15 @@ impl World {
         self.refresh_cash_ref();
     }
 
+    /// The profile of the human who manages the club at `loc` (the default profile for a club of the computer).
+    pub fn options_at(&self, loc: (usize, usize)) -> crate::history::CoachOptions {
+        let name = &self.club_ref(loc).name;
+        self.humans()
+            .find(|h| &h.club == name)
+            .map(|h| h.options)
+            .unwrap_or_default()
+    }
+
     /// The record of the game's currency (scale, loan step, prizes, the word written after amounts).
     pub fn currency_info(&self) -> &'static crate::economy::Currency {
         &crate::economy::CURRENCIES[self.currency.min(crate::economy::CURRENCIES.len() - 1)]
@@ -1104,7 +1124,7 @@ impl World {
     ) -> bool {
         let c = self.club_ref(h);
         h != seller
-            && self.history.options.auction != 2 // the coach profile: no buying in auctions
+            && self.options_at(h).auction != 2 // the coach profile: no buying in auctions
             && c.fin.cash >= ask
             && crate::market::may_bid(c, &self.club_ref(seller).slots[slot_idx])
     }
@@ -1558,7 +1578,7 @@ impl World {
             // the user's wages are renegotiated by the computer for the player classes of the coach profile (the original asks
             // the user in a dialog for the others)
             if round >= 2 && self.club_ref(loc).coach_games > 1 {
-                self.renegotiate_wages(loc, self.history.options.salary);
+                self.renegotiate_wages(loc, self.options_at(loc).salary);
             }
             return;
         }
@@ -2255,7 +2275,7 @@ impl World {
             let mut plans = HashMap::new();
             for h in self.humans() {
                 if let Some((hd, hi)) = self.locate_in_divisions(&h.club) {
-                    if hd == d && !self.history.holiday {
+                    if hd == d && !h.holiday {
                         plans.insert(hi, h.plan.clone());
                     }
                 }
@@ -4250,7 +4270,8 @@ mod tests {
             .lines()
             .map(|l| {
                 if l.starts_with("human|") {
-                    l.rsplit_once('|').unwrap().0.to_string()
+                    // the old line: human|club|formation|starters|bench|subs (no coach, no profile)
+                    l.split('|').take(6).collect::<Vec<_>>().join("|")
                 } else {
                     l.to_string()
                 }
@@ -4264,6 +4285,23 @@ mod tests {
             one.human.as_ref().unwrap().club
         );
         assert_eq!(loaded.human.as_ref().unwrap().coach, "");
+    }
+
+    /// Every human coach has his own profile (`coach+0x1a`) and holiday flag (`coach+6`), kept in saves.
+    #[test]
+    fn every_human_has_his_own_profile() {
+        let mut w = hot_seat_world(2);
+        w.switch_human(1);
+        w.human.as_mut().unwrap().options.auction = 2;
+        w.human.as_mut().unwrap().holiday = true;
+        w.switch_human(0);
+        let clubs = w.human_clubs();
+        let at = |w: &World, k: usize| w.locate(&clubs[k]).unwrap();
+        assert_eq!(w.options_at(at(&w, 0)).auction, 1);
+        assert_eq!(w.options_at(at(&w, 1)).auction, 2);
+        let back = World::load(&w.save()).unwrap();
+        assert_eq!(back.options_at(at(&back, 1)).auction, 2);
+        assert!(back.human_at(1).unwrap().holiday && !back.human_at(0).unwrap().holiday);
     }
 
     #[test]

@@ -182,18 +182,25 @@ pub fn tick(_c: &mut Classic, _d: &mut Dialog, _ms: u32) -> Outcome {
 
 // ---- TCoachManagerDlg ---------------------------------------------------------------------------------------------------
 
-/// The user's coaches as the manager lists them (`TCoach` row with flags `0x13` and `0x8000`: name, club, "férias"). The port has
-/// one user.
+/// The users' coaches as the manager lists them (`TCoach` row with flags `0x13` and `0x8000`: name, club, "férias"), in seat order.
 fn manager_rows(w: &World) -> Vec<String> {
-    let Some(h) = w.human.as_ref() else {
-        return Vec::new();
-    };
-    let mut r = field("", 0x82, &human_coach(w));
-    r += &field("", 0xb4, &h.club);
-    if w.history.holiday {
-        r += &field("", 0x50, "férias");
-    }
-    vec![r]
+    w.humans()
+        .map(|h| {
+            let mut r = field("", 0x82, &h.coach);
+            r += &field("", 0xb4, &h.club);
+            if h.holiday {
+                r += &field("", 0x50, "férias");
+            }
+            r
+        })
+        .collect()
+}
+
+/// The seat of the row chosen in the manager.
+fn manager_seat(d: &Dialog) -> Option<usize> {
+    d.texts
+        .get("ListBoxOfCoaches.sel")
+        .and_then(|v| v.parse().ok())
 }
 
 fn bind_manager(c: &Classic, d: &mut Dialog) {
@@ -204,13 +211,12 @@ fn bind_manager(c: &Classic, d: &mut Dialog) {
     d.text("addBtn.enabled", "0");
     d.text("removeBtn.enabled", "0");
     d.text("CheckBoxOnHoliday.enabled", if sel { "1" } else { "0" });
+    let on = manager_seat(d)
+        .and_then(|k| c.world.human_at(k))
+        .is_some_and(|h| h.holiday);
     d.text(
         "CheckBoxOnHoliday.checked",
-        if sel && c.world.history.holiday {
-            "1"
-        } else {
-            "0"
-        },
+        if sel && on { "1" } else { "0" },
     );
 }
 
@@ -221,8 +227,16 @@ fn click_manager(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     }
     match name {
         "closeBtn" => Outcome::Close,
-        "CheckBoxOnHoliday" if d.texts.contains_key("ListBoxOfCoaches.sel") => {
-            c.world.history.holiday = !c.world.history.holiday;
+        "CheckBoxOnHoliday" => {
+            if let Some(k) = manager_seat(d) {
+                let back = c.world.active_seat();
+                if c.world.switch_human(k) {
+                    if let Some(h) = c.world.human.as_mut() {
+                        h.holiday = !h.holiday;
+                    }
+                }
+                c.world.switch_human(back);
+            }
             Outcome::Keep
         }
         _ => Outcome::Keep,
@@ -242,7 +256,12 @@ fn bind_profile(c: &Classic, d: &mut Dialog) {
         return;
     }
     // the working copy of the options: written to the world by OK
-    let o = c.world.history.options;
+    let o = c
+        .world
+        .human
+        .as_ref()
+        .map(|h| h.options)
+        .unwrap_or_default();
     for (k, b) in BOXES.iter().enumerate() {
         d.text(format!("{b}.checked"), if o.salary[k] { "1" } else { "0" });
     }
@@ -287,7 +306,9 @@ fn click_profile(c: &mut Classic, d: &mut Dialog, name: &str) -> Outcome {
     }
     match name {
         "OKBtn" => {
-            c.world.history.options = profile_options(d);
+            if let Some(h) = c.world.human.as_mut() {
+                h.options = profile_options(d);
+            }
             Outcome::Close
         }
         "CancelBtn" => Outcome::Close,

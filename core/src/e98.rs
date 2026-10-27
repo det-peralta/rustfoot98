@@ -646,20 +646,6 @@ fn history_of(save: &E98, club: &HashMap<u16, String>) -> History {
             h.coach_titles.insert(k.name.clone(), k.titles);
         }
     }
-    if let Some(k) = save.coaches.iter().find(|k| {
-        k.human
-            && save
-                .teams
-                .iter()
-                .any(|t| t.id == save.human_id && t.coach == k.id)
-    }) {
-        h.options = CoachOptions {
-            salary: [k.options[0] != 0, k.options[1] != 0, k.options[2] != 0],
-            auction: k.options[3].min(2),
-            encrypt: k.options[4] != 0,
-        };
-        h.holiday = k.holiday;
-    }
     h
 }
 
@@ -757,10 +743,20 @@ impl World {
             })
         };
         let mut seats: Vec<((usize, usize), String, bool)> = Vec::new();
+        // every human coach brings his own profile (`coach+0x1a`) and holiday flag (`coach+6`)
+        let mut profiles: Vec<(CoachOptions, bool)> = Vec::new();
         for k in save.coaches.iter().filter(|k| k.human) {
             if let Some(t) = save.teams.iter().find(|t| t.coach == k.id) {
                 if let Some(loc) = at(t.id) {
                     seats.push((loc, k.name.clone(), t.id == save.human_id));
+                    profiles.push((
+                        CoachOptions {
+                            salary: [k.options[0] != 0, k.options[1] != 0, k.options[2] != 0],
+                            auction: k.options[3].min(2),
+                            encrypt: k.options[4] != 0,
+                        },
+                        k.holiday,
+                    ));
                 }
             }
         }
@@ -772,6 +768,10 @@ impl World {
         let mut active = 0;
         for (k, ((d, p), name, is_active)) in seats.iter().enumerate() {
             w.add_human(*d, *p, name);
+            if let (Some(h), Some(&(options, holiday))) = (w.human.as_mut(), profiles.get(k)) {
+                h.options = options;
+                h.holiday = holiday;
+            }
             if *is_active {
                 active = k;
             }
@@ -852,11 +852,9 @@ mod tests {
                     (cal[0].goals, cal[0].gate, cal[0].venue),
                     ((1, 2), 10730, 1)
                 );
-                assert_eq!(w.history.options.auction, 1);
-                assert!(
-                    !w.history.options.salary[0],
-                    "the original's new-game profile"
-                );
+                let o = w.human.as_ref().unwrap().options;
+                assert_eq!(o.auction, 1);
+                assert!(!o.salary[0], "the original's new-game profile");
             }
             assert_eq!(w.pool.len(), 20);
             // the standings are internally consistent

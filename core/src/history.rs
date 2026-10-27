@@ -107,9 +107,6 @@ pub struct History {
     pub coach_events: BTreeMap<String, Vec<CoachEvent>>,
     /// League and cup titles per coach name (`coach+0x16`, `+0x18`), the first keys of the coach ranking.
     pub coach_titles: BTreeMap<String, (u16, u16)>,
-    pub options: CoachOptions,
-    /// The user's coach is on holiday: the computer plays for his club (`coach+6`).
-    pub holiday: bool,
 }
 
 /// Where a cup tie goes in a calendar: right after the league game of the round it follows.
@@ -471,7 +468,7 @@ mod tests {
     fn the_coach_profile_decides_which_wages_the_computer_renegotiates() {
         let fresh_after = |salary: [bool; 3]| {
             let mut w = rich_world(12);
-            w.history.options.salary = salary;
+            w.human.as_mut().unwrap().options.salary = salary;
             let (d, i) = w.human_location().unwrap();
             for s in w.divisions[d][i].slots.iter_mut() {
                 s.wage *= 10; // everybody overpaid
@@ -496,7 +493,7 @@ mod tests {
     fn not_buying_in_auctions_leaves_the_user_no_listing() {
         let listings = |mode: u8| {
             let mut w = rich_world(9);
-            w.history.options.auction = mode;
+            w.human.as_mut().unwrap().options.auction = mode;
             (0..14)
                 .map(|_| {
                     w.play_round();
@@ -514,12 +511,14 @@ mod tests {
     #[test]
     fn a_coach_on_holiday_lets_the_computer_play() {
         let mut w = rich_world(13);
-        w.history.holiday = true;
+        w.human.as_mut().unwrap().holiday = true;
+        w.human.as_mut().unwrap().options.auction = 2;
         w.play_round(); // plays with the automatic line-up, nothing to break
         assert_eq!(w.round, 1);
         let back = World::load(&w.save()).unwrap();
-        assert!(back.history.holiday);
-        assert_eq!(back.history.options, w.history.options);
+        let (a, b) = (back.human.as_ref().unwrap(), w.human.as_ref().unwrap());
+        assert!(a.holiday);
+        assert_eq!(a.options, b.options);
     }
 
     #[test]

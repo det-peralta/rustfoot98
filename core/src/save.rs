@@ -65,14 +65,22 @@ impl World {
                 .iter()
                 .map(|s| format!("{}:{}:{}", s.minute, s.out, s.inn))
                 .collect();
+            // (then his profile: the three wage classes, auctions, encrypt, holiday)
+            let o = &h.options;
             out.push_str(&format!(
-                "human|{}|{}|{}|{}|{}|{}\n",
+                "human|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
                 clean(&h.club),
                 h.formation,
                 list(&h.plan.starters),
                 list(&h.plan.bench),
                 subs.join(","),
-                clean(&h.coach)
+                clean(&h.coach),
+                o.salary[0] as u8,
+                o.salary[1] as u8,
+                o.salary[2] as u8,
+                o.auction,
+                o.encrypt as u8,
+                h.holiday as u8
             ));
         }
         if self.human_count() > 1 {
@@ -238,6 +246,9 @@ impl World {
         let mut transfers: Vec<Transfer> = Vec::new();
         let mut has_market = false;
         let mut scale = DEFAULT_SCALE;
+        // the one profile of older saves, and the humans read without one of their own
+        let mut old_profile: Option<(crate::history::CoachOptions, bool)> = None;
+        let mut old_profile_for: Vec<usize> = Vec::new();
         // (games saved before the currency was kept are in reais)
         let mut currency = crate::economy::REAIS;
         let mut cash_ref = [0i64; 4];
@@ -375,14 +386,18 @@ impl World {
                     );
                 }
                 "coachopts" => {
-                    history.options.salary = [
-                        num(n, &f, 1)? != 0,
-                        num(n, &f, 2)? != 0,
-                        num(n, &f, 3)? != 0,
-                    ];
-                    history.options.auction = num(n, &f, 4)?.clamp(0, 2) as u8;
-                    history.options.encrypt = num(n, &f, 5)? != 0;
-                    history.holiday = num(n, &f, 6)? != 0;
+                    old_profile = Some((
+                        crate::history::CoachOptions {
+                            salary: [
+                                num(n, &f, 1)? != 0,
+                                num(n, &f, 2)? != 0,
+                                num(n, &f, 3)? != 0,
+                            ],
+                            auction: num(n, &f, 4)?.clamp(0, 2) as u8,
+                            encrypt: num(n, &f, 5)? != 0,
+                        },
+                        num(n, &f, 6)? != 0,
+                    ));
                 }
                 "transfer" => transfers.push(Transfer {
                     round: num(n, &f, 1)? as usize,
@@ -442,6 +457,9 @@ impl World {
                                 .ok_or(format!("line {}: bad substitution", n + 1))
                         })
                         .collect::<Result<Vec<_>, _>>()?;
+                    // (games saved before every human had his own profile have one `coachopts` line for all)
+                    let own = f.len() >= 13;
+                    let flag = |k: usize| f.get(k).is_some_and(|v| *v == "1");
                     humans.push(Human {
                         club: f.get(1).ok_or("human without club")?.to_string(),
                         coach: f.get(6).unwrap_or(&"").to_string(),
@@ -451,7 +469,20 @@ impl World {
                             bench: nums(n, f.get(4).unwrap_or(&""))?,
                             subs,
                         },
+                        options: if own {
+                            crate::history::CoachOptions {
+                                salary: [flag(7), flag(8), flag(9)],
+                                auction: num(n, &f, 10)?.clamp(0, 2) as u8,
+                                encrypt: flag(11),
+                            }
+                        } else {
+                            Default::default()
+                        },
+                        holiday: own && flag(12),
                     });
+                    if !own {
+                        old_profile_for.push(humans.len() - 1);
+                    }
                 }
                 "club" => {
                     flush(&mut current, &mut divisions, &mut pool);
@@ -596,6 +627,12 @@ impl World {
             w.give_market_defaults();
         }
         // the humans take their seats; the active one is installed last
+        if let Some((options, holiday)) = old_profile {
+            for &k in &old_profile_for {
+                humans[k].options = options;
+                humans[k].holiday = holiday;
+            }
+        }
         let count = humans.len();
         for (seat, h) in humans.into_iter().enumerate() {
             let (pending, observed, sell_tried) = lists.get(seat).cloned().unwrap_or_default();
@@ -697,16 +734,6 @@ impl World {
         for (coach, t) in &h.coach_titles {
             out.push_str(&format!("coachtitles|{}|{}|{}\n", clean(coach), t.0, t.1));
         }
-        let o = &h.options;
-        out.push_str(&format!(
-            "coachopts|{}|{}|{}|{}|{}|{}\n",
-            o.salary[0] as u8,
-            o.salary[1] as u8,
-            o.salary[2] as u8,
-            o.auction,
-            o.encrypt as u8,
-            h.holiday as u8
-        ));
         for t in &self.transfers {
             out.push_str(&format!(
                 "transfer|{}|{}|{}|{}|{}|{}|{}|{}\n",
