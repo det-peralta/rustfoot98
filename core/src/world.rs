@@ -271,6 +271,9 @@ pub struct World {
     pub sell_tried: Vec<String>,
     /// Whether the user accepts an invitation to take over a club whose coach was sacked (the original asks in a dialog).
     pub accept_invitations: bool,
+    /// The option *Ver os desempates por penalties nos jogos sem treinadores humanos* (`10c8:2b33`): every shootout is played kick by
+    /// kick (the dialog), not only the humans' and the final's (`1050:0d46`). It changes the random numbers drawn.
+    pub real_shootouts: bool,
     /// Coach changes of the last round played, as `(sacked club, club that gave its coach)`; the second is the club the
     /// coach came from. The humans' own moves are in `seats.moves`.
     pub coach_changes: Vec<(String, String)>,
@@ -503,6 +506,7 @@ impl World {
             observed: Vec::new(),
             sell_tried: Vec::new(),
             accept_invitations: false,
+            real_shootouts: false,
             coach_changes: Vec::new(),
             coach_changes_free: Vec::new(),
             seats: Seats::default(),
@@ -546,6 +550,7 @@ impl World {
             observed: Vec::new(),
             sell_tried: Vec::new(),
             accept_invitations: false,
+            real_shootouts: false,
             coach_changes: Vec::new(),
             coach_changes_free: Vec::new(),
             seats: Seats::default(),
@@ -598,6 +603,7 @@ impl World {
             observed: Vec::new(),
             sell_tried: Vec::new(),
             accept_invitations: false,
+            real_shootouts: false,
             coach_changes: Vec::new(),
             coach_changes_free: Vec::new(),
             seats: Seats::default(),
@@ -1939,8 +1945,8 @@ impl World {
             let shootout = g.home_goals == g.away_goals;
             let mut pens = None;
             let home_out = if shootout {
-                if human_in_tie || round == ROUNDS {
-                    // the dialog with real kicks (always in the final, or when a human plays)
+                if human_in_tie || round == ROUNDS || self.real_shootouts {
+                    // the dialog with real kicks (always in the final, when a human plays, or for every tie by the option)
                     let r = cup::shootout(
                         &mut self.rng,
                         (&home.slots, &g.pitch[0]),
@@ -2734,6 +2740,39 @@ mod tests {
         w.divisions[0] = cur;
         assert_eq!(w.divisions[0][0].k, 0.5);
         assert!(w.coach_changes.is_empty());
+    }
+
+    /// With the option *Ver os desempates por penalties nos jogos sem treinadores humanos* every shootout is played kick by kick
+    /// (`1050:0d46`); without it only the humans' and the final's are.
+    #[test]
+    fn the_option_plays_every_shootout_kick_by_kick() {
+        for real in [false, true] {
+            let mut w = World::synthetic(5);
+            w.human = None;
+            w.real_shootouts = real;
+            let (mut auto, mut kicks) = (0, 0);
+            for _ in 0..(ROUNDS * 3) {
+                w.play_round_ctl(&mut Control::default());
+                if w.cup_day_due() {
+                    w.play_cup_day_ctl(&mut Control::default());
+                    for m in &w.last_cup.as_ref().unwrap().matches {
+                        if m.shootout {
+                            if m.pens.is_some() {
+                                kicks += 1;
+                            } else {
+                                auto += 1;
+                            }
+                        }
+                    }
+                }
+            }
+            if real {
+                assert_eq!(auto, 0, "every shootout has its kicks");
+                assert!(kicks > 0);
+            } else {
+                assert!(auto > 0, "computer ties are decided by the automatic draw");
+            }
+        }
     }
 
     #[test]

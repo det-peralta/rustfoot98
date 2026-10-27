@@ -296,6 +296,7 @@ impl Classic {
         self.main.menu = None;
         self.md.todo.clear();
         self.world.seats.declined.clear();
+        self.world.real_shootouts = self.opts.view_computer_penalties;
         let snapshot = Box::new(self.world.clone());
         let coaches = self.coach_names();
         let mut ctl = Control::default();
@@ -351,6 +352,7 @@ impl Classic {
         sess.cup = cup;
         let mut w = (*sess.snapshot).clone();
         w.accept_invitations = true;
+        w.real_shootouts = self.opts.view_computer_penalties;
         w.seats.declined = sess.declined.clone();
         let mut ctl = Control::replay(sess.log.clone(), sess.league.clone(), sess.cup.clone());
         if sess.cup_day {

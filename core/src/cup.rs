@@ -8,8 +8,8 @@
 //! * The survivors are shuffled (`1068:0f68`); with `n` survivors, `k` = the smallest power of two `>= n / 2` and `n - k`
 //!   consecutive pairs of the shuffled list play (first of the pair at home); the others get a bye.
 //! * Single leg. A draw after 90 minutes goes to extra time (to minute 120); if still level, a shootout decides.
-//! * Before the final and with no human in the tie the shootout is *automatic*; with a human or in the final the original shows
-//!   a dialog that plays real kicks (see [`shootout`]), which this port plays too.
+//! * Before the final, with no human in the tie and the option *Ver os desempates...* off, the shootout is *automatic*; otherwise
+//!   the original shows a dialog that plays real kicks (see [`shootout`]), which this port plays too (`World::real_shootouts`).
 //! * **The automatic shootout is inverted in the original**: each side draws three `Random(squad mean strength)` and the home
 //!   side is eliminated when its sum is **greater than or equal to** the away side's, so the lower total wins and ties go to
 //!   the away side. This port keeps that behaviour (it is what the program does).

@@ -571,6 +571,7 @@ impl World {
             observed: Vec::new(),
             sell_tried: Vec::new(),
             accept_invitations: false,
+            real_shootouts: false,
             coach_changes: Vec::new(),
             coach_changes_free: Vec::new(),
             seats: Default::default(),
