@@ -248,3 +248,26 @@ pub extern "C" fn cl_out_ptr() -> *const u8 {
 pub extern "C" fn cl_out_len() -> usize {
     HOST.with(|h| h.borrow().out.len())
 }
+
+/// The state in one line, for test drivers: `year round started screen top-dialog` (into the output buffer).
+#[no_mangle]
+pub extern "C" fn cl_status() {
+    HOST.with(|h| {
+        let mut h = h.borrow_mut();
+        let s = h.app.as_ref().map_or(String::new(), |a| {
+            let screen = match a.screen {
+                rustfoot_ui::classic::Screen::Main => "main",
+                _ => "round",
+            };
+            let top = a
+                .dialogs
+                .last()
+                .map_or("-".to_string(), |d| format!("{:?}", d.kind));
+            format!(
+                "{} {} {} {} {}",
+                a.world.year, a.world.round, a.started, screen, top
+            )
+        });
+        h.out = s.into_bytes();
+    })
+}
