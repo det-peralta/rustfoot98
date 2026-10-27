@@ -1942,6 +1942,38 @@ impl World {
         })
     }
 
+    /// The order in which the humans' main windows open before the next day (`13e1` -> `3e9c`: once per game of the day's list,
+    /// for the home club and then the away club): on a league day the next round's games division by division, on a cup day the
+    /// drawn ties. Humans without a game that day (or without a club) are left out.
+    pub fn turn_order(&self) -> Vec<usize> {
+        let mut clubs: Vec<String> = Vec::new();
+        if let Some(draw) = self.cup_draw.as_ref().filter(|_| self.cup_day_due()) {
+            for (h, a) in &draw.pairs {
+                clubs.push(h.clone());
+                clubs.push(a.clone());
+            }
+        } else if self.round < ROUNDS {
+            for div in &self.divisions {
+                for (h, a) in crate::season::fixtures(self.round + 1) {
+                    for k in [h, a] {
+                        if let Some(c) = div.get(k) {
+                            clubs.push(c.name.clone());
+                        }
+                    }
+                }
+            }
+        }
+        let mut seats = Vec::new();
+        for name in clubs {
+            if let Some(s) = self.seat_of(&name).filter(|&s| !self.is_unemployed(s)) {
+                if !seats.contains(&s) {
+                    seats.push(s);
+                }
+            }
+        }
+        seats
+    }
+
     /// The seats of the humans who play a tie on the pending cup day, in seat order.
     pub fn humans_in_cup_tie(&self) -> Vec<usize> {
         let Some(draw) = self.cup_draw.as_ref() else {

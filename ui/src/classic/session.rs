@@ -63,6 +63,8 @@ pub struct State {
     pub session: Option<Session>,
     /// The `A gravar o jogo...` gauge of the save after a round is open (the save is requested when it is full).
     pub saving: bool,
+    /// The seat that took the first turn of the day (hot seat).
+    pub first_turn: usize,
     pub todo: VecDeque<Step>,
     /// Titles won in this run of the program: `club -> (league, cup)` (the end-of-season window counts them).
     pub titles: HashMap<String, (u16, u16)>,
@@ -197,33 +199,34 @@ impl Classic {
         out
     }
 
-    /// The humans who take a turn on the main window before the next day is played: all of them for a league day, only the
-    /// ones who play a tie on a cup day (`1010:3e9c` opens the main window only for the games of the day).
+    /// The humans who take a turn on the main window before the next day is played, in the original's order (`World::turn_order`:
+    /// the day's games one after the other, the home club first; on a cup day only the humans who play a tie, `1010:3e9c` opens the
+    /// main window only for the games of the day).
     fn turn_seats(&self) -> Vec<usize> {
-        if self.world.cup_day_due() {
-            self.world.humans_in_cup_tie()
-        } else {
-            self.world.employed_seats()
-        }
+        self.world.turn_order()
     }
 
-    /// The round button (hot seat): the main window goes to the next human; when every human has pressed it since the last
-    /// round, the round is played. The turn does not go back to the first player afterwards: the human who has the main
-    /// window when the round ends keeps it (observed in the original: after the auctions the next round opened on the last
-    /// human's window), and the others follow in seat order. On a cup day it plays the cup day.
+    /// The round button (hot seat): the main window goes to the next human of the day's order; when every human has pressed it
+    /// since the last round, the day is played. On a cup day it plays the cup day.
     pub fn round_button(&mut self) {
         self.turns += 1;
-        let seats = self.turn_seats();
-        if self.turns < seats.len() {
+        let order = self.turn_seats();
+        if self.turns < order.len() {
             self.main.menu = None;
-            let active = self.world.active_seat();
-            let next = seats
-                .iter()
-                .copied()
-                .find(|&s| s > active)
-                .or_else(|| seats.first().copied())
-                .unwrap_or(active);
-            self.switch_human(next);
+            // the human who has the window takes the first turn (the first day starts with the first player), the others follow
+            // in the day's order
+            let first = if self.turns == 1 {
+                self.world.active_seat()
+            } else {
+                self.md.first_turn
+            };
+            self.md.first_turn = first;
+            let seq: Vec<usize> = std::iter::once(first)
+                .chain(order.iter().copied().filter(|&s| s != first))
+                .collect();
+            if let Some(&next) = seq.get(self.turns) {
+                self.switch_human(next);
+            }
             return;
         }
         self.turns = 0;
@@ -624,6 +627,11 @@ impl Classic {
     pub fn finish_round(&mut self) {
         self.screen = Screen::Main;
         self.md.session = None;
+        // the next day starts with the main window of the first human of its games
+        if let Some(&first) = self.world.turn_order().first() {
+            self.switch_human(first);
+        }
+        self.turns = 0;
         self.dirty = true;
     }
 
@@ -1270,11 +1278,17 @@ mod tests {
     fn the_round_button_hands_the_window_to_each_human_and_the_last_one_starts_the_round() {
         let mut c = hot_seat(3, 4);
         assert_eq!((c.world.active_seat(), c.coach.as_str()), (0, "joga1"));
+        let order = c.world.turn_order();
+        assert_eq!(order.len(), 3);
+        // the first player starts, then the others in the order of the day's games (`13e1`)
         c.round_button();
-        assert_eq!((c.world.active_seat(), c.coach.as_str()), (1, "joga2"));
+        let rest: Vec<usize> = order.iter().copied().filter(|&s| s != 0).collect();
+        let second = rest[0];
+        assert_eq!(c.world.active_seat(), second);
+        assert_eq!(c.coach, format!("joga{}", second + 1));
         assert!(matches!(c.screen, Screen::Main) && c.md.session.is_none());
         c.round_button();
-        assert_eq!((c.world.active_seat(), c.coach.as_str()), (2, "joga3"));
+        assert_eq!(c.world.active_seat(), rest[1]);
         assert!(c.md.session.is_none());
         c.round_button();
         assert!(c.md.session.is_some(), "the third Enter plays the round");
@@ -1282,10 +1296,11 @@ mod tests {
         play_through(&mut c);
         assert!(matches!(c.screen, Screen::Main));
         assert_eq!(c.world.round, 1);
-        // the window stays with the human who had it; the turns count again from zero
-        let seat = c.world.active_seat();
+        // the next day opens on the first human of its games, and the turns go along that day's order
+        let order = c.world.turn_order();
+        assert_eq!(c.world.active_seat(), order[0]);
         c.round_button();
-        assert_eq!(c.world.active_seat(), (seat + 1) % 3);
+        assert_eq!(c.world.active_seat(), order[1]);
     }
 
     /// Plays league days like a user who answers everything until the main window is back with a cup day pending, in which a

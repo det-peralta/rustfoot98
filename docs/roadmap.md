@@ -36,7 +36,8 @@ printing.
 - Done when cash, receipts and wages match for one season (14 rounds) within rounding.
 
 ## 4. Hot-seat leftovers
-- One coach profile per human; the unemployed state kept in saves; the turn order after a round decoded (`13e1` / `3e9c`).
+- Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).
+  Open: the auctions interleaved with the main windows per club (`3e9c` calls `5b37` before the human's window); a new game's first day.
 
 ## 5. Team editor (`EDITEQ.EXE`)
 - Decompile it with the Ghidra scripts in `tools/ghidra/`; map the menu of `TEditor_Main` (Ficheiro, Jogador, Equipa) and the save checks.

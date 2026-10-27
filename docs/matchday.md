@@ -142,9 +142,10 @@ clubs never bid for / coach-swap with a human, a market sale by the computer let
 * The application window behind the end-of-round dialogs (silver caption bar "Elifoot 98") is pixel-exact against `match35`.
 
 ## Not done / differences
-* Hot seat: see the section below (the cup day: only humans with a tie take turns). Approximations: the order of the turns after a round (the window stays with the human who had it
-  and the others follow in seat order; the original's rule was only observed, not decoded), one coach profile (`History::options`) shared by
-  all humans, the standings and the cup draw are the same for everybody.
+* Hot seat: see the section below (the cup day: only humans with a tie take turns). The turns follow the day's games (`World::turn_order`,
+  from `13e1` -> `3e9c`: the next round's games division by division, home club first; on a cup day the drawn ties): every day after the
+  first starts on the first human of its games; the first day starts with the first player. Every human has his own profile and holiday
+  flag (`Human::options`, `holiday`). The standings and the cup draw are the same for everybody.
 * The option *Ver os desempates por penalties nos jogos sem treinadores humanos* (`10c8:2b33`) is honoured: with it on, `1050:0d46` plays
   every shootout kick by kick and shows it (the core's `World::real_shootouts`, set from the option for each cup day); off, ties without a
   human before the final use the automatic draw and show nothing.
