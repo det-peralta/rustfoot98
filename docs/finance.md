@@ -142,7 +142,13 @@ Everything below was read from the disassembly and checked against the original'
   Their residuals cannot be told apart in this data (the spare cash of the buyers covers too narrow a range), so the port keeps the
   decoded structure with 2.2 (`BID_DIVISOR`). The gap is not explained: the routines and their constants are the same in the
   decompiled build and the one the captures ran (see `docs/installation.md`), and neither the buyers' cash before the round, the day's
-  order of sales, the ask or the market value as `value`, nor a larger wage bill fits better. On the sample save
+  order of sales, the ask or the market value as `value`, nor a larger wage bill fits better. Re-checked after the market timing was
+  decoded: the fee is the winner's own bid (`351a`), not the second-best one (that fits worse, spread 13 %); `+0x36` is 0 for every
+  player of the saves, so `5992` is the whole wage bill; the earlier save as the bidders' state (`STATE=before`: each save interrupts
+  the market at the human's turn, so it is the state of the auctions later in that market apart from that market's own changes) gives
+  no exact match either and fits worse (spread 11-12 % for both variants). With the binary's formula on that state, the fees of the
+  buyers with the best bid sit at 0.68-0.75 of it, the size of the spare-cash factor, which points at that factor not being applied;
+  its conditions (wage bill > 100, spare cash > 10 wage bills and > 1) were re-read at `6181`-`6208` and hold for these buyers. On the sample save
   (`core/examples/bidcheck.rs`) 2.2 picks the three winners with fees within 5 % (4.99 M against 5.17 M, 565 000 against 592 000,
   1.42 M against 1.35 M).
 - **Rating accumulators**: the same `3e9c` pass clears `slot+0xc..0x13` for every club whose coach has coached more than one game.

@@ -3,7 +3,8 @@
 //! strength of the transfer record) next to the fee the original booked, and in the end how often the buyer has the best bid and
 //! how far the fees are from the buyer's bid:
 //! `cargo run --release -p rustfoot-core --example auctions -- 001.e98 002.e98 003.e98 ...`.
-//! `DIV=1.6` replaces `market::BID_DIVISOR`; `SPARE=0` leaves out the spare-cash factor of `5f77` (the two fit equally well).
+//! `DIV=1.6` replaces `market::BID_DIVISOR`; `SPARE=0` leaves out the spare-cash factor of `5f77` (the two fit equally well);
+//! `STATE=before` takes the bidders from the earlier save instead.
 use rustfoot_core::e98;
 use rustfoot_core::market::*;
 use rustfoot_core::season::Club;
@@ -53,7 +54,10 @@ fn main() -> Result<(), String> {
         let after = e98::parse(&std::fs::read(&pair[1]).map_err(|e| e.to_string())?)?;
         let w = World::from_e98(1, &after)?;
         let w0 = World::from_e98(1, &before)?;
-        let (e, g) = (after.economy, w.scale);
+        // `STATE=before`: the bidders as the earlier save has them (exact for the auctions later in the same market, which
+        // the save interrupts at the human's turn)
+        let early = std::env::var("STATE").as_deref() == Ok("before");
+        let (e, g) = (if early { before.economy } else { after.economy }, w.scale);
         let name_of = |s: &e98::E98, pid: u16| {
             s.teams
                 .iter()
@@ -68,6 +72,11 @@ fn main() -> Result<(), String> {
             .map(|t| t.short_name.trim().to_string())
             .collect();
         let clubs: Vec<&Club> = w.divisions.iter().flatten().chain(&w.pool).collect();
+        let bidders: Vec<&Club> = if early {
+            w0.divisions.iter().flatten().chain(&w0.pool).collect()
+        } else {
+            clubs.clone()
+        };
         println!(
             "-- {} (round {} {}) -> {} (round {} {}): {} sales",
             pair[0],
@@ -109,12 +118,12 @@ fn main() -> Result<(), String> {
                 .map_or(1.0, |c| c.fin.f);
             let value = rustfoot_core::economy::player_value(slot.strength, f, e, g);
             let mut bids = Vec::new();
-            for c in &clubs {
+            for c in &bidders {
                 if c.name == seller || humans.contains(&c.name) {
                     continue;
                 }
                 let mut c = (*c).clone();
-                if c.name == buyer {
+                if c.name == buyer && !early {
                     c.slots.remove(i);
                     c.names.remove(i);
                     c.fin.cash += t.fee;
