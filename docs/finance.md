@@ -104,6 +104,9 @@ Everything below was read from the disassembly and checked against the original'
   (b) if its cash is negative: puts up the lowest-scoring sellable player at any price; (c) puts a player up for sale if
   `3 * cash < wage bill`, else with probability 1/20 (`Random(20) == 0`), else when it has exactly five foreigners and a squad of 21+.
   The player is the sellable one with the **lowest** `5de1` score (only a foreigner when the club has five foreigners).
+  A human coach on holiday counts as the computer here (`8c67`: human and not on holiday): his club goes through `3aad`
+  instead of the main window `3a6c`, all its wages are renegotiated, and in auctions it bids with `5f77` (`373e`) instead of the
+  dialog. (The holiday is set in *Gestão de treinadores*, which the free copy hides, so only a save can bring it.)
 - **Who is sellable** (`5a6a`): squad >= 12, not `fresh`, at least 2 goalkeepers kept, outfield count stays above 10. `fresh` is set
   when a wage is renegotiated or a player changes club, and **the season change clears it for every player**: in the original's day
   saves the flagged players grow from 15 to 252 over 2026 and are 0 in the first save of 2027 (no routine writes the byte back to 0,

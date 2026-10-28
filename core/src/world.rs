@@ -1033,6 +1033,13 @@ impl World {
         self.is_human_club(&self.club_ref(loc).name)
     }
 
+    /// `1010:8c67`: a human coach who is not on holiday. A club of a human on holiday is run by the computer in the market
+    /// (`3e9c` calls `3aad`, not the main window `3a6c`) and bids like a computer club (`373e` -> `5f77`).
+    fn is_active_human(&self, loc: (usize, usize)) -> bool {
+        let name = &self.club_ref(loc).name;
+        self.is_human(loc) && self.humans().any(|h| h.club == *name && !h.holiday)
+    }
+
     /// Puts `slot_idx` of the club at `seller` up for sale at `ask` (`1010:5b37`) and settles the auction (`1008:3600`,
     /// `373e`, `351a`, `39c7`): every computer-managed club except the seller that may bid does so, the highest bid wins (the
     /// earlier club in the master list on a tie), pays it, and the player moves with a renegotiated wage.
@@ -1050,7 +1057,7 @@ impl World {
         }
         let best = self.best_bid(seller, slot_idx, ask);
         // the user may still outbid the computer on the player of a computer-managed club
-        if !self.is_human(seller) && self.human_may_bid(seller, slot_idx, ask) {
+        if !self.is_active_human(seller) && self.human_may_bid(seller, slot_idx, ask) {
             let s = self.club_ref(seller);
             self.board.push(Listing {
                 seller: s.name.clone(),
@@ -1086,7 +1093,7 @@ impl World {
         );
         let mut best: Option<((usize, usize), i64)> = None;
         for loc in self.all_clubs_by_master() {
-            if loc == seller || self.is_human(loc) {
+            if loc == seller || self.is_active_human(loc) {
                 continue;
             }
             let buyer = self.club_ref(loc);
@@ -1111,7 +1118,7 @@ impl World {
         // some human may still outbid the computer
         self.human_locations()
             .into_iter()
-            .any(|h| self.may_bid_for(h, seller, slot_idx, ask))
+            .any(|h| self.is_active_human(h) && self.may_bid_for(h, seller, slot_idx, ask))
     }
 
     /// Whether the human whose club is at `h` can take part in the auction of `slot_idx` of the club at `seller`.
@@ -1584,7 +1591,7 @@ impl World {
     /// `1010:3e9c` (and `3aad`) for one club before the day `day` (the day counter `2b40`, 1 to 14): wage renegotiation, forced
     /// sale when broke, and the regular decision to put a player up for sale. Neither renegotiates nor sells on the first day.
     fn club_before_day(&mut self, loc: (usize, usize), day: usize) {
-        let human = self.is_human(loc);
+        let human = self.is_active_human(loc);
         let (e, g) = (self.economy, self.scale);
         let round = self.round;
         if human {
@@ -3649,6 +3656,28 @@ mod tests {
             .iter()
             .all(|&k| k < max));
         w.play_round(); // the plan is still playable
+    }
+
+    #[test]
+    fn a_human_on_holiday_bids_like_a_computer_club() {
+        let mut w = World::synthetic(7);
+        let me = w.human_location().unwrap();
+        w.club_mut(me).fin.cash = 2_000_000_000;
+        // a player of another club that the user's squad may take
+        let (seller, idx) = w
+            .all_clubs_by_master()
+            .into_iter()
+            .filter(|&l| l != me)
+            .find_map(|l| {
+                (0..w.club_ref(l).slots.len())
+                    .find(|&i| crate::market::may_bid(w.club_ref(me), &w.club_ref(l).slots[i]))
+                    .map(|i| (l, i))
+            })
+            .unwrap();
+        assert!(w.best_bid(seller, idx, 0).is_none_or(|(b, _)| b != me));
+        w.human.as_mut().unwrap().holiday = true;
+        assert_eq!(w.best_bid(seller, idx, 0).map(|(b, _)| b), Some(me));
+        assert!(!w.human_may_bid(seller, idx, 0));
     }
 
     #[test]
