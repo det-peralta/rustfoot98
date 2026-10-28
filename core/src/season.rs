@@ -78,8 +78,9 @@ pub const SACK_MIN_GAMES: u16 = 10;
 pub const SACK_MORALE: f64 = 0.65;
 
 impl Club {
-    /// `1010:8b5d` + `4f40`: replaces the coach when the results were bad for long enough. The new coach starts with
-    /// `K = 1.0` and zero games. (The original may swap the coach with another club's; that side effect is not modelled.)
+    /// `1010:8b5d` + `4f40` for a division played on its own ([`play_round`]): replaces the coach when the results were bad
+    /// for long enough; the new coach starts with `K = 1.0` and zero games. The game itself swaps the coach with another
+    /// club's (`5343`, `World::replace_coach`), which needs the other divisions.
     pub fn maybe_sack_coach(&mut self) -> bool {
         if self.sack_due() {
             self.k = 1.0;

@@ -42,7 +42,10 @@ printing.
   average, spread 7 %; the binary's 1.6 overshoots by 24 %, cause not found). The direct purchase prices `63fa` are decoded but only
   the registered *Procurar* reaches them. The market runs before every match day with the day counter `2b40`, on cup days for the
   drawn ties (`0ed4` -> `13e1`); from the original's save the port's pace (30 sales over 17 rounds) is within chance of the original's 36.
-- Open: the coach-swap side effect, the referee (`TRefereeAttr`).
+- The coach swap (`4f40` / `5343`) is the game's: `World::replace_coach` swaps the sacked coach with the partner `5343` picks (morale,
+  rating window, free coaches for clubs rated below 15, score order), resets both clubs and moves a human with his coach; only
+  `season::play_round`, a division played on its own for tests, just resets the coach.
+- Open: the referee (`TRefereeAttr`).
 
 ## 4. Hot-seat leftovers
 - Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).
