@@ -37,7 +37,11 @@ printing.
 - Season change (2026-10-27, `core/examples/seasonend.rs` on saves either side of it): the only money is the three prizes; the ledger
   then becomes last season's (`+0x89`, the one before at `+0xa5`) and starts at zero, 52 of 52 clubs. The balance sheet `TbalanceDlg`
   shows the three seasons.
-- Open: the market tiers `63fa`, the coach-swap side effect, the referee (`TRefereeAttr`).
+- Market (2026-10-28, `core/examples/auctions.rs` on 36 auctions of the day saves): the asking price is `371a * 1.6`; the season change
+  clears every player's `fresh` mark (so the market no longer dies out); the bid divisor is calibrated to 2.2 (fees within 0.5 % on
+  average, spread 7 %; the binary's 1.6 overshoots by 24 %, cause not found). The direct purchase prices `63fa` are decoded but only
+  the registered *Procurar* reaches them.
+- Open: the coach-swap side effect, the referee (`TRefereeAttr`).
 
 ## 4. Hot-seat leftovers
 - Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).

@@ -43,11 +43,10 @@ Slot fields: `+0x31/0x33` stored value (long, from `7ff4`), `+0x35` status flag 
   values of its sellable players (`5992`), or with probability 1/20, or when the squad is over 20 and the club is not in the
   default state; the asking price comes from `1040:371a` (`≈ strength^1.04` scaled) and `5b37` opens the auction.
   The same routine repays loan steps (`668d`: `cash −= step`, `loan −= step`) and handles the maximum loan (`3899`).
-- **What an AI club accepts** (`1010:63fa`): requires `5a6a == 0`; computes the player's score; the demanded price is tiered with
-  thresholds near 30/31, 15/16, 7/8 and 1/2 millions, +country adjustments, and a random rounding step.
+- **What an AI club accepts** (`1010:63fa`): see *Direct purchases* below (decoded; only the registered copy's *Procurar* reaches it).
 
 ## Mapped, not decoded
-- The exact price tiers and rounding of `63fa`, the bid acceptance in the auction dialog, the user's own selling dialog
+- The bid acceptance in the auction dialog, the user's own selling dialog
   (`TsellPlayerDlg` from the menu *Jogador > Vender*), and salary renegotiation (`7ff4` vs the stored `+0x31`).
 - **Gate receipts**: `1040:35e1` (called from `1010:0875`) clamps attendance revenue using `G` and the economic factor; ticket
   price is a user setting ("Preço dos bilhetes"), stadium data in `TStadium`. **Per-round coach finances**: `1010:6e48`.
@@ -95,7 +94,7 @@ New games and imported `.e98` saves start with the original's cash (the import a
 Checked against the sample save: first-division gates 2.0-2.9 M (sample 2.2-2.6 M), wages -532 k per game for the best club (sample -471 k).
 
 ## The computer-managed transfer market (decoded this session, `core/src/market.rs`)
-Everything below was read from the disassembly; the three trades of the sample save are the only ground truth.
+Everything below was read from the disassembly and checked against the original's day saves (`tools/capture/days.sh`).
 - **Who sells** (`1010:3e9c` after every round, per club of the next round's games, home then away; `3aad` inside it). Needs the
   round >= 2. Each club: (a) if its coach has coached more than one game: renegotiates the wage of the **most overpaid** player
   (stored wage / current value > 1.2) and of the **most underpaid** one (< 0.8) to the current value, marking both `fresh` (`slot+0x16`);
@@ -103,23 +102,39 @@ Everything below was read from the disassembly; the three trades of the sample s
   `3 * cash < wage bill`, else with probability 1/20 (`Random(20) == 0`), else when it has exactly five foreigners and a squad of 21+.
   The player is the sellable one with the **lowest** `5de1` score (only a foreigner when the club has five foreigners).
 - **Who is sellable** (`5a6a`): squad >= 12, not `fresh`, at least 2 goalkeepers kept, outfield count stays above 10. `fresh` is set
-  when a wage is renegotiated or a player changes club and **no routine clears it**, so every player can be sold at most once and
-  the market thins out over the years (in the simulation: ~15 transfers in the first seasons, ~1 after ten seasons).
-- **Asking price** (`371a`): `round(strength^1.04 * G * E * f * 2000)`, `f = 1 - 0.2 aggr/5 - 0.2 prone/10 + 0.2 g/10`, floored to a multiple
-  of 1000 (`5b37`).
+  when a wage is renegotiated or a player changes club, and **the season change clears it for every player**: in the original's day
+  saves the flagged players grow from 15 to 252 over 2026 and are 0 in the first save of 2027 (no routine writes the byte back to 0,
+  so the season change probably rebuilds the slot records; Donizete, sold on the cup-final day, was free again in 2027 and sold twice).
+  So every player can be sold once a season; the simulation keeps 11-27 transfers a season over twelve seasons (`examples/market.rs`;
+  before the clearing the market died out, ~1 transfer a season after ten).
+- **Asking price** (`3aad` -> `5b37`): `round(371a * [2b50] * 1.6)` floored to a multiple of 1000, the *Preço base* of the auction dialog
+  (`2b50` is the header's extended 1.0 in every save seen). `371a` = `round(strength^1.04 * G * E * f * 2000)`,
+  `f = 1 - 0.2 aggr/5 - 0.2 prone/10 + 0.2 g/10`. The two sales of `3e9c` itself (a club in debt) ask 0. Checked on the dialog: the
+  prices shown (Pierkaski, strength 46: 1 554 000; Maurício Pantera, 11: 319 000) need the factor 1.6 (without it `f` would be above its
+  maximum 1.2).
 - **Auction** (timer loop `1008:3600` / `373e` / `351a` / `39c7`): every club except the seller, in master-list order, that has
   squad + pending < 24, a foreigner quota left (5, the Bosman / PLOP country groups count as domestic), and cash >= the asking
   price bids `5f77`; the highest floored bid >= the asking price wins (the earlier club on a tie). The winner pays its bid to the seller,
-  the player gets the wage `7ff4` computed in the seller's economy, and is marked `fresh`.
-- **Bid** (`5f77`): `0` when the position is already at its target (`SHAPE[rating/10][pos]`); `X = ask * need`, with
+  the player gets the wage `7ff4` computed in the seller's economy, and is marked `fresh`. The dialog shows only the asking price and
+  the result ("Vendido ao X por Y"), not the bids.
+- **Bid** (`5f77`, checked instruction by instruction with `5bb1`, `371a`, `4ec3` and `5992`): `0` when the position is already at its
+  target (`SHAPE[rating/10][pos]`); `X = 371a * need`, with
   `need = (strength/(R+5) * (T+1)/(count+1) * Ttotal/(squad+1))^(1/4) * R^0.2` times 1.5 for a lone goalkeeper, times
   `1.5 + 0.05 foreigners` (same country), `1.15 + 0.05 foreigners` (same group) or 1 (foreigner), times 1.1 for a star (`5bb1`);
-  then `r = (cash - X) / (wages + value + 1)`: `r < 3 -> X = cash - 3 (wages + value)`, `r > 5 -> X *= ln(r) / 1.6`; a club with
-  `cash - X > 10 wages` multiplies by `1 + ln((cash - X)/wages - 9)/10`; the bid is `max(0, min(cash - X - 5 wages, X))`.
-- **Sample check** (`core/examples/bidcheck.rs`): with the buyers' and the other 50 clubs' states taken from the save, the model picks the
-  right winner in all three auctions (São Paulo for Euller, Palmeiras for Ciro and Dega). With the divisor 1.6 of the binary the fees
-  are 30-45 % off (2.98 M against 5.17 M, 0.78 M against 0.59 M, 1.95 M against 1.35 M); with **2.0** they are within 16 %
-  (4.4 M, 0.62 M, 1.56 M), so 2.0 is used (`BID_DIVISOR`). More saves would settle the reason.
+  then `r = (cash - X) / (wages + value + 1)` (`value` = `7ff4` of the player in the seller's economy): `r < 3 -> X = cash - 3 (wages + value)`,
+  `r > 5 -> X *= ln(r) / 1.6`; a club with wages > 100 and `cash - X > 10 wages` multiplies by `1 + ln((cash - X)/wages - 9)/10`; the bid
+  is `max(0, min(cash - X - 5 wages, X))`, floored to 1000 (`351a`). The wages are `5992`, the sum of `slot+0x31` over the slots whose
+  `+0x36` is 0. (The injured/banned branch at `626f` writes into the result variable, which the final `min` overwrites: dead code.)
+- **Calibration** (`core/examples/auctions.rs` over the 16 day saves of `tools/capture/days.sh`, 36 computer-to-computer auctions; the
+  clubs as the later save has them with the sale undone, the player at the strength of the transfer record): with the binary's 1.6 the
+  buyer's bid is 24 % above the fee on average (spread 21 %). Two variants fit equally well: the divisor **2.2** with the spare-cash
+  factor (fee / buyer's bid 1.005, spread 6.7 %, the buyer has the best bid in 23 of 36), or 1.6 without that factor (1.008, 7.1 %, 23).
+  Their residuals cannot be told apart in this data (the spare cash of the buyers covers too narrow a range), so the port keeps the
+  decoded structure with 2.2 (`BID_DIVISOR`). The gap is not explained: the routines and their constants are the same in the
+  decompiled build and the one the captures ran (see `docs/installation.md`), and neither the buyers' cash before the round, the day's
+  order of sales, the ask or the market value as `value`, nor a larger wage bill fits better. On the sample save
+  (`core/examples/bidcheck.rs`) 2.2 picks the three winners with fees within 5 % (4.99 M against 5.17 M, 565 000 against 592 000,
+  1.42 M against 1.35 M).
 - **Rating accumulators**: the same `3e9c` pass clears `slot+0xc..0x13` for every club whose coach has coached more than one game.
   In the sample all but two clubs had zero accumulators after round 2 although round 2's evolution still used them, so the port
   clears them after the evolution (`end_of_round`). (This corrects `match-engine.md`, which said they are never reset.)

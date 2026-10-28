@@ -33,6 +33,11 @@ Contents: `ELIFOOT.EXE`, `EDITEQ.EXE` (16-bit Windows NE), `BIVBX11.DLL`, `GAUGE
 Reference build for differential testing: <https://github.com/elifoot98web/elifoot98web>
 (js-dos bundle `src/assets/elifoot/elifoot98.jsdos`, Git LFS).
 
+The two `ELIFOOT.EXE` are different builds of the same size: the decompiled one (the zip above) and the one the captures run (the js-dos
+bundle, `analysis/jsdos/game.jsdos`) have the same rules segment `1010` byte for byte (and segments 14-26), while the interface segments
+`1000`, `1008`, `1018`-`1060` differ; the auction routines of `1008` (`2fec`'s value, `351a`, `373e`, `39c7`, `3600`) are the same code
+moved by 0x49 bytes. Addresses in the docs are those of the decompiled build.
+
 ## 4. Out of scope
 The registration key generator (`crack.exe`) offered on some mirrors is **not** used.
 

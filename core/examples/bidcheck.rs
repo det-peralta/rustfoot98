@@ -60,7 +60,7 @@ fn main() {
             seller,
             nt.short_name,
             fee,
-            floor_1000(market_value(&slot, e, g))
+            asking_price(&slot, e, g)
         );
         let mut results = Vec::new();
         for t in &a.teams {
@@ -85,7 +85,7 @@ fn main() {
                 );
                 continue;
             }
-            if c.fin.cash < floor_1000(market_value(&slot, e, g)) {
+            if c.fin.cash < asking_price(&slot, e, g) {
                 continue;
             }
             let b = floor_1000(bid(&c, v, &slot, e, g));

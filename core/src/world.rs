@@ -1620,7 +1620,7 @@ impl World {
         if sell {
             let club = self.club_ref(loc);
             if let Some(i) = crate::market::pick_for_sale(club) {
-                let ask = crate::market::market_value(&club.slots[i], e, g);
+                let ask = crate::market::asking_price(&club.slots[i], e, g);
                 self.auction(loc, i, ask, round);
             }
         }
@@ -2492,7 +2492,8 @@ impl World {
         let cup_winner = self.cup_champion.clone();
         let honours = self.honours(cup_winner.as_deref());
         self.pay_prizes(cup_winner.as_deref());
-        // the prizes close the season's ledger (checked on the original's saves on both sides of a season change)
+        // the prizes close the season's ledger, and every player may be sold again (both checked on the original's saves on
+        // both sides of a season change: no player is marked `fresh` in the new season's first save)
         for c in self
             .divisions
             .iter_mut()
@@ -2500,6 +2501,9 @@ impl World {
             .chain(self.pool.iter_mut())
         {
             c.fin.new_season();
+            for s in c.slots.iter_mut() {
+                s.fresh = false;
+            }
         }
         self.record_season_history();
         end_of_season(
@@ -3461,9 +3465,9 @@ mod tests {
     }
 
     #[test]
-    fn a_transferred_player_is_marked_and_cannot_be_sold_again() {
+    fn a_transferred_player_is_marked_until_the_season_ends() {
         let mut w = World::synthetic(7);
-        for _ in 0..14 {
+        for _ in 0..13 {
             w.play_round();
         }
         let t = w
@@ -3485,6 +3489,15 @@ mod tests {
             .expect("the buyer has the player");
         assert!(club.slots[idx].fresh);
         assert_ne!(crate::market::sale_blocker(club, idx), 0);
+        // the new season's first save of the original has no player marked
+        w.play_round();
+        assert_eq!(w.year, 1999);
+        assert!(w
+            .divisions
+            .iter()
+            .flatten()
+            .chain(w.pool.iter())
+            .all(|c| c.slots.iter().all(|s| !s.fresh)));
     }
 
     #[test]

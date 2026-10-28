@@ -176,9 +176,10 @@ pub fn need(buyer: &Club, slot: &Slot) -> f64 {
     x
 }
 
-/// The binary divides by 1.6 here (`CS:5f57`), but with 1.6 the three trades of the sample save come out 30-45 % off; 2.0 reproduces
-/// them within 16 % (see `docs/finance.md`). Kept as a calibrated constant until more saves are available.
-pub const BID_DIVISOR: f64 = 2.0;
+/// The binary divides by 1.6 here (`CS:5f57`), but with 1.6 the bids come out about 40 % above the fees the original booked. On the
+/// 36 computer-to-computer auctions of a season and a half of the original's saves (`core/examples/auctions.rs`) 2.2 gives the fees
+/// with a median error of 3 % and a spread of 7 % (see `docs/finance.md`). Kept as a calibrated constant until the gap is explained.
+pub const BID_DIVISOR: f64 = 2.2;
 
 /// `1010:5f77`: the bid of a computer-managed club for `slot`, whose value (`7ff4` in the seller's economy) is `value`.
 pub fn bid(buyer: &Club, value: i64, slot: &Slot, e: f64, g: i64) -> i64 {
@@ -246,6 +247,12 @@ pub fn direct_price(seller: &Club, idx: usize, buyer: Option<&Club>, e: f64, g: 
         1000
     };
     price / unit * unit
+}
+
+/// `3aad`: the asking price of a computer-managed club's auction, `371a * 1.6` (times the header's extended at `2b50`, 1.0 in
+/// every save seen) rounded down to 1000 by `5b37`: the *Preço base* of the auction dialog.
+pub fn asking_price(slot: &Slot, e: f64, g: i64) -> i64 {
+    floor_1000((market_value(slot, e, g) as f64 * 1.6).round_ties_even() as i64)
 }
 
 /// Rounds a price down to a multiple of 1000 (`1882` then `1845`).
