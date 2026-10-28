@@ -1244,7 +1244,19 @@ impl World {
                 .iter()
                 .position(|n| *n == l.player)
             {
-                self.settle(seller, idx, buyer, fee, l.round);
+                // the original settles at once; here other sales of the same market may have filled the buyer's squad or
+                // emptied his cash since, and the best bid as the clubs are now wins instead
+                let b = self.club_ref(buyer);
+                let deal = if crate::market::may_bid(b, &self.club_ref(seller).slots[idx])
+                    && b.fin.cash >= fee
+                {
+                    Some((buyer, fee))
+                } else {
+                    self.best_bid(seller, idx, l.ask)
+                };
+                if let Some((buyer, fee)) = deal {
+                    self.settle(seller, idx, buyer, fee, l.round);
+                }
             }
         }
     }
@@ -1569,15 +1581,16 @@ impl World {
         }
     }
 
-    /// `1010:3e9c` (and `3aad`) for one computer-managed club after a round: wage renegotiation, forced sale when broke, and
-    /// the regular decision to put a player up for sale.
-    fn club_after_round(&mut self, loc: (usize, usize), round: usize) {
+    /// `1010:3e9c` (and `3aad`) for one club before the day `day` (the day counter `2b40`, 1 to 14): wage renegotiation, forced
+    /// sale when broke, and the regular decision to put a player up for sale. Neither renegotiates nor sells on the first day.
+    fn club_before_day(&mut self, loc: (usize, usize), day: usize) {
         let human = self.is_human(loc);
         let (e, g) = (self.economy, self.scale);
+        let round = self.round;
         if human {
             // the user's wages are renegotiated by the computer for the player classes of the coach profile (the original asks
             // the user in a dialog for the others)
-            if round >= 2 && self.club_ref(loc).coach_games > 1 {
+            if day >= 2 && self.club_ref(loc).coach_games > 1 {
                 self.renegotiate_wages(loc, self.options_at(loc).salary);
             }
             return;
@@ -1593,7 +1606,7 @@ impl World {
                 }
             }
         }
-        if round < 2 {
+        if day < 2 {
             return;
         }
         // wages follow the player's value: the most overpaid and the most underpaid player (outside 0.8..1.2) are repriced
@@ -1626,18 +1639,33 @@ impl World {
         }
     }
 
-    /// The clubs of the next round's games, in game order (`13e1` walks the list of games just created).
-    fn market_round(&mut self, round: usize) {
-        let next = round % ROUNDS + 1;
-        let mut order = Vec::new();
-        for d in 0..4 {
-            for (h, a) in fixtures(next) {
-                order.push((d, h));
-                order.push((d, a));
+    /// `13e1` before the next day: `3e9c` for both clubs of every game of the day in the order of the list, on a cup day (`0ed4`,
+    /// after the draw) the drawn ties, otherwise the league games of the next round division by division. The first day of a
+    /// season runs after the season change.
+    fn market_before_day(&mut self) {
+        let (day, order): (usize, Vec<(usize, usize)>) = match self.cup_draw.as_ref() {
+            Some(draw) => (
+                draw.round,
+                draw.pairs
+                    .iter()
+                    .flat_map(|(h, a)| [h, a])
+                    .filter_map(|n| self.locate(n))
+                    .collect(),
+            ),
+            None => {
+                let next = self.round % ROUNDS + 1;
+                let mut order = Vec::new();
+                for d in 0..4 {
+                    for (h, a) in fixtures(next) {
+                        order.push((d, h));
+                        order.push((d, a));
+                    }
+                }
+                (next, order)
             }
-        }
+        };
         for loc in order {
-            self.club_after_round(loc, round);
+            self.club_before_day(loc, day);
         }
     }
 
@@ -1994,6 +2022,12 @@ impl World {
             return;
         };
         let round = draw.round;
+        // the auctions of the market before the cup day close before its games
+        self.close_board();
+        self.sell_tried.clear();
+        for b in &mut self.seats.benched {
+            b.sell_tried.clear();
+        }
         self.play_cup_ties(&draw, ctl);
         self.record_cup_fixtures(round);
         self.apply_human_move();
@@ -2006,6 +2040,7 @@ impl World {
         if round == ROUNDS {
             self.finish_season();
         }
+        self.market_before_day();
     }
 
     fn play_cup_ties(&mut self, draw: &CupDraw, ctl: &mut Control) {
@@ -2353,9 +2388,9 @@ impl World {
             self.last_round.extend(records.into_iter().map(|r| (d, r)));
         }
         self.record_league_fixtures(round);
-        // order of `1020:0c41`: games, economic factors (`6e48`), clubs sell and renegotiate (`3e9c`), then the evolution
+        // `1020:0c41`: economic factors (`6e48`), clubs sell and renegotiate (`13e1` -> `3e9c`), the games, then the evolution;
+        // here the factors follow the games and the market runs at the end, before the next day (after the cup day's draw)
         self.update_factors();
-        self.market_round(round);
         self.deliver_purchases();
         for (d, base) in DIVISION_BASE.iter().enumerate() {
             end_of_round(&mut self.rng, &mut self.divisions[d], *base);
@@ -2377,6 +2412,7 @@ impl World {
         if round == ROUNDS && self.cup_draw.is_none() {
             self.finish_season();
         }
+        self.market_before_day();
     }
 
     /// `1020:2ae6`: the champion of the first division, the cup winner and the club of every top scorer get their prizes
@@ -3423,7 +3459,6 @@ mod tests {
     #[test]
     fn transfers_move_players_and_money_between_computer_clubs_only() {
         let mut w = World::synthetic(2024);
-        let human = w.human.as_ref().unwrap().club.clone();
         let players = player_count(&w);
         let cash: i64 = w
             .divisions
@@ -3434,7 +3469,14 @@ mod tests {
             .sum();
         let mut moved = 0;
         for _ in 0..28 {
+            let seen = w.transfers.len();
             w.play_round();
+            // the club the human has now (he may have moved): the market runs after the move
+            let human = w.human.as_ref().unwrap().club.clone();
+            for t in w.transfers.iter().skip(seen) {
+                assert_ne!(t.from, human);
+                assert_ne!(t.to, human);
+            }
             moved = moved.max(w.transfers.len());
         }
         assert_eq!(
@@ -3447,8 +3489,6 @@ mod tests {
             "a season of the computer market produces transfers"
         );
         for t in &w.transfers {
-            assert_ne!(t.from, human);
-            assert_ne!(t.to, human);
             assert_ne!(t.from, t.to);
             assert!(t.fee >= 0 && t.fee % 1000 == 0);
         }
@@ -3950,7 +3990,13 @@ mod tests {
         let clubs = || w.divisions.iter().flatten().chain(w.pool.iter());
         let total: i64 = clubs().map(|c| c.fin.past[0][PRIZES]).sum();
         assert!(total >= p1 + p2 + p3, "{total}");
-        assert!(clubs().all(|c| c.fin.ledger() == [0; 7]));
+        // only the stadium works of the new season's first day (`3aad` runs before day 1, after the season change)
+        const WORKS: usize = 5;
+        assert!(clubs().all(|c| {
+            let mut l = c.fin.ledger();
+            l[WORKS] = 0;
+            l == [0; 7]
+        }));
         // a new season starts with fresh scoring tallies
         assert!(w
             .divisions

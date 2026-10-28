@@ -40,7 +40,8 @@ printing.
 - Market (2026-10-28, `core/examples/auctions.rs` on 36 auctions of the day saves): the asking price is `371a * 1.6`; the season change
   clears every player's `fresh` mark (so the market no longer dies out); the bid divisor is calibrated to 2.2 (fees within 0.5 % on
   average, spread 7 %; the binary's 1.6 overshoots by 24 %, cause not found). The direct purchase prices `63fa` are decoded but only
-  the registered *Procurar* reaches them.
+  the registered *Procurar* reaches them. The market runs before every match day with the day counter `2b40`, on cup days for the
+  drawn ties (`0ed4` -> `13e1`); from the original's save the port's pace (30 sales over 17 rounds) is within chance of the original's 36.
 - Open: the coach-swap side effect, the referee (`TRefereeAttr`).
 
 ## 4. Hot-seat leftovers

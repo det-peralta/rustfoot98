@@ -66,7 +66,7 @@ pub struct CoachEvent {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CoachOptions {
     /// The computer manages the wages of the domestic players, of the foreigners covered by the Bosman rule and of the other
-    /// foreigners (renegotiation after a round, `World::club_after_round`).
+    /// foreigners (renegotiation before a day, `World::club_before_day`).
     pub salary: [bool; 3],
     /// Auction offers: 0 bid for every player, 1 not for the weaker ones, 2 do not buy in auctions (the user gets no listing).
     pub auction: u8,

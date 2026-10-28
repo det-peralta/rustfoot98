@@ -95,8 +95,11 @@ Checked against the sample save: first-division gates 2.0-2.9 M (sample 2.2-2.6 
 
 ## The computer-managed transfer market (decoded this session, `core/src/market.rs`)
 Everything below was read from the disassembly and checked against the original's day saves (`tools/capture/days.sh`).
-- **Who sells** (`1010:3e9c` after every round, per club of the next round's games, home then away; `3aad` inside it). Needs the
-  round >= 2. Each club: (a) if its coach has coached more than one game: renegotiates the wage of the **most overpaid** player
+- **Who sells** (`1010:3e9c`, `3aad` inside it). Before every match day `13e1` walks the day's list of games and calls `3e9c` for the
+  home and then the away club (`a67f`): on a league day (`1020:0c41`) the round's games division by division, on a cup day (`0ed4`,
+  after the draw, before the ties are played) the drawn ties, pool clubs included. `3e9c` reads the day counter `2b40` (1 to 14, the
+  day about to be played: the header of every day save holds the next day and in `271e` the human's club, where the interrupted
+  `13e1` resumes): neither the renegotiation nor the sale of (c) happen on day 1, which runs after the season change. Each club: (a) if its coach has coached more than one game: renegotiates the wage of the **most overpaid** player
   (stored wage / current value > 1.2) and of the **most underpaid** one (< 0.8) to the current value, marking both `fresh` (`slot+0x16`);
   (b) if its cash is negative: puts up the lowest-scoring sellable player at any price; (c) puts a player up for sale if
   `3 * cash < wage bill`, else with probability 1/20 (`Random(20) == 0`), else when it has exactly five foreigners and a squad of 21+.
@@ -105,8 +108,11 @@ Everything below was read from the disassembly and checked against the original'
   when a wage is renegotiated or a player changes club, and **the season change clears it for every player**: in the original's day
   saves the flagged players grow from 15 to 252 over 2026 and are 0 in the first save of 2027 (no routine writes the byte back to 0,
   so the season change probably rebuilds the slot records; Donizete, sold on the cup-final day, was free again in 2027 and sold twice).
-  So every player can be sold once a season; the simulation keeps 11-27 transfers a season over twelve seasons (`examples/market.rs`;
+  So every player can be sold once a season; the synthetic world (38 clubs) keeps 15-29 transfers a season over twelve seasons (`examples/market.rs`;
   before the clearing the market died out, ~1 transfer a season after ten).
+- **Pace**: from the day save `d0` the original sold 36 players over the 17 rounds its saves span (2026 day 3 to 2027 day 6; by the
+  rules about 33 sale attempts: 16 league days with sales x 32 clubs / 20 and 142 cup entrants / 20). The port from the same save
+  sells 30 on average over 60 seeds (`core/examples/pace.rs`, 1.78 a round; before the cup-day market and the day counter, 22).
 - **Asking price** (`3aad` -> `5b37`): `round(371a * [2b50] * 1.6)` floored to a multiple of 1000, the *Preço base* of the auction dialog
   (`2b50` is the header's extended 1.0 in every save seen). `371a` = `round(strength^1.04 * G * E * f * 2000)`,
   `f = 1 - 0.2 aggr/5 - 0.2 prone/10 + 0.2 g/10`. The two sales of `3e9c` itself (a club in debt) ask 0. Checked on the dialog: the
@@ -124,7 +130,8 @@ Everything below was read from the disassembly and checked against the original'
   then `r = (cash - X) / (wages + value + 1)` (`value` = `7ff4` of the player in the seller's economy): `r < 3 -> X = cash - 3 (wages + value)`,
   `r > 5 -> X *= ln(r) / 1.6`; a club with wages > 100 and `cash - X > 10 wages` multiplies by `1 + ln((cash - X)/wages - 9)/10`; the bid
   is `max(0, min(cash - X - 5 wages, X))`, floored to 1000 (`351a`). The wages are `5992`, the sum of `slot+0x31` over the slots whose
-  `+0x36` is 0. (The injured/banned branch at `626f` writes into the result variable, which the final `min` overwrites: dead code.)
+  `+0x36` (the pending buyer of a player sold who leaves at the end of the round) is 0; the port moves a sold player at once, so
+  `market::wage_sum` over the squad is the same sum. (The injured/banned branch at `626f` writes into the result variable, which the final `min` overwrites: dead code.)
 - **Calibration** (`core/examples/auctions.rs` over the 16 day saves of `tools/capture/days.sh`, 36 computer-to-computer auctions; the
   clubs as the later save has them with the sale undone, the player at the strength of the transfer record): with the binary's 1.6 the
   buyer's bid is 24 % above the fee on average (spread 21 %). Two variants fit equally well: the divisor **2.2** with the spare-cash

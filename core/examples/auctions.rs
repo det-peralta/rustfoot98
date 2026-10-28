@@ -68,6 +68,16 @@ fn main() -> Result<(), String> {
             .map(|t| t.short_name.trim().to_string())
             .collect();
         let clubs: Vec<&Club> = w.divisions.iter().flatten().chain(&w.pool).collect();
+        println!(
+            "-- {} (round {} {}) -> {} (round {} {}): {} sales",
+            pair[0],
+            w0.round,
+            w0.year,
+            pair[1],
+            w.round,
+            w.year,
+            after.transfers.len().saturating_sub(before.transfers.len())
+        );
         for t in after.transfers.iter().skip(before.transfers.len()) {
             let (Some(buyer), Some(seller)) =
                 (name_of(&after, t.player), name_of(&before, t.player))
