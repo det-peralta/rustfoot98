@@ -1689,8 +1689,8 @@ fn bitbtn_glyph_left(
             margin = (cw - (gw + spacing + tw) + 1) / 2;
         }
     } else if spacing == -1 {
-        // (rounded up; GDI's text extent of the emboldened raster MS Sans Serif counts its 1-pixel overhang)
-        let overhang = font.map_or(0, |t| i32::from(t.bold && t.face == "ms sans serif"));
+        // (rounded up; GDI's text extent of an emboldened raster font counts its 1-pixel overhang)
+        let overhang = font.map_or(0, |t| t.overhang());
         spacing = (cw + 1 - (margin + gw) - tw - overhang) / 2;
     }
     let gx = x + 2 + margin;
@@ -1708,7 +1708,9 @@ fn bitbtn_glyph_left(
             text(fb, font, tx, ty, &label, GRAY, false);
         }
         if cx.focus == n.name {
-            focus_rect(fb, tx - 1, ty - 1, tw + 2, th + 2, x, y);
+            // the rectangle is the text extent's, overhang included
+            let ov = font.overhang();
+            focus_rect(fb, tx - 1, ty - 1, tw + ov + 2, th + 2, x, y);
         }
     }
 }
@@ -1807,7 +1809,8 @@ fn bitbtn(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
                 fb,
                 x + (w - tw + round_up) / 2 - 1,
                 ty - 1,
-                tw + 2,
+                // the text extent's width, an emboldened raster font's overhang included
+                tw + font.overhang() + 2,
                 font.height() + 2,
                 x,
                 y,

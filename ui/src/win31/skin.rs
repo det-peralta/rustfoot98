@@ -33,6 +33,13 @@ impl Font {
     pub fn glyph(&self, code: u8) -> Option<&Glyph> {
         self.glyphs.get(code.checked_sub(self.first)? as usize)
     }
+    /// GDI's `tmOverhang`: 1 for a raster font it emboldens (MS Sans Serif, and Arial at 9 pixels, which the font mapper draws
+    /// with the raster MS Serif), counted once in a string's text extent.
+    pub fn overhang(&self) -> i32 {
+        i32::from(
+            self.bold && (self.face == "ms sans serif" || (self.face == "arial" && self.px == 9)),
+        )
+    }
     /// Width of `s` in pixels (Windows' ANSI code page for the accented letters; no kerning).
     pub fn width(&self, s: &str) -> i32 {
         s.chars()
