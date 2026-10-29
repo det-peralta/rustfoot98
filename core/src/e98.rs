@@ -174,6 +174,19 @@ pub struct E98 {
     pub coaches: Vec<E98Coach>,
     pub winners: Vec<E98Winner>,
     pub transfers: Vec<E98Transfer>,
+    /// The referees (`2706`) in list order.
+    pub referees: Vec<E98Referee>,
+    /// The day's games (`270a`), raw records.
+    pub games: Vec<Vec<u8>>,
+}
+
+/// A referee (`TReferee`, `1010:c6ca`): id (`+4`), free for a game (`+6`), name and country code (`TRefereeAttr`).
+#[derive(Clone, Debug)]
+pub struct E98Referee {
+    pub id: u16,
+    pub free: bool,
+    pub name: String,
+    pub country: String,
 }
 
 fn u16_at(d: &[u8], o: usize) -> Option<u16> {
@@ -410,11 +423,16 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         .iter()
         .map(|(k, g, s)| (k.id, k.human, *g, *s, k.name.clone()))
         .collect();
-    c.list(|c| {
-        c.raw(3)?;
-        c.pstr()?;
-        c.pstr()?;
-        Ok(())
+    let referees = c.list(|c| {
+        let r = c.raw(3)?;
+        let name = c.pstr()?;
+        let country = c.pstr()?;
+        Ok(E98Referee {
+            id: u16::from_le_bytes([r[0], r[1]]),
+            free: r[2] != 0,
+            name,
+            country,
+        })
     })?;
     let mut teams = c.list(team)?;
     for t in &mut teams {
@@ -432,10 +450,7 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         let name = String::from_utf8_lossy(&b[1..1 + (b[0] as usize).min(20)]).into_owned();
         Ok((name, c.list(|c| c.u16())?))
     })?;
-    c.list(|c| {
-        c.raw(1 + 41 + 2 + 2 + 10 + 4 + 2 + 2 + 2 + 1)?;
-        Ok(())
-    })?;
+    let games = c.list(|c| Ok(c.raw(1 + 41 + 2 + 2 + 10 + 4 + 2 + 2 + 2 + 1)?.to_vec()))?;
     while c.u16()? != 0 {
         c.list(|c| c.u16())?;
     }
@@ -497,6 +512,8 @@ pub fn parse(d: &[u8]) -> Result<E98, String> {
         coaches: coach_records.into_iter().map(|(k, _, _)| k).collect(),
         winners,
         transfers,
+        referees,
+        games,
     })
 }
 
@@ -593,6 +610,7 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c.coach_score = t.coach_score;
     c.colors = t.colors;
     c.full_name = t.full_name.clone();
+    c.short_name = t.short_name.clone();
     c.coach_name = t.coach_name.clone();
     c.fin = Finance::new_game(base, DEFAULT_SCALE); // stadium level: the save's stadium object was not located
     c.fin.cash = t.cash;
@@ -748,6 +766,24 @@ impl World {
             w.scale = crate::economy::CURRENCIES[c].scale;
         }
         w.history = history_of(save, &club_names);
+        // the referees in the list's order, and those of the day's games (`270a`: home and away ids at 42 and 44, the
+        // referee's id at 60 of each record; header records have kind 2)
+        w.referees = save
+            .referees
+            .iter()
+            .map(|r| crate::world::Referee {
+                id: r.id,
+                country: r.country.clone(),
+                name: r.name.clone(),
+                free: r.free,
+            })
+            .collect();
+        for g in save.games.iter().filter(|g| g[0] == 0) {
+            let id = |k: usize| u16::from_le_bytes([g[k], g[k + 1]]);
+            if let (Some(h), Some(a)) = (club_names.get(&id(42)), club_names.get(&id(44))) {
+                w.day_referees.push((h.clone(), a.clone(), id(60)));
+            }
+        }
         w.transfers = transfers_of(save, &club_names);
         w.refresh_cash_ref();
         w.tie_order = save.division_order().into_iter().collect();
@@ -812,6 +848,48 @@ mod tests {
     #[test]
     fn rejects_foreign_files() {
         assert!(parse(&[0u8; 100]).is_err());
+    }
+
+    /// The referees of a save's day (`270a`, `2706`) give exactly the bonus values the save stores for its games, and after a
+    /// round the port gives every game a referee by the original's rule. Local samples only.
+    #[test]
+    fn the_referees_of_a_save_give_its_bonus_values() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../original/saves");
+        let Ok(bytes) = std::fs::read(root.join("snap2.e98")) else {
+            return;
+        };
+        let save = parse(&bytes).unwrap();
+        let mut w = World::from_e98(1, &save).unwrap();
+        assert_eq!(w.referees.len(), 182);
+        assert_eq!(w.day_referees.len(), 16);
+        for g in save.games.iter().filter(|g| g[0] == 0) {
+            let id = |k: usize| u16::from_le_bytes([g[k], g[k + 1]]);
+            let name = |i: u16| {
+                save.teams
+                    .iter()
+                    .find(|t| t.id == i)
+                    .unwrap()
+                    .short_name
+                    .trim()
+                    .to_string()
+            };
+            let (h, a) = (name(id(42)), name(id(44)));
+            let club = |n: &str| w.divisions.iter().flatten().find(|c| c.name == n).unwrap();
+            let b = w.game_bonus(club(&h), club(&a), b"");
+            assert_eq!(b, (id(62) as i32, id(64) as i32), "{h} - {a}");
+        }
+        w.play_round();
+        assert_eq!(w.day_referees.len(), 16);
+        for (h, a, _) in &w.day_referees {
+            let r = w.referee_of(h, a).unwrap();
+            let country = |n: &str| {
+                let c = w.divisions.iter().flatten().find(|c| c.name == *n).unwrap();
+                String::from_utf8_lossy(&c.country).into_owned()
+            };
+            let (ch, ca) = (country(h), country(a));
+            assert!((r.country == ch && r.country == ca) || (r.country != ch && r.country != ca));
+            assert!(!r.free);
+        }
     }
 
     /// Runs against the author's local samples when present (they are copyrighted game saves and are not in the repo).

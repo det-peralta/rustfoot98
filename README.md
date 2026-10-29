@@ -26,7 +26,7 @@ windows; the teams it saves stay in the browser and new games use them (*Importa
 
 Up to six human coaches share the machine (hot seat), with the original's turn order. Not modelled: the registered-copy features (the
 original hides loans, "Procurar jogadores" and the *Controle* page in an unregistered copy and so does the port; no key check is
-implemented), the referee's influence on a game, hover hints (`ShowHint`). The computer clubs' bids use a divisor calibrated on the
+implemented), hover hints (`ShowHint`). The computer clubs' bids use a divisor calibrated on the
 original's auctions (2.2 instead of the binary's 1.6, see `docs/finance.md`). The original seeds its random numbers at start-up, so its games cannot be replayed move for
 move; the money rules were checked on the original's own saves instead (`docs/finance.md`).
 

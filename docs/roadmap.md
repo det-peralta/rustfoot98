@@ -45,7 +45,10 @@ printing.
 - The coach swap (`4f40` / `5343`) is the game's: `World::replace_coach` swaps the sacked coach with the partner `5343` picks (morale,
   rating window, free coaches for clubs rated below 15, score order), resets both clubs and moves a human with his coach; only
   `season::play_round`, a division played on its own for tests, just resets the coach.
-- Open: the referee (`TRefereeAttr`).
+- The referee (2026-10-29): every game of a day gets one when the day's games are made (`0875`: the list shuffled per division,
+  the first free referee of both clubs' country, else of neither), and his name and country give the game's bonus values
+  (`c95c`), which gate the rare chances, red cards and annulled goals. Checked on the original's day saves: 288 of 288 games' values
+  and 72 of 72 picks. The windows show the game's referee (the original's own on a loaded `.e98`).
 
 ## 4. Hot-seat leftovers
 - Done: one coach profile per human; the unemployed state kept in saves; the turns in the order of the day's games (`13e1` / `3e9c`).

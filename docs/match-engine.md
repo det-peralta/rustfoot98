@@ -99,13 +99,26 @@ via `1010:100b` (weights) into `shooterOut`.
 Stage 3: needs a shooter (`*shooterOut != nil`). Then `8c67` is checked twice and `1068:11c7` runs (side effect, unknown).
 
 ## Per-fixture bonus values — `1010:c95c` (decoded)
-The match constructor `1010:8db2` stores `homeBonus (+0x4c) = c95c(division, home) + 2` and
-`awayBonus (+0x4e) = c95c(division, away)`. Exactly:
+The match constructor `1010:8db2` takes the game's **referee** (`+0x48`, `1a66` on the referee list `2706`) and stores
+`homeBonus (+0x4c) = c95c(referee, home) + 2` and `awayBonus (+0x4e) = c95c(referee, away)` (0 and 0 when no referee was free).
+Exactly:
 ```
-A = pstr at (division+7)->+4        B = pstr at teamdata+0x2d         n = max(len A, len B)   (1068:0fed = Max)
-S = sum_{i=1..n} A[i] - B[i]         (bytes past a string's length count as 0)
-value = |S mod 11|  (signed remainder, then abs)  + 3 if  pstr(division+7 -> +0x2d) == teamdata country(+0x4a)
+A = referee name (TRefereeAttr +4, string[40])     B = the club's short name (.EFT object +0x2d, string[20])
+n = max(len A, len B)   (1068:0fed = Max)
+S = sum_{i=1..n} A[i] - B[i]     (B reads on past its 20 characters into the colours +0x42/+0x46, country +0x4a, level +0x4e;
+                                  A is zero past its length; both in the game's single-byte encoding)
+value = |S mod 11|  (signed remainder, then abs)  + 3 if the referee's country (TRefereeAttr +0x2d) == the club's (+0x4a)
 ```
+Checked byte for byte on the 288 games of the original's 18 day saves (`core/examples/referees.rs`; the games list `270a` of a
+save keeps each game's referee id and both values): `matchsim::referee_value`.
+
+**The referee of a game** (`0875`, which makes the day's games: `6e48` calls it for every division of a league day, `0ed4` for a
+cup day): the list `2706` (182 referees of `REFEREE.TXE`, ids in file order) is shuffled first (`1068:0f68`: `3n` times
+`Random(n)` picks an entry that moves to the end), then every game in the order of the day's list takes (`1916`, two passes) the
+first referee still free (`+6`) whose country is both clubs', else the first whose country is neither club's. He is busy until
+his game ends (`9396`). Checked on the last batch of games of every day save (72 of 72). With 11 Brazilian referees a Brazilian
+league runs out of them after 11 games, and a game between clubs of two countries never has a referee of either: those games
+lose the `+3`.
 `|S mod 11|` is uniform on 0..10, and the `+3` applies to every domestic league fixture, so a typical league match has
 home bonus 5..15 and away bonus 3..13. The bonus gates four things: the rare primary rolls
 (`Random(6000) < homeBonus`, `Random(7000) < awayBonus`), red cards and annulments (both need `bonus < r` with `r < 10`,
@@ -150,7 +163,6 @@ For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)
 - It scales the goal threshold by `(K/2)^(1/4)`: a team on a winning run scores more, a team on a losing run much less.
 
 ## Still unknown
-- Identity of the two strings fed to `c95c` (division/country name vs a team string); the formula itself is decoded.
 - Role of the global `Real` at `10c8:2b46` that `0c41` random-walks every round (likely a finance/economy index).
 - Half-time (minute 45) and extra-time (minute 90 -> 120) routines; the penalty shoot-out UI path; human-controlled chance path (`1038:328b`).
 - Where `division.base` (division `+4`) comes from.
@@ -166,8 +178,9 @@ tie may extend the length to 120.
 ## Rust port status (`core/src/matchsim.rs`)
 Implemented: bonus rolls, main goal generator, weighted scorer roulette, red cards, injuries, automatic
 substitutions, penalties after red cards, goal annulment (30 unit tests, clippy clean).
-Not yet: half-time/extra time, interactive (human) paths, foul roulette of the UI path, and
-the identity of the two `c95c` strings (the formula itself is implemented as `fixture_value`).
+Not yet: half-time/extra time, interactive (human) paths, foul roulette of the UI path. The referees and `c95c` are the
+game's (`World::assign_referees`, `World::game_bonus`); a world made without `REFEREE.TXE` (the synthetic test worlds, the
+simulation below) uses `fixture_value` with a stand-in string, every club domestic.
 100k games per pairing (`cargo run --release -p rustfoot-core --example sim`, 4-4-2, bench of 5, `c95c` with random strings,
 domestic league match):
 

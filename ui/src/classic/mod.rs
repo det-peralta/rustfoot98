@@ -269,7 +269,12 @@ impl Classic {
     pub fn load_text(&mut self, text: &str) -> Result<(), String> {
         let (h, body) = options::Header::split(text);
         match World::load(body) {
-            Ok(w) => {
+            Ok(mut w) => {
+                // a game saved before the referees were kept gets the file's list
+                if w.referees.is_empty() && !self.data.referees.is_empty() && !self.teams.is_empty()
+                {
+                    w.set_referees(&self.data.referees);
+                }
                 self.world = w;
                 if !h.coach.is_empty() {
                     self.coach = h.coach;

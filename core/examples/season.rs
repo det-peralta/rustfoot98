@@ -44,15 +44,16 @@ fn main() {
             .collect();
         for round in 1..=14 {
             let mut seed = DelphiRng::new(season as u32 * 31 + round as u32);
-            let mut names = move |_h: usize, _a: usize| {
+            let mut bonus = move |_h: usize, _a: usize| {
                 let n = |r: &mut DelphiRng| name(r).into_bytes();
-                (n(&mut seed), n(&mut seed), n(&mut seed))
+                let (d, h, a) = (n(&mut seed), n(&mut seed), n(&mut seed));
+                rustfoot_core::season::standin_bonus(&d, &h, &a)
             };
             play_round(
                 &mut rng,
                 &mut clubs,
                 round,
-                &mut names,
+                &mut bonus,
                 &Default::default(),
                 None,
             );

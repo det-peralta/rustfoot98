@@ -143,9 +143,26 @@ pub fn next_opponent(c: &Classic) -> Option<(usize, usize, bool)> {
     })
 }
 
-/// Display-only choice of the referee of a match (it does not use the game's random numbers): a referee of another country than both
-/// clubs, picked from a hash of the round and the clubs.
+/// The referee of a game of the next match day as the windows write it, `Name (Country)`: the one `w` gave the game
+/// (`World::referee_of`). A world without referees (made without the game's files) gets a display-only choice: a referee of
+/// another country than both clubs, picked from a hash of the round and the clubs.
 pub fn referee(c: &Classic, home: &Club, away: &Club) -> String {
+    referee_in(c, &c.world, home, away)
+}
+
+/// [`referee`] as the world `w` has it (the copy of the world from before a day was played, for its dialogs).
+pub fn referee_in(
+    c: &Classic,
+    w: &rustfoot_core::world::World,
+    home: &Club,
+    away: &Club,
+) -> String {
+    if !w.referees.is_empty() {
+        return w
+            .referee_of(&home.name, &away.name)
+            .map(|r| with_country(c, &r.country, &r.name))
+            .unwrap_or_default();
+    }
     if c.data.referees.is_empty() {
         return String::new();
     }
@@ -168,12 +185,16 @@ pub fn referee(c: &Classic, home: &Club, away: &Club) -> String {
         k = (k + 1) % n;
     }
     let (cc, name) = &c.data.referees[k];
+    with_country(c, cc, name)
+}
+
+fn with_country(c: &Classic, cc: &str, name: &str) -> String {
     let country = c
         .data
         .countries
         .get(cc)
         .cloned()
-        .unwrap_or_else(|| cc.clone());
+        .unwrap_or_else(|| cc.to_string());
     format!("{name} ({country})")
 }
 
@@ -221,7 +242,8 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
                 Status::Sub => "-",
                 Status::Out => "",
             };
-            let name = if s.foreign > 0 {
+            // `1058:13fe` writes a player's name with `*` after it for a "craque" (the class object's flag `+0x1a`)
+            let name = if s.star() {
                 format!("{}*", club.names[i])
             } else {
                 club.names[i].clone()

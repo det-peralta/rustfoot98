@@ -57,7 +57,7 @@ hits Cancel). The saved game `ABCDEEEE` (a 2-round Brazil/Belgium league) lets "
 ## Measured against the original's own dialogs (information dialogs, October 2026)
 Captures of the original (the saved game ABCDEEEE = `original/saves/snap2.e98`) opened through its menus and compared with `classic_shot` renders
 (`tools/ui/regions.py`): standings, scorers, all-time scorers, calendar, transfers, coach history, ranking, options (both tabs), coach profile and
-stadium now differ only by the mouse cursor and the state that cannot be reproduced (referee names, the second human's bold row).
+stadium now differ only by the mouse cursor and the state that cannot be reproduced (the second human's bold row; the referees are the game's since 2026-10-29).
 * **Windows below a dialog** have the inactive caption: silver bar (and silver thick frame) with black lettering (`win31::draw::INACTIVE`).
 * **Thick frame sizes**: a `bsDialog` form is drawn `ClientWidth + 4` x `ClientHeight + 4` (the frame hides four pixels); a form the program resizes
   itself passes `@client` in real units: the standings window is 592x375 (the DFM size, no +4), the list dialogs' `@client` is the computed size + 4

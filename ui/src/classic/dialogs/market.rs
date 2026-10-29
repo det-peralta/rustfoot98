@@ -1018,7 +1018,7 @@ fn plantel_bind(c: &Classic, d: &mut Dialog) {
                 "{}|{}{}|{}|{}|{}|{}",
                 ["G", "D", "M", "A"][s.position as usize],
                 club.names[i],
-                if s.foreign == 2 { "*" } else { "" },
+                if s.star() { "*" } else { "" }, // the name as `1058:13fe` writes it
                 s.strength,
                 if s.ban > 0 { "S" } else { "" },
                 if s.injured > 0 { "L" } else { "" },

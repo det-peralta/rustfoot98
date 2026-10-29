@@ -268,8 +268,12 @@ fn referee_of(c: &Classic, cup: bool, info: &Info) -> String {
     ) else {
         return String::new();
     };
-    if !cup {
-        if let Some(s) = c.md.session.as_ref() {
+    if let Some(s) = c.md.session.as_ref() {
+        // the referees the day's games had before it was played
+        if !s.snapshot.referees.is_empty() {
+            return main_win::referee_in(c, &s.snapshot, h, a);
+        }
+        if !cup {
             if let Some(r) = info.clubs.iter().find_map(|n| s.referees.get(n)) {
                 return r.clone();
             }

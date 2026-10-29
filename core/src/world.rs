@@ -294,6 +294,11 @@ pub struct World {
     /// order). The original sorts its division lists in place after every round, so clubs level on points, goal difference
     /// and goals keep the order of the table before.
     pub tie_order: Vec<Vec<usize>>,
+    /// The referees (`2706`) in the order of the list, which is shuffled whenever a day's games are made. Empty in a world made
+    /// without the game's files (`World::synthetic`): its games then use a stand-in for the referee's values.
+    pub referees: Vec<Referee>,
+    /// The referee of every game of the next match day, as `(home, away, referee id)` (`match+0x48`).
+    pub day_referees: Vec<(String, String, u16)>,
 }
 
 /// A player the user could buy straight away (`Procurar jogadores`).
@@ -325,6 +330,16 @@ pub struct Search {
 pub struct Pending {
     pub seller: String,
     pub player: String,
+}
+
+/// A referee (`TReferee`, `1010:c6ca`): an id, `REFEREE.TXE`'s country code and name (`TRefereeAttr`), and whether he is
+/// free (`+6`): a game of the day takes him when the day's games are made (`1916`) and lets him go when it is played (`9396`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Referee {
+    pub id: u16,
+    pub country: String,
+    pub name: String,
+    pub free: bool,
 }
 
 /// A player on offer in an open auction.
@@ -447,6 +462,7 @@ fn club_from_eft(
     club.country = code(&t.country);
     club.colors = (t.background, t.foreground);
     club.full_name = t.full_name.clone();
+    club.short_name = t.short_name.clone();
     club.coach_name = t.coach.clone();
     club.master = master as u16;
     Ok(club)
@@ -588,6 +604,8 @@ impl World {
             seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
+            referees: Vec::new(),
+            day_referees: Vec::new(),
         };
         w.reset_cup();
         w.log_new_game();
@@ -633,6 +651,8 @@ impl World {
             seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
+            referees: Vec::new(),
+            day_referees: Vec::new(),
         };
         w.reset_cup();
         w.refresh_cash_ref();
@@ -687,6 +707,8 @@ impl World {
             seats: Seats::default(),
             history: History::default(),
             tie_order: Vec::new(),
+            referees: Vec::new(),
+            day_referees: Vec::new(),
         };
         w.reset_cup();
         w.log_new_game();
@@ -1650,6 +1672,8 @@ impl World {
     /// after the draw) the drawn ties, otherwise the league games of the next round division by division. The first day of a
     /// season runs after the season change.
     fn market_before_day(&mut self) {
+        // `0875` makes the day's games, with their referees, before `13e1`
+        self.assign_referees();
         let (day, order): (usize, Vec<(usize, usize)>) = match self.cup_draw.as_ref() {
             Some(draw) => (
                 draw.round,
@@ -1723,6 +1747,135 @@ impl World {
             }
         }
         self.refresh_cash_ref();
+    }
+
+    /// Gives the world the referees of `REFEREE.TXE` (`(country code, name)` in the file's order, ids from 1) and the next match
+    /// day's games their referees. A new game has the file's order; the list is shuffled whenever a day's games are made.
+    pub fn set_referees(&mut self, list: &[(String, String)]) {
+        self.referees = list
+            .iter()
+            .enumerate()
+            .map(|(i, (country, name))| Referee {
+                id: i as u16 + 1,
+                country: country.clone(),
+                name: name.clone(),
+                free: true,
+            })
+            .collect();
+        self.day_referees.clear();
+        self.assign_referees();
+    }
+
+    /// `1068:0f68` on the referee list: three times its length, a random entry moves to the end.
+    fn shuffle_referees(&mut self) {
+        let n = self.referees.len();
+        for _ in 0..3 * n {
+            let k = self.rng.random(n as u16) as usize;
+            let r = self.referees.remove(k);
+            self.referees.push(r);
+        }
+    }
+
+    /// `1a66` / `1916`: the first free referee of the list from the country of both clubs, else the first from neither club's
+    /// country (none: the game has no referee and no bonus values). He is taken for the day.
+    fn pick_referee(&mut self, home: &str, away: &str) -> Option<u16> {
+        let country = |n: &str| {
+            self.locate(n)
+                .map(|l| String::from_utf8_lossy(&self.club_ref(l).country).into_owned())
+        };
+        let (h, a) = (country(home)?, country(away)?);
+        let k = self
+            .referees
+            .iter()
+            .position(|r| r.free && r.country == h && r.country == a)
+            .or_else(|| {
+                self.referees
+                    .iter()
+                    .position(|r| r.free && r.country != h && r.country != a)
+            })?;
+        self.referees[k].free = false;
+        Some(self.referees[k].id)
+    }
+
+    /// The games of the next match day get their referees (`1010:0875`, called by `6e48` for every division of a league day
+    /// and by `0ed4` for a cup day): the list is shuffled before each division (once for the cup's ties), then every game in
+    /// the order of the day's list takes one. The referees of the day before are free again (`9396` frees them as the
+    /// games end). Checked on the original's day saves: the referees of the last batch of games are the ones this picks.
+    fn assign_referees(&mut self) {
+        if self.referees.is_empty() {
+            return;
+        }
+        for (_, _, id) in std::mem::take(&mut self.day_referees) {
+            if let Some(r) = self.referees.iter_mut().find(|r| r.id == id) {
+                r.free = true;
+            }
+        }
+        let batches: Vec<Vec<(String, String)>> = match &self.cup_draw {
+            Some(draw) => vec![draw.pairs.clone()],
+            None => {
+                let next = self.round % ROUNDS + 1;
+                self.divisions
+                    .iter()
+                    .map(|div| {
+                        fixtures(next)
+                            .into_iter()
+                            .filter_map(|(h, a)| {
+                                Some((div.get(h)?.name.clone(), div.get(a)?.name.clone()))
+                            })
+                            .collect()
+                    })
+                    .collect()
+            }
+        };
+        for games in batches {
+            self.shuffle_referees();
+            for (h, a) in games {
+                if let Some(id) = self.pick_referee(&h, &a) {
+                    self.day_referees.push((h, a, id));
+                }
+            }
+        }
+    }
+
+    /// The referee of the game `home` - `away` of the next match day.
+    pub fn referee_of(&self, home: &str, away: &str) -> Option<&Referee> {
+        let (_, _, id) = self
+            .day_referees
+            .iter()
+            .find(|(h, a, _)| h == home && a == away)?;
+        self.referees.iter().find(|r| r.id == *id)
+    }
+
+    /// The bonus values `(home, away)` of a game of the day (`8db2`: `c95c(referee, home) + 2` and `c95c(referee, away)`; a
+    /// game without a referee has none). A world without referees uses `stand_in` for the referee's name, every club domestic.
+    pub(crate) fn game_bonus(&self, home: &Club, away: &Club, stand_in: &[u8]) -> (i32, i32) {
+        if self.referees.is_empty() {
+            return crate::season::standin_bonus(
+                stand_in,
+                home.name.as_bytes(),
+                away.name.as_bytes(),
+            );
+        }
+        let Some(r) = self.referee_of(&home.name, &away.name) else {
+            return (0, 0);
+        };
+        let latin1 = |s: &str| s.chars().map(|c| c as u32 as u8).collect::<Vec<u8>>();
+        let (name, country) = (latin1(&r.name), latin1(&r.country));
+        let value = |c: &Club| {
+            let short = latin1(&c.short_name);
+            let (bg, fg) = c.colors;
+            crate::matchsim::referee_value(
+                &name,
+                &country,
+                &crate::matchsim::TeamMemory {
+                    short_name: &short,
+                    colors: [bg[0], bg[1], bg[2], 0, fg[0], fg[1], fg[2], 0],
+                    country: &c.country,
+                    level: 0,
+                },
+            )
+        };
+        (value(home) + 2, value(away))
     }
 
     pub fn reset_cup(&mut self) {
@@ -2099,8 +2252,7 @@ impl World {
                 true,
                 home.fin.capacity(),
             );
-            let hb = crate::matchsim::fixture_value(b"TACA", home.name.as_bytes(), true) + 2;
-            let ab = crate::matchsim::fixture_value(b"TACA", away.name.as_bytes(), true);
+            let (hb, ab) = self.game_bonus(&home, &away, b"TACA");
             let human_in_tie = hp.is_some() || ap.is_some();
             let decisions = if human_in_tie {
                 ctl.decisions(true, &home.name)
@@ -2355,18 +2507,17 @@ impl World {
         let round = self.round + 1;
         #[allow(clippy::needless_range_loop)]
         for d in 0..4 {
-            let division_name = DIVISION_NAMES[d].as_bytes().to_vec();
-            let team_names: Vec<Vec<u8>> = self.divisions[d]
-                .iter()
-                .map(|c| c.name.as_bytes().to_vec())
+            // the bonus values of the day's games, from their referees (`8db2`, made with the day's games)
+            let div = &self.divisions[d];
+            let bonuses: HashMap<(usize, usize), (i32, i32)> = fixtures(round)
+                .into_iter()
+                .filter(|&(h, a)| h < div.len() && a < div.len())
+                .map(|(h, a)| {
+                    let b = self.game_bonus(&div[h], &div[a], DIVISION_NAMES[d].as_bytes());
+                    ((h, a), b)
+                })
                 .collect();
-            let mut names = |h: usize, a: usize| {
-                (
-                    division_name.clone(),
-                    team_names[h].clone(),
-                    team_names[a].clone(),
-                )
-            };
+            let mut bonus = |h: usize, a: usize| bonuses.get(&(h, a)).copied().unwrap_or((0, 0));
             let mut plans = HashMap::new();
             for h in self.humans() {
                 if let Some((hd, hi)) = self.locate_in_divisions(&h.club) {
@@ -2383,7 +2534,7 @@ impl World {
                 &mut rng,
                 &mut cur,
                 round,
-                &mut names,
+                &mut bonus,
                 &plans,
                 Some(money),
                 &mut |cur, i| self.replace_coach(d, cur, i, round == ROUNDS),
@@ -3656,6 +3807,47 @@ mod tests {
             .iter()
             .all(|&k| k < max));
         w.play_round(); // the plan is still playable
+    }
+
+    /// `1916`: a referee of both clubs' country while one is free, then one of neither; the day's referees are taken until the
+    /// games are played and travel with a save.
+    #[test]
+    fn games_get_referees_of_their_country_then_neutral_ones() {
+        let mut w = World::synthetic(3);
+        // two divisions of clubs from AAA, the other two mixed
+        for (d, div) in w.divisions.iter_mut().enumerate() {
+            for (i, c) in div.iter_mut().enumerate() {
+                c.country = if d < 2 || i % 2 == 0 {
+                    *b"AAA"
+                } else {
+                    *b"BBB"
+                };
+            }
+        }
+        let list: Vec<(String, String)> = (0..6)
+            .map(|i| ("AAA".to_string(), format!("Local {i}")))
+            .chain((0..30).map(|i| ("CCC".to_string(), format!("Neutral {i}"))))
+            .collect();
+        w.set_referees(&list);
+        assert_eq!(w.day_referees.len(), 16);
+        let mut locals = 0;
+        for (h, a, _) in &w.day_referees {
+            let r = w.referee_of(h, a).unwrap();
+            let c = |n: &str| w.club_ref(w.locate(n).unwrap()).country;
+            if c(h) == c(a) && r.country == "AAA" {
+                locals += 1;
+            } else {
+                assert_eq!(r.country, "CCC", "{h} - {a}");
+            }
+        }
+        assert_eq!(locals, 6, "every local referee is used before neutral ones");
+        assert_eq!(w.referees.iter().filter(|r| !r.free).count(), 16);
+        let back = World::load(&w.save()).unwrap();
+        assert_eq!(back.referees, w.referees);
+        assert_eq!(back.day_referees, w.day_referees);
+        w.play_round();
+        assert_eq!(w.day_referees.len(), 16, "the next day's games");
+        assert_eq!(w.referees.iter().filter(|r| !r.free).count(), 16);
     }
 
     #[test]

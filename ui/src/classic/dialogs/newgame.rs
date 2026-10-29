@@ -573,18 +573,23 @@ pub fn key(c: &mut Classic, d: &mut Dialog, key: Key) -> Option<Outcome> {
 
 /// Builds the world of a new game from the pack's teams (invented clubs without any).
 pub fn build_world(c: &Classic) -> Result<World, String> {
-    if c.teams.is_empty() {
-        Ok(World::synthetic(c.seed))
+    let mut w = if c.teams.is_empty() {
+        World::synthetic(c.seed)
     } else if !c.new_game.countries.is_empty() {
         World::from_countries(
             c.seed,
             &c.teams,
             &c.new_game.countries,
             c.new_game.currency.unwrap_or(rustfoot_core::economy::REAIS),
-        )
+        )?
     } else {
-        World::from_teams(c.seed, &c.teams)
+        World::from_teams(c.seed, &c.teams)?
+    };
+    // the referees of `REFEREE.TXE` (the first day's games get theirs)
+    if !c.teams.is_empty() && !c.data.referees.is_empty() {
+        w.set_referees(&c.data.referees);
     }
+    Ok(w)
 }
 
 pub fn tick(c: &mut Classic, d: &mut Dialog, ms: u32) -> Outcome {

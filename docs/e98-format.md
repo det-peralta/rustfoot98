@@ -9,8 +9,9 @@ game's delta-ciphered Pascal string (`docs/findings.md`); `DS:xxxx` are globals 
    `u8 271a`, `u16 2722`, `u32 year` (`2b42`), `ext E` (economy index, `2b46`), `ext 1.0` (ticket price rounding `2b50`/`2d9b`), and a **101-byte
    currency record** (`2d40..`): currency name pstrs (`Reais`, ` reais`), loan step `u32 @0x7b`, `u32 4`, `G u32 @0x83`, `u32 1`, prizes
    `3 x u32` (20 000 000 / 6 000 000 / 3 000 000 for `G = 5`).
-2. Lists, each written as `u16 count` followed by the elements (`1010:0751` and friends), in this order: players `26fe`, teams `2702`, `2706`
-   (games of the calendar), master team list `26f6` (flag 1), cup list `26f2` (flag 0), divisions `26fa`, current games `270a`, then the
+2. Lists, each written as `u16 count` followed by the elements (`1010:0751` and friends), in this order: players `26fe`, teams `2702`, the referees `2706`
+   (`u16 id`, `u8 free`, name and country pstrs), master team list `26f6` (flag 1), cup list `26f2` (flag 0), divisions `26fa`, current games `270a` (67 bytes each: `u8` kind (2 a division's title row), name pstr[40], home and away team ids, `ext`,
+   `u32`, the referee's id at 60, the bonus values `+0x4c` / `+0x4e` at 62 and 64, `u8`), then the
    news lists (`2716`, `270e`, `2712`: `1020:1513`, `1661`, `16eb`).
 
 ## Team record (`1010:305a`, loader `2bca`)

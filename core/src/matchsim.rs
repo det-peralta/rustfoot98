@@ -131,6 +131,39 @@ pub fn fixture_value(a: &[u8], b: &[u8], domestic: bool) -> i32 {
     (sum % 11).abs() + if domestic { 3 } else { 0 }
 }
 
+/// What a club's `.EFT` object holds from its short name on (`+0x2d`), as `c95c` reads it.
+#[derive(Clone, Copy, Debug)]
+pub struct TeamMemory<'a> {
+    /// The short name (`string[20]` at `+0x2d`), in the game's single-byte encoding.
+    pub short_name: &'a [u8],
+    /// The two colours (`+0x42`, `+0x46`) as stored.
+    pub colors: [u8; 8],
+    /// The country code (`string[3]` at `+0x4a`).
+    pub country: &'a [u8],
+    pub level: u8,
+}
+
+/// `1010:c95c(referee, team)` byte for byte: the referee's name (`TRefereeAttr+4`, `string[40]`) minus the team's short name,
+/// summed over the longer of the two lengths, so a referee name longer than 20 characters reads on into the team's colours,
+/// country and level; `|sum mod 11|`, plus 3 when the referee's country (`+0x2d`) is the team's. Checked on the day's games of
+/// the original's saves (`core/examples/referees.rs`).
+pub fn referee_value(name: &[u8], country: &[u8], team: &TeamMemory) -> i32 {
+    let mut b = [0u8; 42];
+    let short = &team.short_name[..team.short_name.len().min(20)];
+    b[0] = short.len() as u8;
+    b[1..1 + short.len()].copy_from_slice(short);
+    b[0x15..0x1d].copy_from_slice(&team.colors);
+    let c = &team.country[..team.country.len().min(3)];
+    b[0x1d] = c.len() as u8;
+    b[0x1e..0x1e + c.len()].copy_from_slice(c);
+    b[0x21] = team.level;
+    let name = &name[..name.len().min(40)];
+    let n = name.len().max(short.len());
+    let a = |i: usize| name.get(i - 1).copied().unwrap_or(0) as i32;
+    let sum: i32 = (1..=n).map(|i| a(i) - b[i] as i32).sum();
+    (sum % 11).abs() + if country == team.country { 3 } else { 0 }
+}
+
 /// `1010:0f2e` weights for the roulette `1010:100b`: kind 1 strength, 2 `pos^2*strength*g` (scorers),
 /// 3 aggression (red cards), 4 injury proneness.
 fn weight(p: &Slot, kind: u8) -> u32 {

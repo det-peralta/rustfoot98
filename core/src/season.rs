@@ -42,6 +42,8 @@ pub fn fixtures(round: usize) -> Vec<(usize, usize)> {
 #[derive(Clone, Debug)]
 pub struct Club {
     pub name: String,
+    /// The `.EFT` short name as the file has it (`name` is trimmed and made unique); the referee's values read it.
+    pub short_name: String,
     pub slots: Vec<Slot>,
     /// Player names, parallel to `slots`.
     pub names: Vec<String>,
@@ -100,6 +102,7 @@ impl Club {
     pub fn new(name: &str, slots: Vec<Slot>) -> Self {
         Self {
             name: name.to_string(),
+            short_name: name.to_string(),
             names: (0..slots.len())
                 .map(|i| format!("Player {}", i + 1))
                 .collect(),
@@ -473,17 +476,26 @@ pub fn coach_points(x: i32, y: i32) -> (i64, i64) {
     }
 }
 
+/// The bonus values of a game played without a referee list (a world made without the game's files): `c95c` with a stand-in
+/// string for the referee's name and every club domestic.
+pub fn standin_bonus(stand_in: &[u8], home: &[u8], away: &[u8]) -> (i32, i32) {
+    (
+        fixture_value(stand_in, home, true) + 2,
+        fixture_value(stand_in, away, true),
+    )
+}
+
 /// Plays one league round with the local fallback for sackings (the coach is replaced by a fresh one); see
 /// [`play_round_with`] for the original's coach swap between clubs.
 pub fn play_round(
     rng: &mut DelphiRng,
     clubs: &mut [Club],
     round: usize,
-    names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+    bonus: &mut dyn FnMut(usize, usize) -> (i32, i32),
     plans: &HashMap<usize, Plan>,
     money: Option<MoneyCtx>,
 ) -> Vec<MatchRecord> {
-    play_round_with(rng, clubs, round, names, plans, money, &mut |clubs, i| {
+    play_round_with(rng, clubs, round, bonus, plans, money, &mut |clubs, i| {
         clubs[i].maybe_sack_coach();
     })
 }
@@ -496,7 +508,7 @@ pub fn play_round_with(
     rng: &mut DelphiRng,
     clubs: &mut [Club],
     round: usize,
-    names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+    bonus: &mut dyn FnMut(usize, usize) -> (i32, i32),
     plans: &HashMap<usize, Plan>,
     money: Option<MoneyCtx>,
     on_sack: &mut dyn FnMut(&mut [Club], usize),
@@ -505,7 +517,7 @@ pub fn play_round_with(
         rng,
         clubs,
         round,
-        names,
+        bonus,
         plans,
         money,
         on_sack,
@@ -578,7 +590,7 @@ pub fn play_round_ctl(
     rng: &mut DelphiRng,
     clubs: &mut [Club],
     round: usize,
-    names: &mut dyn FnMut(usize, usize) -> (Vec<u8>, Vec<u8>, Vec<u8>),
+    bonus: &mut dyn FnMut(usize, usize) -> (i32, i32),
     plans: &HashMap<usize, Plan>,
     money: Option<MoneyCtx>,
     on_sack: &mut dyn FnMut(&mut [Club], usize),
@@ -594,9 +606,7 @@ pub fn play_round_ctl(
     }
     for (h, a) in fixtures(round) {
         ctl.checkpoint(rng);
-        let (division, hn, an) = names(h, a);
-        let hb = fixture_value(&division, &hn, true) + 2;
-        let ab = fixture_value(&division, &an, true);
+        let (hb, ab) = bonus(h, a);
         let (hc, ac) = two_mut(clubs, h, a);
         let (attendance, gate) = match money {
             Some(m) => {
@@ -938,15 +948,15 @@ mod tests {
             .map(|i| Club::new(&format!("C{i}"), crate::matchsim::tests::squad(6, &mut rng)))
             .collect();
         let mut seed = DelphiRng::new(6);
-        let mut names = move |_h: usize, _a: usize| {
+        let mut bonus = move |_h: usize, _a: usize| {
             let mut n = || {
                 (0..8)
                     .map(|_| b'a' + seed.random(26) as u8)
                     .collect::<Vec<u8>>()
             };
-            (n(), n(), n())
+            standin_bonus(&n(), &n(), &n())
         };
-        play_round(&mut rng, &mut clubs, 1, &mut names, &HashMap::new(), None);
+        play_round(&mut rng, &mut clubs, 1, &mut bonus, &HashMap::new(), None);
         for c in &clubs {
             assert_eq!(c.wins + c.draws + c.losses, 1);
             assert_eq!(c.points, c.wins * 3 + c.draws);

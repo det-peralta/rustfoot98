@@ -145,6 +145,19 @@ impl World {
                 out.push_str(&format!("cuptie|{}|{}\n", clean(h), clean(a)));
             }
         }
+        // the referees in the list's order and the next day's games' referees
+        for r in &self.referees {
+            out.push_str(&format!(
+                "referee|{}|{}|{}|{}\n",
+                r.id,
+                r.free as u8,
+                clean(&r.country),
+                clean(&r.name)
+            ));
+        }
+        for (h, a, id) in &self.day_referees {
+            out.push_str(&format!("dayreferee|{}|{}|{id}\n", clean(h), clean(a)));
+        }
         for (d, order) in self.tie_order.iter().enumerate() {
             let list: Vec<String> = order.iter().map(|i| i.to_string()).collect();
             out.push_str(&format!("tieorder|{d}|{}\n", list.join(",")));
@@ -152,7 +165,7 @@ impl World {
         self.save_history(&mut out);
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -195,7 +208,8 @@ impl World {
                     .flatten()
                     .map(|v| v.to_string())
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(","),
+                clean(&c.short_name)
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -244,6 +258,8 @@ impl World {
             |f: &[&str], at: usize| f.get(at).and_then(|x| x.parse::<usize>().ok()).unwrap_or(0);
         let mut cup: Vec<String> = Vec::new();
         let mut cup_draw: Option<crate::world::CupDraw> = None;
+        let mut referees: Vec<crate::world::Referee> = Vec::new();
+        let mut day_referees: Vec<(String, String, u16)> = Vec::new();
         let mut cup_champion: Option<String> = None;
         let mut has_cup = false;
         let mut has_finance = false;
@@ -443,6 +459,17 @@ impl World {
                         d.pairs.push((h.to_string(), a.to_string()));
                     }
                 }
+                "referee" => referees.push(crate::world::Referee {
+                    id: num(n, &f, 1)? as u16,
+                    free: f.get(2).is_some_and(|v| *v == "1"),
+                    country: f.get(3).unwrap_or(&"").to_string(),
+                    name: f.get(4).unwrap_or(&"").to_string(),
+                }),
+                "dayreferee" => day_referees.push((
+                    f.get(1).unwrap_or(&"").to_string(),
+                    f.get(2).unwrap_or(&"").to_string(),
+                    num(n, &f, 3)? as u16,
+                )),
                 "cupchampion" => {
                     cup_champion = Some(f.get(1).ok_or("cupchampion without name")?.to_string())
                 }
@@ -549,6 +576,9 @@ impl World {
                     if let Some(v) = f.get(30) {
                         c.coach_name = v.to_string();
                     }
+                    if let Some(v) = f.get(32) {
+                        c.short_name = v.to_string();
+                    }
                     if let Some(v) = f.get(28) {
                         let n: Vec<u8> = v.split(',').filter_map(|t| t.parse().ok()).collect();
                         if n.len() == 6 {
@@ -633,6 +663,8 @@ impl World {
             seats: Default::default(),
             history,
             tie_order,
+            referees,
+            day_referees,
         };
         if !has_cup {
             w.reset_cup();
