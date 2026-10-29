@@ -9,6 +9,19 @@ impl Classic {
         if let Ev::Move(x, y) | Ev::Down(x, y) | Ev::Up(x, y) = ev {
             self.mouse = (x, y);
         }
+        match (ev, self.dialogs.last()) {
+            (Ev::Move(x, y), Some(d)) => {
+                self.hover
+                    .moved(&d.form, self.forms.get(&d.form), &d.hits, x, y);
+            }
+            (Ev::Move(..), None) => {
+                self.hover.clear();
+            }
+            (Ev::Down(..) | Ev::Key(_), _) => {
+                self.hover.cancel();
+            }
+            _ => {}
+        }
         if !self.dialogs.is_empty() {
             self.dialog_event(ev);
         } else if matches!(self.screen, Screen::Main) {
@@ -21,6 +34,9 @@ impl Classic {
 
     /// Time passes: the round clock runs and dialogs animate.
     pub fn tick(&mut self, ms: u32) {
+        if self.hover.tick(ms) {
+            self.dirty = true;
+        }
         if let Some(mut d) = self.dialogs.pop() {
             let out = dialogs::tick(self, &mut d, ms);
             self.apply(d, out);

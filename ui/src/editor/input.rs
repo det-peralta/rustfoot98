@@ -24,6 +24,18 @@ impl Editor {
         if let Ev::Move(x, y) = ev {
             self.mouse = (x, y);
         }
+        match (ev, self.dialogs.last()) {
+            (Ev::Move(x, y), Some(d)) => {
+                self.hover
+                    .moved(&d.form, self.forms.get(&d.form), &d.hits, x, y);
+            }
+            (Ev::Move(..), None) => {
+                self.hover.clear();
+            }
+            (Ev::Down(..) | Ev::DblClick(..) | Ev::Key(_), _) => {
+                self.hover.cancel();
+            }
+        }
         if !self.dialogs.is_empty() {
             self.dialog_event(ev);
         } else {

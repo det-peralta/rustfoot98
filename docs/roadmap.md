@@ -69,7 +69,8 @@ printing.
   OK waits for the names, the coach, a country, the player's name; a spin edit keeps Enter.
 - A team made in the port (`editor_shot ... save=`) put in the original's bundle opens in `EDITEQ.EXE` with its names, coach,
   country, level, players and colours (`analysis/captures/editor/port_team_in_original.png`).
-- Open: hover hints (`ShowHint`) are not drawn.
+- Hover hints (2026-10-29, `ui/src/win31/hint.rs`): a control with `Hint` and `ShowHint` shows it after 800 ms (`HintPause`) in
+  Delphi 1's hint window, measured on the new-game dialog's file name (0 pixels differ); game and team editor.
 
 ## 6. Browser product and close-out
 - Done: `tools/capture/classic_season.mjs` plays the browser build by the game's state (`cl_status`): one human for a season and two

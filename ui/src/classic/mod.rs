@@ -200,6 +200,8 @@ pub struct Classic {
     /// The wall clock as `dd/mm/yy hh:mm`, set by the host (it goes into the description of saved games).
     pub clock: String,
     pub mouse: (i32, i32),
+    /// The hint of the control under the pointer in the topmost dialog.
+    pub hover: crate::win31::hint::Hover,
     pub hits: Vec<Hit>,
     /// Set whenever something changed that needs a new frame.
     pub dirty: bool,
@@ -231,6 +233,7 @@ impl Classic {
             loading: None,
             clock: String::new(),
             mouse: (0, 0),
+            hover: Default::default(),
             hits: Vec::new(),
             dirty: true,
         }
@@ -386,6 +389,9 @@ impl Classic {
             d.draw(self);
         }
         inactive(false);
+        if let Some(d) = dialogs.last() {
+            self.hover.draw(&mut self.fb, &self.skin, &d.form);
+        }
         self.dialogs = dialogs;
         self.dirty = false;
     }

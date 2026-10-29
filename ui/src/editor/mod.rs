@@ -69,6 +69,8 @@ pub struct Editor {
     /// The position of the last player added (the next new player starts there).
     pub last_position: Position,
     pub mouse: (i32, i32),
+    /// The hint of the control under the pointer in the topmost dialog.
+    pub hover: crate::win31::hint::Hover,
     pub hits: Vec<Hit>,
     pub dirty: bool,
 }
@@ -97,6 +99,7 @@ impl Editor {
             new_steps: None,
             last_position: Position::Goalkeeper,
             mouse: (0, 0),
+            hover: Default::default(),
             hits: Vec::new(),
             dirty: true,
         }
@@ -145,8 +148,11 @@ impl Editor {
         self.open.as_ref().filter(|_| !naming)
     }
 
-    /// Time passes: the *Acerca* box scrolls its banner.
+    /// Time passes: the *Acerca* box scrolls its banner, a hint opens.
     pub fn tick(&mut self, ms: u32) {
+        if self.hover.tick(ms) {
+            self.dirty = true;
+        }
         let Some(mut d) = self.dialogs.pop() else {
             return;
         };
@@ -176,6 +182,7 @@ impl Editor {
         inactive(false);
         if let Some(d) = dialogs.last() {
             self.hits = d.hits.clone();
+            self.hover.draw(&mut self.fb, &self.skin, &d.form);
         }
         self.dialogs = dialogs;
         if let (Some((open, hl)), true) = (self.menu, self.dialogs.is_empty()) {

@@ -1891,6 +1891,29 @@ pub fn focus_rect(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, wx: i32, wy: i32)
 /// The desktop colour of the original install.
 pub const DESKTOP: Rgb = GREEN;
 
+/// The colour of hint windows (Delphi 1's `Application.HintColor`, `$80FFFF`).
+pub const HINT_BG: Rgb = Rgb(255, 255, 128);
+
+/// The hint of a control (Delphi 1's `THintWindow`, measured on the original's new-game dialog): a black frame filled with
+/// `HINT_BG`, the text in MS Sans Serif 8 two pixels in from the left and one down, the window the text extent plus 6 wide and
+/// plus 2 high. It opens at the control's left edge, 6 pixels below its bottom (`(x, y, h)` is the control's rectangle), moved left
+/// and above the control when it would leave the screen.
+pub fn hint_window(fb: &mut Fb, skin: &Skin, (x, y, h): (i32, i32, i32), s: &str) {
+    let Some(font) = skin.font("ms sans serif", 11, false, false) else {
+        return;
+    };
+    let (w, hh) = (font.width(s) + 6, font.tm_height + 2);
+    let wx = x.min(super::fb::W - w).max(0);
+    let wy = if y + h + 6 + hh > super::fb::H {
+        y - hh
+    } else {
+        y + h + 6
+    };
+    fb.fill(wx, wy, w, hh, BLACK);
+    fb.fill(wx + 1, wy + 1, w - 2, hh - 2, HINT_BG);
+    text(fb, font, wx + 2, wy + 1, s, BLACK, false);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
