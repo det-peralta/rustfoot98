@@ -59,7 +59,7 @@ bench's share picks **nobody** and the event does not happen, so deep benches di
 
 ## Attack opportunity — `1010:a6eb(match, ..., minute)`
 Match object: home team ptr `+0x2e`, away team ptr `+0x32`, event list `+0x44`,
-**home attack value `+0x4c`**, **away attack value `+0x4e`** (signed u16).
+**home attack value `+0x4c`**, **away attack value `+0x4e`** (signed u16): the game's referee bonus values (`c95c`, home + 2).
 1. A pending penalty from the previous minute (last event: `minute-1`, kind 4, not yet taken) forces a chance
    (taken immediately, or with `Random(3)==0` on a retake) and requires `minute % 45 > 1`.
 2. Otherwise home chance if `Random(6000) < homeAttack`; away chance if `Random(7000) < awayAttack`

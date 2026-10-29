@@ -12,7 +12,7 @@ What is left to finish the port is tracked in `docs/roadmap.md`.
 - [x] File formats: `.EFT` team, `.TXE` (done, see findings)
 - [~] File formats: `.e98` save (layout documented in docs/e98-format.md; fixtures/cup/news not imported), `DRLIST.ELI`
 - [x] Locate RNG and match simulation (see docs/match-engine.md); partly decoded
-- [ ] Decode attack-value computation (+0x4c/+0x4e) and the Real math in 46df
+- [x] Decode attack-value computation (+0x4c/+0x4e: the referee's bonus values, `c95c`) and the Real math in 46df (docs/match-engine.md)
 - [ ] Finances, transfers, injuries, calendar/competition generation, AI
 - [x] Registration check: the unregistered copy hides loans' extras, *Procurar* and the *Controle* page; the port hides them too (no key check, by decision)
 - [x] `core/` in Rust (cipher, Delphi RNG, EFT/TXE, sectors, chance generator, outcome, evolution, Match v0)
@@ -33,4 +33,4 @@ What is left to finish the port is tracked in `docs/roadmap.md`.
 - [x] Computer-managed transfer market: sale decisions, asking price, auction, bids (docs/finance.md; fees calibrated on one save)
 - [x] The user's market: bidding in open auctions, selling players (async adaptation, docs/finance.md)
 - [x] Loans (limit, interest) and stadium expansion
-- [ ] Market leftovers (buy/sell, tickets, salaries)
+- [x] Market leftovers (buy/sell, tickets, salaries; the market before every match day, holiday humans; docs/finance.md)
