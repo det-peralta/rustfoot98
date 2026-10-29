@@ -23,7 +23,8 @@ that follow a round. Code: `ui/src/classic/{round_view,session}.rs`, `ui/src/cla
 
 Timer speed (`1048:0ba3`, profiles registered by `1060:3219`): without a human coach in the games 100 ms per minute (50 for *Ultrassónico*);
 with humans `p3 + (n - 1) * p1` ms for the profile `(p1, p3)` = Lento (200, 1000), Médio (150, 800, the default), Rápido (100, 600),
-Super-rápido (125, 400), Rapidíssimo (50, 250), Ultrassónico (0, 50).
+Super-rápido (125, 400), Rapidíssimo (50, 250), Ultrassónico (0, 50). Windows 3.1 fires the timer on the first 18.2 Hz clock tick after the
+interval (950 ms becomes 989); measured under js-dos with two humans on *Médio*: 1092 ms a minute (45 minutes in 48 s).
 
 ## The cup day (`1020:11b8` -> `1020:0ed4`, decoded; captures `season/or/r7,c1,c3,p2,d5`)
 `11b8` loops the rounds: `0c41` (league day) and, when the round number is even, `0ed4` (cup day). The structure, with the functions that

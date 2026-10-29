@@ -75,14 +75,18 @@ pub const TIME_PROFILES: [(u32, u32, u32); 6] = [
     (0, 50, 50),
 ];
 
-/// Milliseconds per game minute for a profile (1..=6) and the number of human coaches in the games shown (`1048:0ba3`).
+/// Milliseconds per game minute for a profile (1..=6) and the number of human coaches in the games shown (`1048:0ba3`). Windows 3.1
+/// fires a timer on the first tick of the 18.2 Hz PC clock after its interval, so the interval grows to whole ticks of 54.925 ms
+/// (measured: two humans on *Médio*, 950 ms, ran 1092 ms a minute under js-dos, whose own drawing adds the rest).
 pub fn interval(profile: usize, humans: usize) -> u32 {
     let (step, with, without) = TIME_PROFILES[profile.clamp(1, 6) - 1];
-    if humans == 0 {
+    let ms = if humans == 0 {
         without
     } else {
         with + (humans as u32 - 1) * step
-    }
+    };
+    let ticks = (ms * 1000).div_ceil(54925);
+    (ticks * 54925 + 500) / 1000
 }
 
 #[derive(Clone, Debug)]
@@ -697,16 +701,17 @@ mod tests {
 
     #[test]
     fn the_timer_interval_follows_the_profile_and_the_humans() {
-        // Médio: 100 ms without a human, 800 ms with one, 150 ms more for every further human coach
-        assert_eq!(interval(2, 0), 100);
-        assert_eq!(interval(2, 1), 800);
-        assert_eq!(interval(2, 2), 950);
-        assert_eq!(interval(1, 1), 1000);
-        assert_eq!(interval(6, 1), 50);
-        assert_eq!(interval(6, 0), 50);
+        // Médio: 100 ms without a human, 800 ms with one, 150 ms more for every further human coach, each rounded up to whole
+        // ticks of the PC clock
+        assert_eq!(interval(2, 0), 110);
+        assert_eq!(interval(2, 1), 824);
+        assert_eq!(interval(2, 2), 989);
+        assert_eq!(interval(1, 1), 1044);
+        assert_eq!(interval(6, 1), 55);
+        assert_eq!(interval(6, 0), 55);
         // out-of-range profiles fall back to the nearest one
-        assert_eq!(interval(0, 1), 1000);
-        assert_eq!(interval(9, 1), 50);
+        assert_eq!(interval(0, 1), 1044);
+        assert_eq!(interval(9, 1), 55);
     }
 
     #[test]

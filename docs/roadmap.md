@@ -79,7 +79,9 @@ printing.
 - Offline (2026-10-27): the game and editor pages register `sw.js` (v3, network first, the cache answers without a network; the skin
   pack the server has is precached); `tools/capture/offline.mjs` loads the game, the editor and `/` with the network off after one visit.
   `?nosw` removes the worker while developing.
-- Open: the speed settings against the original's timing (the runs use the default).
+- Speed (2026-10-29): timed on the original under js-dos, two humans on *Médio*: the pie clock ran 1092 ms a minute against the
+  decoded 950 ms (`1048:0ba3`); Windows 3.1 rounds a timer up to whole 54.925 ms clock ticks (989 ms), the emulator's drawing
+  the rest. The round view uses the decoded interval with that rounding (`round_view::interval`).
 
 ## Size
 | Step | Sessions |

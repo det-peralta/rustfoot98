@@ -54,13 +54,6 @@ pub const SOUND: [&str; 2] = ["Sim", "Não"];
 pub const NO_YES: [&str; 2] = ["Não", "Sim"];
 
 impl Options {
-    /// Milliseconds one match minute lasts in the round view: the medium profile is the 90 ms of the replay, the others scale with the
-    /// original's per-profile delay.
-    pub fn minute_ms(&self) -> u32 {
-        let d = PROFILES[(self.profile as usize).min(PROFILES.len() - 1)].1;
-        (90 * d / 800).max(1)
-    }
-
     /// Whether the game is saved after the round `round` (rounds played so far in the season), `1018:229f`.
     pub fn saves_after(&self, round: usize) -> bool {
         round == 1
@@ -215,16 +208,6 @@ mod tests {
         assert!(o.saves_after(2));
         o.save_when = 2;
         assert!(o.saves_after(1) && !o.saves_after(3));
-    }
-
-    #[test]
-    fn profiles_scale_the_minute() {
-        let mut o = Options::default();
-        assert_eq!(o.minute_ms(), 90);
-        o.profile = 0;
-        assert!(o.minute_ms() > 90);
-        o.profile = 2;
-        assert!(o.minute_ms() < 90);
     }
 
     #[test]
