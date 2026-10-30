@@ -90,3 +90,19 @@ gauges, scroll bars, menus (capture each dialog of the original with `driver.mjs
 3. Bind forms to the game: each form is data; its controls get their text and state from `World` by control name, events call the same
 `World` methods as the shared UI. 4. Host the renderer in the SDL and web front ends (blit the 800x600 buffer) and load the skin pack from the user's
 own files (SDL: a directory; web: a file the user picks, kept in IndexedDB).
+
+## Rules found by the screen catalogue (2026-10-30, `tools/screens/`)
+* **Focus rectangle colours**: `DrawFocusRect` blits a 50 % pattern brush with XOR; the lit dots XOR the background colour
+  (white: they invert) and the dots between XOR the text colour of the device context. On black text nothing shows between
+  the dots; on a red team's list they turn cyan; on a selected row (white text) both phases turn the band white, a solid ring.
+  `widgets::focus_rect_ink`.
+* **Focus on show**: a form without `ActiveControl` gives the focus to its first tab stop (the stadium's *Fechar*); a list under
+  a dialog (an inactive window) shows no focus rectangle, and an edit there no caret.
+* **Edits**: `TEdit` with `AutoSize` (the default) is `tmHeight + min(tmHeight, 16) / 4 + 4` high (Delphi 1's `AdjustHeight`
+  without the new-style controls). `TSpinEdit` writes its value 4 pixels in, with a 2-pixel caret as high as the font.
+* **Labels** that are not `AutoSize` are clipped to their bounds (descenders can be cut).
+* **Buttons**: a plain `TButton` centres its caption on the text extent including a bold raster font's overhang; a
+  glyph-on-top `TBitBtn` with `Margin = -1` centres glyph, spacing and caption using the caption's line height (for TrueType a
+  pixel more than `tmHeight`).
+* **Panels** of zero height draw nothing. **List boxes** that are not of integral height show the top of the next row.
+* **Menus**: three drop-downs (those whose registered-only entries are hidden) are a pixel narrower in the port; not explained.

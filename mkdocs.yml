@@ -42,6 +42,7 @@ nav:
       - Coaches and referees: game/coaches.md
       - Files: game/files.md
   - Verification:
+      - How screens are verified: verification/method.md
       - Screen by screen: verification/screens.md
       - Gallery: verification/gallery.md
       - Pixel-exact interface: pixel-exact-ui.md
