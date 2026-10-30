@@ -17,7 +17,7 @@ fonts, dialogs and rules, recovered from the program itself rather than imitated
 | Section | What it holds |
 |---|---|
 | [How the game works](game/index.md) | The rules of Elifoot 98 explained from the decompiled program: the match engine minute by minute, seasons and the cup, the economy, the transfer market, coaches and referees, the save files. |
-| [Verification](verification/screens.md) | Every screen of the original captured under an emulator and compared, pixel by pixel, with the port's picture of the same game state; the [gallery](verification/gallery.md) shows them side by side. |
+| [Verification](verification/screens.md) | 77 screens of the original captured under an emulator and compared with the port's picture of the same game state, 63 of them pixel by pixel; the [gallery](verification/gallery.md) shows them side by side and [the method](verification/method.md) explains how. |
 | [Reverse engineering](installation.md) | How the binary was taken apart (Ghidra on the 16-bit NE executable, the Delphi class and form tables) and the raw findings: function map, file formats, notes per subsystem. |
 | [The port](architecture.md) | How the Rust code is organised: the rules core, the Windows 3.1 renderer, the game's windows as a state machine, the WebAssembly host. |
 

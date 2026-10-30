@@ -9,6 +9,9 @@ binary and rebuilt in **Rust** and **WebAssembly**. It runs in a browser with th
 
 - **Rules** recovered with Ghidra from the 16-bit Delphi executable and checked against the original's own saves and screens.
 - **Interface** drawn by a renderer that reproduces Windows 3.1 and the Delphi VCL from the forms, fonts and bitmaps of your copy.
+- **Verified screen by screen**: 77 screens of the game and the team editor captured from the original under emulation and compared
+  with the port's render of the same state; 63 of them pixel for pixel, typically within a hundred or so of 480 000 pixels (single
+  pixels of TrueType glyphs). See [docs/verification/screens.md](docs/verification/screens.md).
 - **Everything** the original offers, apart from the registered-copy features: new game, up to six human coaches (hot seat),
   four divisions and the cup, match days with half-time decisions and penalties, the transfer market and auctions, finances,
   stadium and loans, coaches sacked and swapped, the end of season, saved games. The team editor (`EDITEQ.EXE`) is ported too.

@@ -30,7 +30,8 @@ await p.keyboard.type('joga1'); await p.keyboard.press('Enter'); await run(500);
 await p.keyboard.press('Enter'); await run(1500);
 const rounds = Number(process.argv[4] || 4); let shot = 0;
 for (let r = 0; r < rounds; r++) {
-  await p.keyboard.press('F5'); await p.keyboard.press('Enter');
+  // A (Automático): a formation the squad can play (Jogar waits for one, as in the original)
+  await p.keyboard.press('a'); await p.keyboard.press('Enter');
   for (let i = 0; i < 400; i++) {
     await run(2000);
     await p.mouse.click(300, 312); await p.mouse.click(550, 360); await p.keyboard.press('Enter');
