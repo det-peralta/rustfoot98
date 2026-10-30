@@ -1087,8 +1087,9 @@ fn editor_players(
         let c: Vec<&str> = row.split('|').collect();
         let ry = y + 2 + (k - top) as i32 * ROW;
         let on = sel == Some(k as i64);
+        // (the selected row's band is a pixel higher than its text's row, measured)
         if on {
-            fb.fill(rx, ry, rw, ROW, ink);
+            fb.fill(rx, ry - 1, rw, ROW, ink);
         }
         let colour = if on { selink } else { ink };
         let ty = ry + (ROW - font.height()) / 2 - 1;
@@ -1104,8 +1105,18 @@ fn editor_players(
             );
         }
         // the focus rectangle: on the selected row, or on the first one before any is chosen
+        // (a pixel outside the row on the left, right and top, over the list's inner border; over a row that is not selected the
+        // dots between are XORed with the team's ink: cyan on a red team, measured)
         if sel.map_or(k == top, |s| s == k as i64) {
-            focus_rect(fb, rx, ry, rw, ROW, rx, ry);
+            let inner = fb.clip;
+            fb.clip = (rx - 1, y + 1, rx + rw + 1, y + h - 1);
+            if on {
+                // on the band both phases turn cyan: the lit dots XOR white, the others the white of the text
+                widgets::focus_rect_ink(fb, rx, ry - 1, rw, ROW, rx, ry, selink);
+            } else {
+                widgets::focus_rect_ink(fb, rx - 1, ry - 1, rw + 2, ROW, rx, ry, ink);
+            }
+            fb.clip = inner;
         }
         cx.hits.borrow_mut().push(Hit {
             name: format!("{}#{k}", n.name),

@@ -130,3 +130,33 @@ for sid, title, form, ev, exact, note in [
 ]:
     add(id=sid, group="Start and new game", title=title, form=form, steps=None, exact=exact, note=note,
         port=["-", START_TEAMS, "saves=ABCDEEEE"] + (["ev=" + ev] if ev else []))
+
+# the team editor (EDITEQ.EXE), captured over Program Manager in an earlier session (analysis/captures/editor/): compared inside the
+# editor's window only (`region`), with the emulator's team files and ARSENAL.EFT open
+ED = ["dir=analysis/screens/jsdos/d/eli98/equipas"]
+ED_NOTES = {
+    "ed_about": "animated: blinking notice, scrolling banner",
+    "ed_team": "the capture shows the flag's hint (the country, set by the program) under the pointer",
+}
+ARS = ED + ["team=ARSENAL.EFT"]
+for sid, cap, title, form, port in [
+    ("ed_empty", "empty", "Editor without a team", "TEDITOR_MAIN", ED),
+    ("ed_team", "team", "Editor with a team", "TEDITOR_MAIN", ARS),
+    ("ed_team_selected", "team_selected", "Editor, a player selected", "TEDITOR_MAIN", ARS + ["sel=2"]),
+    ("ed_menu_ficheiro", "menu_ficheiro", "Editor menu Ficheiro", "TEDITOR_MAIN", ARS + ["menu=0", "hl=0"]),
+    ("ed_menu_jogador", "menu_jogador", "Editor menu Jogador", "TEDITOR_MAIN", ARS + ["menu=1", "hl=0"]),
+    ("ed_menu_equipa", "menu_equipa", "Editor menu Equipa", "TEDITOR_MAIN", ARS + ["sel=2", "menu=2", "hl=0"]),
+    ("ed_menu_elifoot", "menu_elifoot", "Editor menu Elifoot", "TEDITOR_MAIN", ARS + ["menu=3", "hl=0"]),
+    ("ed_open", "open", "Abrir", "TOPENTEAMDLG", ED + ["do=Abrir1"]),
+    ("ed_name", "dlg_nome", "Equipa › Nome", "TSETTEAMNAMEDLG", ARS + ["sel=2", "do=Nome1"]),
+    ("ed_colors", "dlg_cores", "Equipa › Cores", "TTEAMCOLORDLG", ARS + ["sel=2", "do=TeamColor"]),
+    ("ed_country", "dlg_pais", "Equipa › País", "TSETCOUNTRYDLG", ARS + ["sel=2", "do=EquipaPais"]),
+    ("ed_level", "dlg_nivel", "Equipa › Nível inicial", "TTEAMSKILLDLG", ARS + ["do=EquipaNivelInicial"]),
+    ("ed_coach", "dlg_treinador", "Equipa › Treinador", "TCOACHNAMEDLG", ARS + ["do=EquipaTreinador"]),
+    ("ed_player", "edit_player", "Jogador › Editar", "TEDITPLAYERDLG", ARS + ["sel=2", "do=JogadorEditar"]),
+    ("ed_transfer", "dlg_transfer", "Jogador › Transferir", "TTRANSFERPLAYERDLG", ARS + ["sel=2", "do=JogadorTransferir"]),
+    ("ed_about", "about", "Elifoot › Acerca", "TABOUTDLG", ARS + ["do=Acerca1"]),
+]:
+    add(id=sid, group="Team editor", title=title, form=form, steps=None, capture="editor/%s.png" % cap, tool="editor",
+        region="window", port=port, exact=sid != "ed_about",
+        note=ED_NOTES.get(sid, ""))

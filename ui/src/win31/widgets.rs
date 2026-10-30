@@ -73,6 +73,39 @@ pub(super) fn focus_rect_not(
     }
 }
 
+/// `DrawFocusRect` on a row written in the colour `ink`: GDI's pattern brush XORs its lit dots with the background colour (white:
+/// they invert) and the others with the text colour, so a list in red shows cyan between the dots (the team editor's, measured).
+#[allow(clippy::too_many_arguments)]
+pub(super) fn focus_rect_ink(
+    fb: &mut Fb,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    wx: i32,
+    wy: i32,
+    ink: Rgb,
+) {
+    focus_rect_not(fb, x, y, w, h, wx, wy, false);
+    let k = ink.q();
+    let dot = |fb: &mut Fb, px: i32, py: i32| {
+        if (px - wx + py - wy).rem_euclid(2) == 0 {
+            let c = under(fb, px, py);
+            fb.set(px, py, Rgb(c.0 ^ k.0, c.1 ^ k.1, c.2 ^ k.2));
+        }
+    };
+    for i in 1..w - 1 {
+        for j in [0, h - 1] {
+            dot(fb, x + i, y + j);
+        }
+    }
+    for j in 1..h - 1 {
+        for i in [0, w - 1] {
+            dot(fb, x + i, y + j);
+        }
+    }
+}
+
 /// The focus rectangle of a notebook tab: lit dots black, the others are XORed with the tab text colour.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn focus_rect_tab(
@@ -649,7 +682,11 @@ pub(super) fn listbox_rows(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32
         // the focus rectangle sits on the selected row, or on the first one while nothing is selected (`caret`; none when negative)
         let caret = get_num(cx, n, "caret").unwrap_or(0);
         if focused && (selected || (sel.is_none() && caret >= 0 && i == caret as usize)) {
-            focus_rect_not(fb, x + 1, ry, right - x - 1, ih, x, y, false);
+            if selected {
+                focus_rect_not(fb, x + 1, ry, right - x - 1, ih, x, y, false);
+            } else {
+                focus_rect_ink(fb, x + 1, ry, right - x - 1, ih, x, y, fg);
+            }
         }
         push_hit(
             cx,

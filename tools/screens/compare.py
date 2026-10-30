@@ -83,6 +83,14 @@ def main():
                 arrow = pointers.get(s['id']) or find_arrow(load(orig))
                 if arrow:
                     d[max(0, arrow[1] - 1):arrow[1] + 21, max(0, arrow[0] - 1):arrow[0] + 13] = False
+                if s.get('region') == 'window':
+                    # only the program's own window: the box of what the port draws over its desktop
+                    pic = load(port)
+                    ys, xs = np.nonzero((pic != pic[300, 2]).any(axis=2))
+                    keep = np.zeros_like(d)
+                    keep[ys.min():ys.max() + 1, xs.min():xs.max() + 1] = True
+                    keep[:20] = False  # the desktop's title bar
+                    d &= keep
                 n = int(d.sum())
                 # the diff: the port's picture faded, the differing pixels in red
                 img = (load(port) * 0.35 + 160).astype(np.uint8)

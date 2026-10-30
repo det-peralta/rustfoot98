@@ -277,3 +277,133 @@ not pixel-compared (2322 px) · `TPLANTELDLG` · the club is drawn at random
 |---|---|---|
 | [![original](img/original/start_13_main.png)](img/original/start_13_main.png) | [![port](img/port/start_13_main.png)](img/port/start_13_main.png) | [![difference](img/diff/start_13_main.png)](img/diff/start_13_main.png) |
 
+## Team editor
+
+### Editor without a team
+
+688 px (0.143 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_empty.png)](img/original/ed_empty.png) | [![port](img/port/ed_empty.png)](img/port/ed_empty.png) | [![difference](img/diff/ed_empty.png)](img/diff/ed_empty.png) |
+
+### Editor with a team
+
+915 px (0.191 %) · `TEDITOR_MAIN` · the capture shows the flag's hint (the country, set by the program) under the pointer
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_team.png)](img/original/ed_team.png) | [![port](img/port/ed_team.png)](img/port/ed_team.png) | [![difference](img/diff/ed_team.png)](img/diff/ed_team.png) |
+
+### Editor, a player selected
+
+224 px (0.047 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_team_selected.png)](img/original/ed_team_selected.png) | [![port](img/port/ed_team_selected.png)](img/port/ed_team_selected.png) | [![difference](img/diff/ed_team_selected.png)](img/diff/ed_team_selected.png) |
+
+### Editor menu Ficheiro
+
+151 px (0.031 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_menu_ficheiro.png)](img/original/ed_menu_ficheiro.png) | [![port](img/port/ed_menu_ficheiro.png)](img/port/ed_menu_ficheiro.png) | [![difference](img/diff/ed_menu_ficheiro.png)](img/diff/ed_menu_ficheiro.png) |
+
+### Editor menu Jogador
+
+437 px (0.091 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_menu_jogador.png)](img/original/ed_menu_jogador.png) | [![port](img/port/ed_menu_jogador.png)](img/port/ed_menu_jogador.png) | [![difference](img/diff/ed_menu_jogador.png)](img/diff/ed_menu_jogador.png) |
+
+### Editor menu Equipa
+
+494 px (0.103 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_menu_equipa.png)](img/original/ed_menu_equipa.png) | [![port](img/port/ed_menu_equipa.png)](img/port/ed_menu_equipa.png) | [![difference](img/diff/ed_menu_equipa.png)](img/diff/ed_menu_equipa.png) |
+
+### Editor menu Elifoot
+
+168 px (0.035 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_menu_elifoot.png)](img/original/ed_menu_elifoot.png) | [![port](img/port/ed_menu_elifoot.png)](img/port/ed_menu_elifoot.png) | [![difference](img/diff/ed_menu_elifoot.png)](img/diff/ed_menu_elifoot.png) |
+
+### Abrir
+
+34 px (0.007 %) · `TOPENTEAMDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_open.png)](img/original/ed_open.png) | [![port](img/port/ed_open.png)](img/port/ed_open.png) | [![difference](img/diff/ed_open.png)](img/diff/ed_open.png) |
+
+### Equipa › Nome
+
+121 px (0.025 %) · `TSETTEAMNAMEDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_name.png)](img/original/ed_name.png) | [![port](img/port/ed_name.png)](img/port/ed_name.png) | [![difference](img/diff/ed_name.png)](img/diff/ed_name.png) |
+
+### Equipa › Cores
+
+348 px (0.072 %) · `TTEAMCOLORDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_colors.png)](img/original/ed_colors.png) | [![port](img/port/ed_colors.png)](img/port/ed_colors.png) | [![difference](img/diff/ed_colors.png)](img/diff/ed_colors.png) |
+
+### Equipa › País
+
+186 px (0.039 %) · `TSETCOUNTRYDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_country.png)](img/original/ed_country.png) | [![port](img/port/ed_country.png)](img/port/ed_country.png) | [![difference](img/diff/ed_country.png)](img/diff/ed_country.png) |
+
+### Equipa › Nível inicial
+
+118 px (0.025 %) · `TTEAMSKILLDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_level.png)](img/original/ed_level.png) | [![port](img/port/ed_level.png)](img/port/ed_level.png) | [![difference](img/diff/ed_level.png)](img/diff/ed_level.png) |
+
+### Equipa › Treinador
+
+95 px (0.020 %) · `TCOACHNAMEDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_coach.png)](img/original/ed_coach.png) | [![port](img/port/ed_coach.png)](img/port/ed_coach.png) | [![difference](img/diff/ed_coach.png)](img/diff/ed_coach.png) |
+
+### Jogador › Editar
+
+205 px (0.043 %) · `TEDITPLAYERDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_player.png)](img/original/ed_player.png) | [![port](img/port/ed_player.png)](img/port/ed_player.png) | [![difference](img/diff/ed_player.png)](img/diff/ed_player.png) |
+
+### Jogador › Transferir
+
+189 px (0.039 %) · `TTRANSFERPLAYERDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_transfer.png)](img/original/ed_transfer.png) | [![port](img/port/ed_transfer.png)](img/port/ed_transfer.png) | [![difference](img/diff/ed_transfer.png)](img/diff/ed_transfer.png) |
+
+### Elifoot › Acerca
+
+not pixel-compared (1882 px) · `TABOUTDLG` · animated: blinking notice, scrolling banner
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_about.png)](img/original/ed_about.png) | [![port](img/port/ed_about.png)](img/port/ed_about.png) | [![difference](img/diff/ed_about.png)](img/diff/ed_about.png) |
+

@@ -55,3 +55,24 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Coaches' names | `TGETTEAMSDLG` | 420 px (0.087 %) |  |
 | Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3706 px) | the club is drawn at random |
 | A new game's main window | `TPLANTELDLG` | not pixel-compared (2322 px) | the club is drawn at random |
+
+## Team editor
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Editor without a team | `TEDITOR_MAIN` | 688 px (0.143 %) |  |
+| Editor with a team | `TEDITOR_MAIN` | 915 px (0.191 %) | the capture shows the flag's hint (the country, set by the program) under the pointer |
+| Editor, a player selected | `TEDITOR_MAIN` | 224 px (0.047 %) |  |
+| Editor menu Ficheiro | `TEDITOR_MAIN` | 151 px (0.031 %) |  |
+| Editor menu Jogador | `TEDITOR_MAIN` | 437 px (0.091 %) |  |
+| Editor menu Equipa | `TEDITOR_MAIN` | 494 px (0.103 %) |  |
+| Editor menu Elifoot | `TEDITOR_MAIN` | 168 px (0.035 %) |  |
+| Abrir | `TOPENTEAMDLG` | 34 px (0.007 %) |  |
+| Equipa › Nome | `TSETTEAMNAMEDLG` | 121 px (0.025 %) |  |
+| Equipa › Cores | `TTEAMCOLORDLG` | 348 px (0.072 %) |  |
+| Equipa › País | `TSETCOUNTRYDLG` | 186 px (0.039 %) |  |
+| Equipa › Nível inicial | `TTEAMSKILLDLG` | 118 px (0.025 %) |  |
+| Equipa › Treinador | `TCOACHNAMEDLG` | 95 px (0.020 %) |  |
+| Jogador › Editar | `TEDITPLAYERDLG` | 205 px (0.043 %) |  |
+| Jogador › Transferir | `TTRANSFERPLAYERDLG` | 189 px (0.039 %) |  |
+| Elifoot › Acerca | `TABOUTDLG` | not pixel-compared (1882 px) | animated: blinking notice, scrolling banner |
