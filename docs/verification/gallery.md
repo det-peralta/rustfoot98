@@ -289,7 +289,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor with a team (the flag's hint)
 
-122 px (0.025 %) · `TEDITOR_MAIN`
+2 px (0.000 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -297,7 +297,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor, a player selected
 
-181 px (0.038 %) · `TEDITOR_MAIN`
+58 px (0.012 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -305,7 +305,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Ficheiro
 
-123 px (0.026 %) · `TEDITOR_MAIN`
+0 px (0.000 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -313,7 +313,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Jogador
 
-400 px (0.083 %) · `TEDITOR_MAIN`
+277 px (0.058 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -321,7 +321,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Equipa
 
-452 px (0.094 %) · `TEDITOR_MAIN`
+329 px (0.069 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -329,7 +329,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Elifoot
 
-125 px (0.026 %) · `TEDITOR_MAIN`
+2 px (0.000 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -345,7 +345,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Nome
 
-100 px (0.021 %) · `TSETTEAMNAMEDLG`
+82 px (0.017 %) · `TSETTEAMNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -353,7 +353,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Cores
 
-321 px (0.067 %) · `TTEAMCOLORDLG`
+198 px (0.041 %) · `TTEAMCOLORDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -361,7 +361,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › País
 
-167 px (0.035 %) · `TSETCOUNTRYDLG`
+149 px (0.031 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -369,7 +369,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Nível inicial
 
-74 px (0.015 %) · `TTEAMSKILLDLG`
+56 px (0.012 %) · `TTEAMSKILLDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -377,7 +377,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Treinador
 
-74 px (0.015 %) · `TCOACHNAMEDLG`
+56 px (0.012 %) · `TCOACHNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -393,7 +393,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Jogador › Transferir
 
-88 px (0.018 %) · `TTRANSFERPLAYERDLG`
+70 px (0.015 %) · `TTRANSFERPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -607,7 +607,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team made (the flag's hint)
 
-242 px (0.050 %) · `TEDITOR_MAIN`
+0 px (0.000 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -615,7 +615,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### Gravar equipa
 
-235 px (0.049 %) · `TSAVETEAMDLG`
+144 px (0.030 %) · `TSAVETEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -623,7 +623,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### The team cannot be saved
 
-214 px (0.045 %) · `TCANTSAVETEAMDLG`
+124 px (0.026 %) · `TCANTSAVETEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|

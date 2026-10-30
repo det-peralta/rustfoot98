@@ -61,20 +61,20 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
 | Editor without a team | `TEDITOR_MAIN` | 0 px (0.000 %) |  |
-| Editor with a team (the flag's hint) | `TEDITOR_MAIN` | 122 px (0.025 %) |  |
-| Editor, a player selected | `TEDITOR_MAIN` | 181 px (0.038 %) |  |
-| Editor menu Ficheiro | `TEDITOR_MAIN` | 123 px (0.026 %) |  |
-| Editor menu Jogador | `TEDITOR_MAIN` | 400 px (0.083 %) |  |
-| Editor menu Equipa | `TEDITOR_MAIN` | 452 px (0.094 %) |  |
-| Editor menu Elifoot | `TEDITOR_MAIN` | 125 px (0.026 %) |  |
+| Editor with a team (the flag's hint) | `TEDITOR_MAIN` | 2 px (0.000 %) |  |
+| Editor, a player selected | `TEDITOR_MAIN` | 58 px (0.012 %) |  |
+| Editor menu Ficheiro | `TEDITOR_MAIN` | 0 px (0.000 %) |  |
+| Editor menu Jogador | `TEDITOR_MAIN` | 277 px (0.058 %) |  |
+| Editor menu Equipa | `TEDITOR_MAIN` | 329 px (0.069 %) |  |
+| Editor menu Elifoot | `TEDITOR_MAIN` | 2 px (0.000 %) |  |
 | Abrir | `TOPENTEAMDLG` | 30 px (0.006 %) |  |
-| Equipa › Nome | `TSETTEAMNAMEDLG` | 100 px (0.021 %) |  |
-| Equipa › Cores | `TTEAMCOLORDLG` | 321 px (0.067 %) |  |
-| Equipa › País | `TSETCOUNTRYDLG` | 167 px (0.035 %) |  |
-| Equipa › Nível inicial | `TTEAMSKILLDLG` | 74 px (0.015 %) |  |
-| Equipa › Treinador | `TCOACHNAMEDLG` | 74 px (0.015 %) |  |
+| Equipa › Nome | `TSETTEAMNAMEDLG` | 82 px (0.017 %) |  |
+| Equipa › Cores | `TTEAMCOLORDLG` | 198 px (0.041 %) |  |
+| Equipa › País | `TSETCOUNTRYDLG` | 149 px (0.031 %) |  |
+| Equipa › Nível inicial | `TTEAMSKILLDLG` | 56 px (0.012 %) |  |
+| Equipa › Treinador | `TCOACHNAMEDLG` | 56 px (0.012 %) |  |
 | Jogador › Editar | `TEDITPLAYERDLG` | 188 px (0.039 %) |  |
-| Jogador › Transferir | `TTRANSFERPLAYERDLG` | 88 px (0.018 %) |  |
+| Jogador › Transferir | `TTRANSFERPLAYERDLG` | 70 px (0.015 %) |  |
 | Elifoot › Acerca | `TABOUTDLG` | not pixel-compared (1820 px) | animated: blinking notice, scrolling banner |
 
 ## Match day
@@ -134,9 +134,9 @@ Every screen of the original, captured under js-dos, against the port's render o
 | New team: starting level | `TTEAMSKILLDLG` | 29 px (0.006 %) |  |
 | New team: coach | `TCOACHNAMEDLG` | 57 px (0.012 %) |  |
 | New team: the first player | `TEDITPLAYERDLG` | 176 px (0.037 %) |  |
-| New team made (the flag's hint) | `TEDITOR_MAIN` | 242 px (0.050 %) |  |
-| Gravar equipa | `TSAVETEAMDLG` | 235 px (0.049 %) |  |
-| The team cannot be saved | `TCANTSAVETEAMDLG` | 214 px (0.045 %) |  |
+| New team made (the flag's hint) | `TEDITOR_MAIN` | 0 px (0.000 %) |  |
+| Gravar equipa | `TSAVETEAMDLG` | 144 px (0.030 %) |  |
+| The team cannot be saved | `TCANTSAVETEAMDLG` | 124 px (0.026 %) |  |
 
 ## Main window
 
@@ -153,7 +153,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 ## Coverage
 
-78 screens, 63 of them compared pixel for pixel (median 56 differing pixels); 34 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
+78 screens, 63 of them compared pixel for pixel (median 30 differing pixels); 34 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
 
 | Form | Why it has no screen |
 |---|---|

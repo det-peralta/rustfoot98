@@ -1624,7 +1624,8 @@ fn image(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
         return;
     };
     if let Some(b) = cx.skin.bitmap(form, name) {
-        // `Stretch`: the bitmap is scaled to the control's size (nearest neighbour, as StretchBlt does for whole factors)
+        // `Stretch`: the bitmap is scaled to the control's size; StretchBlt takes the source pixel under the centre of each
+        // destination pixel (measured on the team editor's flag, 39x29 drawn 81x49)
         let (w, h) = if n.flag("Stretch", false) {
             (n.int("Width", b.w), n.int("Height", b.h))
         } else {
@@ -1632,7 +1633,8 @@ fn image(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
         };
         for r in 0..h {
             for c in 0..w {
-                let p = b.px[((r * b.h / h) * b.w + c * b.w / w) as usize];
+                let p = b.px
+                    [(((2 * r + 1) * b.h / (2 * h)) * b.w + (2 * c + 1) * b.w / (2 * w)) as usize];
                 fb.set(x + c, y + r, Rgb((p >> 16) as u8, (p >> 8) as u8, p as u8));
             }
         }
