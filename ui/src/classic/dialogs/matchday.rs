@@ -449,9 +449,15 @@ fn bind_forced(c: &Classic, d: &mut Dialog) {
     let name = "ListBoxOfSubstitutePlayers";
     d.lists.insert(name.into(), rows(&info, side, &bench));
     club_list(d, name, &ink, &form, "3,18,200", 15);
+    // (this list keeps its sunken border, unlike the half-time ones)
+    d.text(format!("{name}.flat"), "0");
     let sel = bench.iter().position(|&i| i as i64 == d.num("sel"));
     set_sel(d, name, sel);
     d.text("OKBtn.enabled", (sel.is_some() as u8).to_string());
+    // the caption is the club's name; the list has the focus, with no rectangle until a row is picked (measured)
+    d.text("@caption", info.clubs[side].clone());
+    d.focus = name.into();
+    d.text(format!("{name}.caret"), "-1");
 }
 
 /// The penalty of a primary chance at `minute` of the user's game: `attack` when the user's club shoots (he picks the shooter).

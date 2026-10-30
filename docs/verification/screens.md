@@ -145,9 +145,15 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Renovar contrato, a low offer typed | `TPREPAREGAMEDLG` | 335 px (0.070 %) |  |
 | The player refuses the offer (Actualização de Salário) | `TASKMORESALARYDLG` | 274 px (0.057 %) |  |
 
+## Match day
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| An injured player must be replaced | `TFORCEDSUBSTITUTIONDLG` | not pixel-compared (131013 px) | the match differs (the original's random numbers): layout only |
+
 ## Coverage
 
-77 screens, 63 of them compared pixel for pixel (median 121 differing pixels); 33 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
+78 screens, 63 of them compared pixel for pixel (median 121 differing pixels); 34 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
 
 | Form | Why it has no screen |
 |---|---|
@@ -157,7 +163,6 @@ Every screen of the original, captured under js-dos, against the port's render o
 | `TCLOCKDLG` | "Relógio" (a gauge): not shown in any recorded session; the port does not use it |
 | `TCOACHMANAGERDLG` | registered copy only (Treinador › Gestão de treinadores) |
 | `TCODEDLG` | the registration code dialog: no key check is implemented, by decision |
-| `TFORCEDSUBSTITUTIONDLG` | an injury in a human's game with substitutes left: random, not in the recordings yet |
 | `TFORM1` | an empty form left in the program; never shown |
 | `TINPUTDLG` | not shown in any recorded session; the port does not use it |
 | `TJANELACOR` | not shown in any recorded session (the editor's colours use TTeamColorDlg) |

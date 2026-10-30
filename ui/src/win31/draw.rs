@@ -1284,7 +1284,16 @@ fn listbox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     if flat {
         fb.fill(x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(cx.bg));
     } else {
-        sunken_box(fb, x, y, w, h, cx.color_of(n, "bg").unwrap_or(WHITE));
+        // (a `ParentColor` list is painted in its form's colour)
+        let fill = cx
+            .color_of(n, "bg")
+            .or_else(|| cx.color_of(n, "bgcolor"))
+            .unwrap_or(if n.flag("ParentColor", false) {
+                cx.bg
+            } else {
+                WHITE
+            });
+        sunken_box(fb, x, y, w, h, fill);
     }
     let Some(font) = cx.font(f) else {
         return;

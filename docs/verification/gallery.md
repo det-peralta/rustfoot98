@@ -647,3 +647,13 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 |---|---|---|
 | [![original](img/original/dlg_askmore.png)](img/original/dlg_askmore.png) | [![port](img/port/dlg_askmore.png)](img/port/dlg_askmore.png) | [![difference](img/diff/dlg_askmore.png)](img/diff/dlg_askmore.png) |
 
+## Match day
+
+### An injured player must be replaced
+
+not pixel-compared (131013 px) · `TFORCEDSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_forcedsub.png)](img/original/md_forcedsub.png) | [![port](img/port/md_forcedsub.png)](img/port/md_forcedsub.png) | [![difference](img/diff/md_forcedsub.png)](img/diff/md_forcedsub.png) |
+

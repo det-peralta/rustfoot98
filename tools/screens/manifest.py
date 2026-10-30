@@ -242,7 +242,6 @@ NOT_COVERED = {
                       "checked: a click at half-time does nothing",
     "TCODEDLG": "the registration code dialog: no key check is implemented, by decision",
     "TLOANDLG": "offered only to a club in debt or with a loan (Equipa › Pedir / pagar empréstimo); not reached in the recordings",
-    "TFORCEDSUBSTITUTIONDLG": "an injury in a human's game with substitutes left: random, not in the recordings yet",
     "TPROGRESSDLG": "the start-up gauge (captured as start_7_next, animated): not compared",
     "TJOURNEYDLG": "the round view: compared as md_roundview",
     "TADDINSDLG": "\"Extras\": not shown by the unregistered game in any recorded session; the port does not use it",
@@ -254,3 +253,5 @@ NOT_COVERED = {
     "TJANELACOR": "not shown in any recorded session (the editor's colours use TTeamColorDlg)",
     "TASSIGNNACDLG": "\"Abreviatura Inexistente\": asks for a country when a team's code is unknown; no team of the packs has one",
 }
+add(id="md_forcedsub", group="Match day", title="An injured player must be replaced", form="TFORCEDSUBSTITUTIONDLG", steps=None,
+    capture="probe1/0750_dialog_over_roundview.png", port=BASE + ["ev=season:40:ForcedSubstitution"], exact=False, note=MD)

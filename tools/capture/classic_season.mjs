@@ -59,7 +59,8 @@ while (steps < 200000) {
   const dlg = top.join(' ');
   if (Number(year) >= target && round === '0' && screen === 'main' && dlg === '-') break;
   if (st === last) same++; else { same = 0; last = st; }
-  if (same > 400) { console.log('STUCK', st); await shot('stuck'); break; }
+  // (a cup day can show many shoot-outs in a row, each 13 s or more, and the status line does not change between them)
+  if (same > (st.endsWith('Shootout') ? 4000 : 400)) { console.log('STUCK', st); await shot('stuck'); break; }
   if (screen === 'round' && dlg === '-') { await run(500); continue; }
   // a new game: every country (Todas), then OK
   if (dlg === 'SelectCountries') { await p.mouse.click(507, 130); await run(200); await p.mouse.click(600, 130); await run(800); continue; }
