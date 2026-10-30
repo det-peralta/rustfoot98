@@ -949,22 +949,34 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         spinedit_editor(fb, cx, n, f, (x, y, w, h), &value);
         return;
     }
-    let bh = (h - 2) / 2;
-    let bx = x + w - 17;
-    flat_button(fb, bx, y + 1, 16, bh);
-    flat_button(fb, bx, y + 1 + bh, 16, h - 2 - bh);
+    // the two buttons (measured on the contract's new salary): a black rule on their left and between them, each face with a
+    // white top-left and a grey bottom-right edge, 7-pixel arrows in the middle
+    let bx = x + w - 15;
+    let th = (h - 4) / 2;
+    let (top, low) = (y + 1, y + 2 + th);
+    let bh = h - 3 - th;
+    fb.fill(bx, y + 1, 1, h - 2, BLACK);
+    fb.fill(bx + 14, y + 1, 1, h - 2, BLACK);
+    fb.fill(bx, top + th, 14, 1, BLACK);
+    for (fy, fh) in [(top, th), (low, bh)] {
+        fb.fill(bx + 1, fy, 12, fh, SILVER);
+        fb.fill(bx + 1, fy, 12, 1, WHITE);
+        fb.fill(bx + 1, fy, 1, fh, WHITE);
+        fb.fill(bx + 13, fy, 1, fh, GRAY);
+        fb.fill(bx, fy + fh - 1, 14, 1, GRAY);
+    }
     glyph(
         fb,
-        bx + 5,
-        y + 1 + (bh - 4) / 2,
-        &["...#...", "..###..", ".#####."],
+        bx + 4,
+        top + (th - 4) / 2,
+        &["...#...", "..###..", ".#####.", "#######"],
         BLACK,
     );
     glyph(
         fb,
-        bx + 5,
-        y + 1 + bh + (h - 2 - bh - 3) / 2,
-        &[".#####.", "..###..", "...#..."],
+        bx + 4,
+        low + (bh - 4) / 2,
+        &["#######", ".#####.", "..###..", "...#..."],
         BLACK,
     );
     if let Some(font) = cx.font(f) {
@@ -982,16 +994,8 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         }
         fb.clip = old;
     }
-    push_hit(cx, format!("{}#up", n.name), "SpinUp", bx, y + 1, 16, bh);
-    push_hit(
-        cx,
-        format!("{}#down", n.name),
-        "SpinDown",
-        bx,
-        y + 1 + bh,
-        16,
-        h - 2 - bh,
-    );
+    push_hit(cx, format!("{}#up", n.name), "SpinUp", bx, top, 14, th);
+    push_hit(cx, format!("{}#down", n.name), "SpinDown", bx, low, 14, bh);
 }
 
 /// The team editor's spin edit: a black rule left of two 13-pixel buttons (white top and left, a 1-pixel grey shadow) split by a black

@@ -115,7 +115,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 |---|---|---|---|
 | A player selected, page Jogo | `TPREPAREGAMEDLG` | 18 px (0.004 %) |  |
 | A player selected, page Jogador | `TPREPAREGAMEDLG` | 18 px (0.004 %) |  |
-| Renovar contrato (the player's page) | `TPREPAREGAMEDLG` | 218 px (0.045 %) |  |
+| Renovar contrato (the player's page) | `TPREPAREGAMEDLG` | 65 px (0.014 %) |  |
 | Jogador › Vender | `TPREPAREGAMEDLG` | 12 px (0.003 %) |  |
 
 ## Match day
@@ -142,8 +142,8 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
-| Renovar contrato, a low offer typed | `TPREPAREGAMEDLG` | 226 px (0.047 %) |  |
-| The player refuses the offer (Actualização de Salário) | `TASKMORESALARYDLG` | 184 px (0.038 %) |  |
+| Renovar contrato, a low offer typed | `TPREPAREGAMEDLG` | 73 px (0.015 %) |  |
+| The player refuses the offer (Actualização de Salário) | `TASKMORESALARYDLG` | 31 px (0.006 %) |  |
 
 ## Match day
 

@@ -531,7 +531,7 @@ not pixel-compared (2778 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Renovar contrato (the player's page)
 
-218 px (0.045 %) · `TPREPAREGAMEDLG`
+65 px (0.014 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -633,7 +633,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### Renovar contrato, a low offer typed
 
-226 px (0.047 %) · `TPREPAREGAMEDLG`
+73 px (0.015 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -641,7 +641,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### The player refuses the offer (Actualização de Salário)
 
-184 px (0.038 %) · `TASKMORESALARYDLG`
+31 px (0.006 %) · `TASKMORESALARYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
