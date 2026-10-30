@@ -59,7 +59,7 @@ def main():
         back = os.path.join(OUT, '..', 'back.png')
         c({"op": "wait", "ms": 600})
         c({"op": "guest", "path": os.path.abspath(back)})
-        if not same_as_reference(back):
+        if not s.get('final') and not same_as_reference(back):
             sys.exit('not back on the main window after %s (see %s)' % (s['id'], back))
 
 if __name__ == '__main__':

@@ -52,9 +52,9 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Countries | `TSELECTCOUNTRIESDLG` | 85 px (0.018 %) |  |
 | Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 153 px (0.032 %) |  |
 | Currency | `TCURRENCYDLG` | 182 px (0.038 %) |  |
-| Coaches' names | `TGETTEAMSDLG` | 420 px (0.087 %) |  |
-| Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3706 px) | the club is drawn at random |
-| A new game's main window | `TPLANTELDLG` | not pixel-compared (2322 px) | the club is drawn at random |
+| Coaches' names | `TGETTEAMSDLG` | 4 px (0.001 %) |  |
+| Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3713 px) | the club is drawn at random |
+| A new game's main window | `TPLANTELDLG` | not pixel-compared (1959 px) | the club is drawn at random |
 
 ## Team editor
 
@@ -102,3 +102,16 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
 | Hint of the file name | `TSELECTGAMEDLG` | 93 px (0.019 %) | the capture's list shows ABCDEEEE |
+
+## Menu dialogs
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Elifoot › Opções, page Jogo | `TOPTIONSDLG` | 78 px (0.016 %) |  |
+
+## Main window
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| A player selected, page Jogo | `TPLANTELDLG` | 64 px (0.013 %) |  |
+| A player selected, page Jogador | `TPLANTELDLG` | 64 px (0.013 %) |  |

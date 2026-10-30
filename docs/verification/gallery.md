@@ -255,7 +255,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Coaches' names
 
-420 px (0.087 %) · `TGETTEAMSDLG`
+4 px (0.001 %) · `TGETTEAMSDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -263,7 +263,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Clubs drawn
 
-not pixel-compared (3706 px) · `TGETTEAMSDLG` · the club is drawn at random
+not pixel-compared (3713 px) · `TGETTEAMSDLG` · the club is drawn at random
 
 | Original | Port | Difference |
 |---|---|---|
@@ -271,7 +271,7 @@ not pixel-compared (3706 px) · `TGETTEAMSDLG` · the club is drawn at random
 
 ### A new game's main window
 
-not pixel-compared (2322 px) · `TPLANTELDLG` · the club is drawn at random
+not pixel-compared (1959 px) · `TPLANTELDLG` · the club is drawn at random
 
 | Original | Port | Difference |
 |---|---|---|
@@ -500,4 +500,32 @@ not pixel-compared (2896 px) · `TSELLPLAYERDLG` · the match differs (the origi
 | Original | Port | Difference |
 |---|---|---|
 | [![original](img/original/hint_gamename.png)](img/original/hint_gamename.png) | [![port](img/port/hint_gamename.png)](img/port/hint_gamename.png) | [![difference](img/diff/hint_gamename.png)](img/diff/hint_gamename.png) |
+
+## Menu dialogs
+
+### Elifoot › Opções, page Jogo
+
+78 px (0.016 %) · `TOPTIONSDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/dlg_opcoes_jogo.png)](img/original/dlg_opcoes_jogo.png) | [![port](img/port/dlg_opcoes_jogo.png)](img/port/dlg_opcoes_jogo.png) | [![difference](img/diff/dlg_opcoes_jogo.png)](img/diff/dlg_opcoes_jogo.png) |
+
+## Main window
+
+### A player selected, page Jogo
+
+64 px (0.013 %) · `TPLANTELDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/main_sel_jogo.png)](img/original/main_sel_jogo.png) | [![port](img/port/main_sel_jogo.png)](img/port/main_sel_jogo.png) | [![difference](img/diff/main_sel_jogo.png)](img/diff/main_sel_jogo.png) |
+
+### A player selected, page Jogador
+
+64 px (0.013 %) · `TPLANTELDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/main_sel_jogador.png)](img/original/main_sel_jogador.png) | [![port](img/port/main_sel_jogador.png)](img/port/main_sel_jogador.png) | [![difference](img/diff/main_sel_jogador.png)](img/diff/main_sel_jogador.png) |
 

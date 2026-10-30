@@ -390,12 +390,10 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
                 }
                 t("LabelSuspended.visible", ((s.ban > 0) as u8).to_string());
                 t("LabelInjured.visible", ((s.injured > 0) as u8).to_string());
-                let word = match s.aggression {
-                    0 | 1 => "Cavalheiro",
-                    2 | 3 => "Caneleiro",
-                    _ => "Sarrafeiro",
-                };
-                t("textPlayerBehaviour", word.into());
+                t(
+                    "textPlayerBehaviour",
+                    super::text::behaviour(s.aggression).into(),
+                );
                 t("textSeasonGoals", s.goals.to_string());
                 t("textHistoryGamesPlayed", s.history[0].to_string());
                 t("textHistoryGoals", s.history[1].to_string());

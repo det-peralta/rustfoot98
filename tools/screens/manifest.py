@@ -190,3 +190,12 @@ add(id="dlg_balance", group="Menu dialogs", title="Balance sheet (a click on the
 add(id="hint_gamename", group="Start and new game", title="Hint of the file name", form="TSELECTGAMEDLG", steps=None,
     capture="hint4.png", port=["-", START_TEAMS, "saves=ABCDEEEE", "ev=key:Enter;click:196,183;move:440,221;tick:1000"],
     note="the capture's list shows ABCDEEEE")
+
+# more screens of the loaded game, captured after the menus' (the last ones change the window for good: `final`)
+add(id="dlg_opcoes_jogo", group="Menu dialogs", title="Elifoot › Opções, page Jogo", form="TOPTIONSDLG",
+    steps=menu_keys(0, 0) + [("key", "Enter"), ("wait", 2500), ("click", 337, 183), ("wait", 1500)],
+    back=[("key", "Escape"), ("wait", 800)], port=BASE + ["dialog=opcoesElifoot", "ev=click:337,183"])
+add(id="main_sel_jogo", group="Main window", title="A player selected, page Jogo", form="TPLANTELDLG",
+    steps=[("click", 200, 218), ("wait", 1500)], back=[], final=True, port=BASE + ["ev=click:200,218"])
+add(id="main_sel_jogador", group="Main window", title="A player selected, page Jogador", form="TPLANTELDLG",
+    steps=[("click", 512, 511), ("wait", 1500)], back=[], final=True, port=BASE + ["select=2", "page=1"])

@@ -204,7 +204,9 @@ impl Classic {
                 .strip_prefix("ListBoxOfPlayers#")
                 .and_then(|i| i.parse().ok())
             {
+                // `ListBoxOfPlayersClick` (`1018:36b7`): the player's page shows
                 self.main.selected = Some(i);
+                self.main.page = Some(Page::Player);
             }
             // `ShowBalance` (`1018:3c45`): the list keeps the clicked row selected and opens the balance sheet
             if let Some(i) = name
@@ -294,6 +296,8 @@ impl Classic {
                         (Some(i), Key::Down) => (i + 1).min(n - 1),
                         (Some(i), _) => i.saturating_sub(1),
                     });
+                    // (the list's OnClick follows the arrow keys too)
+                    self.main.page = Some(Page::Player);
                 }
             }
             Key::Enter if self.play_enabled() => self.round_button(),

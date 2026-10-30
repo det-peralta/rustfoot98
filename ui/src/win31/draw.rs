@@ -981,8 +981,10 @@ fn roster(
             false,
         );
         // the list has the focus only while its window is the active one (not under a dialog)
+        // (GDI's pattern XORs the dots between with the row's text colour: a solid white ring on the selected row, cyan dots on a red
+        // club's list, measured)
         if focus == Some(i) && !INACTIVE.with(|a| a.get()) {
-            focus_rect(fb, x + 1, ty, w - 2, 16, x + 1, y + 1);
+            widgets::focus_rect_ink(fb, x + 1, ty, w - 2, 16, x + 1, y + 1, color);
         }
         cx.hits.borrow_mut().push(Hit {
             name: format!("{}#{i}", n.name),
@@ -1740,7 +1742,12 @@ fn bitbtn_glyph_left(
         glyph_image(fb, b, gx, gy, gw, glyphs, key, enabled);
     }
     if let Some(font) = font {
-        let (tx, ty) = (gx + gw + spacing, y + 2 + (ch - th + 1) / 2);
+        let (mut tx, ty) = (gx + gw + spacing, y + 2 + (ch - th + 1) / 2);
+        // a plain `TButton` centres its caption on the text extent, an emboldened raster font's overhang included (measured on
+        // "Renovar contrato..." in Arial and "Sortear equipas" in bold MS Sans Serif)
+        if n.class == "TButton" && bmp.is_none() {
+            tx = x + (w - tw - font.overhang()) / 2 - 1;
+        }
         if enabled {
             text(fb, font, tx, ty, &label, f.color, false);
         } else {

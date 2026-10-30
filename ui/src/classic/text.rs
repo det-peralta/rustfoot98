@@ -45,13 +45,17 @@ pub fn money_words(v: i64, unit: &str) -> String {
     format!("{body} {unit}")
 }
 
-/// The behaviour word of a player by his aggression (`0..=5`).
+/// The behaviour word of a player by their aggression (`0..=5`): the table of `10c8:171a`, one word per value.
 pub fn behaviour(aggression: u8) -> &'static str {
-    match aggression {
-        0 | 1 => "Cavalheiro",
-        2 | 3 => "Caneleiro",
-        _ => "Sarrafeiro",
-    }
+    const WORDS: [&str; 6] = [
+        "Fair play",
+        "Cordeirinho",
+        "Cavalheiro",
+        "Caneleiro",
+        "Caceteiro",
+        "Sarrafeiro",
+    ];
+    WORDS[(aggression as usize).min(5)]
 }
 
 pub const POSITIONS: [&str; 4] = ["Guarda-redes", "Defesa", "Médio", "Avançado"];
