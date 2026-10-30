@@ -30,7 +30,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 |---|---|---|---|
 | Elifoot › Opções | `TOPTIONSDLG` | 140 px (0.029 %) |  |
 | Elifoot › Acerca | `TABOUTDLG` | not pixel-compared (3035 px) | animated: the notice blinks every 500 ms and the banner scrolls, so the capture's moment decides |
-| Equipa › Estádio | `TSTADIUMDLG` | 560 px (0.117 %) | the stadium picture is drawn from measurements (~400 px of its outline) |
+| Equipa › Estádio | `TSTADIUMDLG` | 474 px (0.099 %) | the stadium picture is drawn from measurements (~400 px of its outline) |
 | Equipa › Historial | `TPRINTLISTDLG` | 51 px (0.011 %) |  |
 | Jogador › Últimas transferências | `TPRINTLISTDLG` | 49 px (0.010 %) |  |
 | Campeonato › Classificação | `TCLASSIFICATIONDLG` | 82 px (0.017 %) |  |
