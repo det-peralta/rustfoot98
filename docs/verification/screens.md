@@ -166,7 +166,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | `TFORM1` | an empty form left in the program; never shown |
 | `TINPUTDLG` | not shown in any recorded session; the port does not use it |
 | `TJANELACOR` | not shown in any recorded session (the editor's colours use TTeamColorDlg) |
-| `TLOANDLG` | offered only to a club in debt or with a loan (Equipa › Pedir / pagar empréstimo); not reached in the recordings |
+| `TLOANDLG` | registered copy only: its menu entry (Equipa › Pedir / pagar empréstimo) and the stadium's loan button are hidden in the unregistered game (1018:11f3; the stadium capture shows no loan button) |
 | `TMAINWINDOW` | an empty form captioned "Elifoot 97", left in the program; never shown |
 | `TOBSERVEDPLAYERSDLG` | registered copy only (Jogadores sob observação) |
 | `TPROGRESSDLG` | the start-up gauge (captured as start_7_next, animated): not compared |

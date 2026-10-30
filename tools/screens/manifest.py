@@ -241,7 +241,8 @@ NOT_COVERED = {
     "TREFEREEAIDDLG": "registered copy only: the referee's name opens it only with features 0x23 / 0x0a (1008:2427, 1018:3416); "
                       "checked: a click at half-time does nothing",
     "TCODEDLG": "the registration code dialog: no key check is implemented, by decision",
-    "TLOANDLG": "offered only to a club in debt or with a loan (Equipa › Pedir / pagar empréstimo); not reached in the recordings",
+    "TLOANDLG": "registered copy only: its menu entry (Equipa › Pedir / pagar empréstimo) and the stadium's loan button are "
+                "hidden in the unregistered game (1018:11f3; the stadium capture shows no loan button)",
     "TPROGRESSDLG": "the start-up gauge (captured as start_7_next, animated): not compared",
     "TJOURNEYDLG": "the round view: compared as md_roundview",
     "TADDINSDLG": "\"Extras\": not shown by the unregistered game in any recorded session; the port does not use it",
