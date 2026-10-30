@@ -7,14 +7,15 @@ a capture is its exact bitmap. This tool finds them:
 
   harvest  renders every exact screen of tools/screens/manifest.py with the glyph log (GLYPHLOG), and wherever a glyph of the
            port differs from the original's pixels in the same place (its box and a pixel around it, nothing else drawn
-           there), takes the original's bitmap; a correction is kept only when every place the glyph was seen agrees.
+           there), takes the original's bitmap; a correction is kept when one version dominates (three times the places where the port
+           already agrees, and most of the differing ones).
            Writes analysis/out/skin/glyph_fix.json (merged with what is there).
   apply    writes the corrections into analysis/out/skin/fonts.bin (from the pristine copy fonts.orig.bin, made the first
            time) and copies it to web/skin/fonts.bin.
 
 Both files are derived from the fonts and stay local (git-ignored). Run from the repository root with analysis/captures/venv."""
 import json, os, shutil, struct, subprocess, sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 import numpy as np
 from PIL import Image
 
@@ -73,16 +74,26 @@ def harvest():
             cx0, cy0, cx1, cy1 = g['clip']
             if x0 < max(cx0, 0) or y0 < max(cy0, 0) or x1 > min(cx1, W) or y1 > min(cy1, H):
                 continue  # partly clipped
-            # nothing else drawn in the box and its margin
-            if any(j != i and o['x'] < x1 and o['x'] + o['w'] > x0 and o['y'] < y1 and o['y'] + o['h'] > y0
-                   for j, o in enumerate(recs)):
+            # no other glyph inside the box itself; the margin leaves out the boxes of the neighbours
+            others = [o for j, o in enumerate(recs) if j != i and o['x'] < x1 and o['x'] + o['w'] > x0
+                      and o['y'] < y1 and o['y'] + o['h'] > y0]
+            if any(o['x'] < x1 - 1 and o['x'] + o['w'] > x0 + 1 and o['y'] < y1 - 1 and o['y'] + o['h'] > y0 + 1
+                   for o in others):
                 continue
+            own = np.ones((y1 - y0, x1 - x0), dtype=bool)
+            for o in others:
+                ox0, oy0 = max(o['x'], x0) - x0, max(o['y'], y0) - y0
+                ox1, oy1 = min(o['x'] + o['w'], x1) - x0, min(o['y'] + o['h'], y1) - y0
+                own[oy0:oy1, ox0:ox1] = False
+            own[1:-1, 1:-1] = True
             c = np.array(g['c'])
             po, oo = port[y0:y1, x0:x1], orig[y0:y1, x0:x1]
-            pm, om = (po == c).all(axis=2), (oo == c).all(axis=2)
+            pm, om = (po == c).all(axis=2) & own, (oo == c).all(axis=2) & own
             # outside the ink both pictures must show the same background
-            if not ((po == oo).all(axis=2) | pm | om).all():
+            if not ((po == oo).all(axis=2) | pm | om | ~own).all():
                 continue
+            if pm.sum() == 0:
+                continue  # painted over by a window drawn later
             if (pm == om).all():
                 seen[g['key']]['agree'] += 1
                 continue
@@ -95,9 +106,13 @@ def harvest():
     fixes = json.load(open(FIX)) if os.path.exists(FIX) else {}
     new = 0
     for key, v in seen.items():
-        cands = set(v['cands'])
-        if len(cands) == 1 and v['agree'] == 0:
-            dx, dy, m = next(iter(cands))
+        if not v['cands']:
+            continue
+        # the most common version of the original's glyph, if it clearly dominates the places where the port already agrees
+        # (a few places can disagree: a glyph partly covered, a neighbour's pixels in its margin)
+        best, n = Counter(v['cands']).most_common(1)[0]
+        if n >= 3 * v['agree'] and n * 10 >= 7 * len(v['cands']):
+            dx, dy, m = best
             fixes[key] = {'dx': dx, 'dy': dy, 'rows': [''.join('#' if b else '.' for b in r) for r in m], 'seen': len(v['cands'])}
             new += 1
     json.dump(fixes, open(FIX, 'w'), indent=0, sort_keys=True)
