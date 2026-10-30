@@ -48,5 +48,5 @@ analysis/captures/
 analysis/screens/
 
 # the docs site: its build and the gallery pictures (made locally from your own copy)
-site/
+/site/
 docs/verification/img/
