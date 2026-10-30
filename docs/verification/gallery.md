@@ -337,7 +337,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Abrir
 
-30 px (0.006 %) · `TOPENTEAMDLG`
+2 px (0.000 %) · `TOPENTEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -345,7 +345,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Nome
 
-82 px (0.017 %) · `TSETTEAMNAMEDLG`
+30 px (0.006 %) · `TSETTEAMNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -353,7 +353,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Cores
 
-198 px (0.041 %) · `TTEAMCOLORDLG`
+16 px (0.003 %) · `TTEAMCOLORDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -361,7 +361,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › País
 
-149 px (0.031 %) · `TSETCOUNTRYDLG`
+97 px (0.020 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -369,7 +369,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Nível inicial
 
-56 px (0.012 %) · `TTEAMSKILLDLG`
+2 px (0.000 %) · `TTEAMSKILLDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -377,7 +377,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Treinador
 
-56 px (0.012 %) · `TCOACHNAMEDLG`
+2 px (0.000 %) · `TCOACHNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -385,7 +385,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Jogador › Editar
 
-188 px (0.039 %) · `TEDITPLAYERDLG`
+176 px (0.037 %) · `TEDITPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -393,7 +393,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Jogador › Transferir
 
-70 px (0.015 %) · `TTRANSFERPLAYERDLG`
+18 px (0.004 %) · `TTRANSFERPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -559,7 +559,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: name (the hint of the full name)
 
-56 px (0.012 %) · `TSETTEAMNAMEDLG`
+29 px (0.006 %) · `TSETTEAMNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -567,7 +567,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: colours
 
-94 px (0.020 %) · `TTEAMCOLORDLG`
+2 px (0.000 %) · `TTEAMCOLORDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -575,7 +575,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: country
 
-316 px (0.066 %) · `TSETCOUNTRYDLG`
+97 px (0.020 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -583,7 +583,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: starting level
 
-29 px (0.006 %) · `TTEAMSKILLDLG`
+2 px (0.000 %) · `TTEAMSKILLDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -591,7 +591,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: coach
 
-57 px (0.012 %) · `TCOACHNAMEDLG`
+30 px (0.006 %) · `TCOACHNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -615,7 +615,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### Gravar equipa
 
-144 px (0.030 %) · `TSAVETEAMDLG`
+32 px (0.007 %) · `TSAVETEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -623,7 +623,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### The team cannot be saved
 
-124 px (0.026 %) · `TCANTSAVETEAMDLG`
+16 px (0.003 %) · `TCANTSAVETEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|

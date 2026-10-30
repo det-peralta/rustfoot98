@@ -773,7 +773,12 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
             fb.fill(fx, fy + fh - 1, fw, 1, NAVY);
             fb.fill(fx, fy, 1, fh, NAVY);
             fb.fill(fx + fw - 1, fy, 1, fh, NAVY);
-            focus_rect(fb, rx, ry, rw, rh, x, y);
+            // (dotted around a country; with none chosen yet every pixel of it is inverted: both measured)
+            if shown.is_empty() {
+                focus_rect_not(fb, rx, ry, rw, rh, x, y, true);
+            } else {
+                focus_rect(fb, rx, ry, rw, rh, x, y);
+            }
         }
         fb.clip = old;
         if flag(cx, n, "open") && !items.is_empty() {
