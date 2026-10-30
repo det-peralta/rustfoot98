@@ -272,7 +272,8 @@ fn bind_profile(c: &Classic, d: &mut Dialog) {
     d.text("RadioGroupBuyInAuction.index", o.auction.to_string());
     d.text("TabbedNotebook1.page", "0");
     d.text("@caption", format!("Perfil de {}", human_coach(&c.world)));
-    d.focus = "OKBtn".into();
+    // (the notebook has the focus when the dialog opens: measured)
+    d.focus = "TabbedNotebook1".into();
     d.st.insert("built".into(), "1".into());
 }
 
