@@ -149,6 +149,9 @@ pub struct E98Team {
     pub coach_score: i64,
     pub coach_human: bool,
     pub coach_name: String,
+    /// The bytes `+0x22..+0x2f`, one per league round: the key `1050:1a61` sorts a division's clubs by before `1010:0875` pairs
+    /// them into the day's games (`+0x21 + day`).
+    pub day_keys: [u8; 14],
     /// Team ids of the opponents in the fixture list (each twice); empty for clubs outside the league.
     pub opponents: Vec<u16>,
     /// Titles and places of the club (`TTeamEvent`).
@@ -376,6 +379,7 @@ fn team(c: &mut Cur) -> Result<E98Team, String> {
         coach_score: 0,
         coach_human: false,
         coach_name: String::new(),
+        day_keys: std::array::from_fn(|i| block[0x22 - 0x16 + i]),
         opponents,
         events,
         calendar,

@@ -804,7 +804,9 @@ mod tests {
                     }
                     c.dialogs.clear();
                 }
-                Kind::Halftime | Kind::Invitation => press(c, "OKBtn"),
+                Kind::Halftime => press(c, "OKBtn"),
+                // (the invitation's buttons are Sim and Não)
+                Kind::Invitation => press(c, "noBtn"),
                 _ => {
                     c.dialogs.pop();
                 }

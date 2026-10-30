@@ -260,7 +260,7 @@ impl Classic {
     /// The text of the game for the host to keep: a header line (coach, date, options) and the world.
     pub fn save_text(&self) -> String {
         let h = options::Header {
-            coach: self.coach.clone(),
+            coach: self.active_coach(),
             stamp: self.clock.clone(),
             opts: None,
         };
@@ -316,6 +316,16 @@ impl Classic {
     }
 
     /// The header shows the name of the active human (saves from before several humans have none: the name stays).
+    /// The name of the active human coach: the world's (it changes seats by itself during a match day), else the one set by the host.
+    pub fn active_coach(&self) -> String {
+        self.world
+            .human
+            .as_ref()
+            .map(|h| h.coach.clone())
+            .filter(|n| !n.is_empty())
+            .unwrap_or_else(|| self.coach.clone())
+    }
+
     pub fn sync_coach(&mut self) {
         if let Some(h) = self.world.human.as_ref().filter(|h| !h.coach.is_empty()) {
             self.coach = h.coach.clone();
@@ -357,6 +367,7 @@ impl Classic {
     /// Draws the whole screen (800x600) into `self.fb`.
     pub fn draw(&mut self) {
         self.hits.clear();
+        self.sync_coach();
         if !self.started {
             main_win::desktop(&mut self.fb, &self.skin);
         }

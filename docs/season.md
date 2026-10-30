@@ -8,6 +8,10 @@
   `v = TABLE[t][r-1]`; opponent index = `|v| mod 8` (8 means team 0); `v > 0` home, `v < 0` away.
   Verified by tests: every pair meets twice (once at each ground), each team has 7 home games, 4 games per round.
   The table is `SCHEDULE` in `core/src/season.rs`. Indices are fixed team slots, not the sorted standings position.
+- **Order of a day's games** (checked 2026-10-30 on 10 saves, `core/examples/daykeys.rs`): each club keeps a key per round
+  (`team+0x22..+0x2f`, a function of its slot only: `season::DAY_ORDER`). `1010:6e48` sorts the division's clubs by the day's key
+  (`1050:1a61` reads `+0x21 + day`) and `1010:0875` pairs them in that order, so the games come in the order of their home club's
+  odd key; the round view lists them so and the minute loop plays them so. `fixtures()` returns them in that order.
 - **Round setup**: `1010:0875(teams, nPairs, ...)` creates games by pairing consecutive teams (`i`, `i+1`) and adds them
   to the day's game list; the cup draw first shuffles the entrants with `1068:0f68` (3n random swaps).
   Game finalisation: `1010:13e1 -> a67f -> 3e9c` (per team post-game: finances and transfer AI, 11.8 KB, **not decoded**).

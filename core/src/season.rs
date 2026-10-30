@@ -29,14 +29,31 @@ pub const SCHEDULE: [[i8; 14]; 8] = [
     [-3, 8, -6, 4, -2, 5, -1, 3, -8, 6, -4, 2, -5, 1],
 ];
 
+/// The order of a league round's games (`team+0x21 + day`, set per schedule slot): `1050:1a61` sorts a division's clubs by this
+/// key and `1010:0875` pairs them in that order, so the games of a day come in the order of their home club's (odd) key. Read
+/// from the original's saves (`core/examples/daykeys.rs`).
+pub const DAY_ORDER: [[u8; 14]; 8] = [
+    [3, 4, 5, 8, 2, 6, 7, 4, 3, 6, 7, 1, 5, 8],
+    [1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+    [4, 5, 8, 1, 7, 3, 6, 3, 6, 7, 2, 8, 4, 5],
+    [5, 8, 2, 7, 6, 4, 3, 6, 7, 1, 8, 5, 3, 4],
+    [8, 1, 7, 6, 3, 5, 4, 7, 2, 8, 5, 4, 6, 3],
+    [2, 7, 6, 3, 4, 8, 5, 1, 8, 5, 4, 3, 7, 6],
+    [7, 6, 3, 4, 5, 1, 8, 8, 5, 4, 3, 6, 2, 7],
+    [6, 3, 4, 5, 8, 7, 2, 5, 4, 3, 6, 7, 8, 1],
+];
+
 /// Home/away pairs of a league round (1..=14), as `(home, away)` club indices.
+/// In the order the original lists and plays them (`DAY_ORDER`).
 pub fn fixtures(round: usize) -> Vec<(usize, usize)> {
-    (0..8)
+    let mut v: Vec<(usize, usize)> = (0..8)
         .filter_map(|t| {
             let v = SCHEDULE[t][round - 1];
             (v > 0).then_some((t, v.unsigned_abs() as usize % 8))
         })
-        .collect()
+        .collect();
+    v.sort_by_key(|&(home, _)| DAY_ORDER[home][round - 1]);
+    v
 }
 
 #[derive(Clone, Debug)]
@@ -815,6 +832,24 @@ pub fn end_of_season(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `DAY_ORDER` pairs the clubs the schedule pairs: key `2k - 1` at home against key `2k`.
+    #[test]
+    fn the_day_order_agrees_with_the_schedule() {
+        for round in 1..=14 {
+            let mut by_key = [0usize; 9];
+            for (slot, keys) in DAY_ORDER.iter().enumerate() {
+                by_key[keys[round - 1] as usize] = slot;
+            }
+            for (k, &(home, away)) in fixtures(round).iter().enumerate() {
+                assert_eq!(
+                    (by_key[2 * k + 1], by_key[2 * k + 2]),
+                    (home, away),
+                    "round {round}"
+                );
+            }
+        }
+    }
 
     #[test]
     #[allow(clippy::needless_range_loop)] // the loops index several tables with the same (team, round)

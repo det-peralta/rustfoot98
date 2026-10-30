@@ -271,7 +271,7 @@ not pixel-compared (3713 px) · `TGETTEAMSDLG` · the club is drawn at random
 
 ### A new game's main window
 
-not pixel-compared (1959 px) · `TPLANTELDLG` · the club is drawn at random
+not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 | Original | Port | Difference |
 |---|---|---|
@@ -411,7 +411,7 @@ not pixel-compared (1882 px) · `TABOUTDLG` · animated: blinking notice, scroll
 
 ### Half-time
 
-not pixel-compared (114357 px) · `TSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (113850 px) · `TSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -419,7 +419,7 @@ not pixel-compared (114357 px) · `TSUBSTITUTIONDLG` · the match differs (the o
 
 ### Standings after a round
 
-not pixel-compared (112815 px) · `TCLASSIFICATIONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (123945 px) · `TCLASSIFICATIONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -435,7 +435,7 @@ not pixel-compared (16504 px) · `TSORTEIODLG` · the match differs (the origina
 
 ### Penalty shoot-out
 
-not pixel-compared (122634 px) · `TPENALTIESDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (122602 px) · `TPENALTIESDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -443,7 +443,7 @@ not pixel-compared (122634 px) · `TPENALTIESDLG` · the match differs (the orig
 
 ### A human's penalty
 
-not pixel-compared (195729 px) · `TPENALTYDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (190978 px) · `TPENALTYDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -451,7 +451,7 @@ not pixel-compared (195729 px) · `TPENALTYDLG` · the match differs (the origin
 
 ### Coaches sacked
 
-not pixel-compared (1476 px) · `TPRINTLISTDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (1543 px) · `TPRINTLISTDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -459,7 +459,7 @@ not pixel-compared (1476 px) · `TPRINTLISTDLG` · the match differs (the origin
 
 ### End of season
 
-not pixel-compared (10517 px) · `TENDOFSEASONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (19401 px) · `TENDOFSEASONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -467,7 +467,7 @@ not pixel-compared (10517 px) · `TENDOFSEASONDLG` · the match differs (the ori
 
 ### Auction
 
-not pixel-compared (2789 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -544,4 +544,14 @@ not pixel-compared (2789 px) · `TSELLPLAYERDLG` · the match differs (the origi
 | Original | Port | Difference |
 |---|---|---|
 | [![original](img/original/main_sell.png)](img/original/main_sell.png) | [![port](img/port/main_sell.png)](img/port/main_sell.png) | [![difference](img/diff/main_sell.png)](img/diff/main_sell.png) |
+
+## Match day
+
+### Round view during the games
+
+not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_roundview.png)](img/original/md_roundview.png) | [![port](img/port/md_roundview.png)](img/port/md_roundview.png) | [![difference](img/diff/md_roundview.png)](img/diff/md_roundview.png) |
 

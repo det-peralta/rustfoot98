@@ -54,7 +54,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Currency | `TCURRENCYDLG` | 182 px (0.038 %) |  |
 | Coaches' names | `TGETTEAMSDLG` | 4 px (0.001 %) |  |
 | Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3713 px) | the club is drawn at random |
-| A new game's main window | `TPLANTELDLG` | not pixel-compared (1959 px) | the club is drawn at random |
+| A new game's main window | `TPLANTELDLG` | not pixel-compared (2012 px) | the club is drawn at random |
 
 ## Team editor
 
@@ -81,14 +81,14 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
-| Half-time | `TSUBSTITUTIONDLG` | not pixel-compared (114357 px) | the match differs (the original's random numbers): layout only |
-| Standings after a round | `TCLASSIFICATIONDLG` | not pixel-compared (112815 px) | the match differs (the original's random numbers): layout only |
+| Half-time | `TSUBSTITUTIONDLG` | not pixel-compared (113850 px) | the match differs (the original's random numbers): layout only |
+| Standings after a round | `TCLASSIFICATIONDLG` | not pixel-compared (123945 px) | the match differs (the original's random numbers): layout only |
 | Cup draw | `TSORTEIODLG` | not pixel-compared (16504 px) | the match differs (the original's random numbers): layout only |
-| Penalty shoot-out | `TPENALTIESDLG` | not pixel-compared (122634 px) | the match differs (the original's random numbers): layout only |
-| A human's penalty | `TPENALTYDLG` | not pixel-compared (195729 px) | the match differs (the original's random numbers): layout only |
-| Coaches sacked | `TPRINTLISTDLG` | not pixel-compared (1476 px) | the match differs (the original's random numbers): layout only |
-| End of season | `TENDOFSEASONDLG` | not pixel-compared (10517 px) | the match differs (the original's random numbers): layout only |
-| Auction | `TSELLPLAYERDLG` | not pixel-compared (2789 px) | the match differs (the original's random numbers): layout only |
+| Penalty shoot-out | `TPENALTIESDLG` | not pixel-compared (122602 px) | the match differs (the original's random numbers): layout only |
+| A human's penalty | `TPENALTYDLG` | not pixel-compared (190978 px) | the match differs (the original's random numbers): layout only |
+| Coaches sacked | `TPRINTLISTDLG` | not pixel-compared (1543 px) | the match differs (the original's random numbers): layout only |
+| End of season | `TENDOFSEASONDLG` | not pixel-compared (19401 px) | the match differs (the original's random numbers): layout only |
+| Auction | `TSELLPLAYERDLG` | not pixel-compared (2819 px) | the match differs (the original's random numbers): layout only |
 | Invitation to coach another club | `TINVITECOACHDLG` | 9 px (0.002 %) |  |
 
 ## Menu dialogs
@@ -117,3 +117,9 @@ Every screen of the original, captured under js-dos, against the port's render o
 | A player selected, page Jogador | `TPLANTELDLG` | 64 px (0.013 %) |  |
 | Renovar contrato (the player's page) | `TPLANTELDLG` | 342 px (0.071 %) |  |
 | Jogador › Vender | `TPLANTELDLG` | 42 px (0.009 %) |  |
+
+## Match day
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Round view during the games | `TJOURNEYDLG` | not pixel-compared (3917 px) | the match differs (the original's random numbers): layout only |

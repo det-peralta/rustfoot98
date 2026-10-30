@@ -203,3 +203,5 @@ add(id="main_contract", group="Main window", title="Renovar contrato (the player
     port=BASE + ["ev=click:200,218;click:570,479"])
 add(id="main_sell", group="Main window", title="Jogador › Vender", form="TPLANTELDLG", steps=None,
     port=BASE + ["ev=click:200,218", "page=sell"])
+add(id="md_roundview", group="Match day", title="Round view during the games", form="TJOURNEYDLG", steps=None,
+    capture="probe1/0030_roundview.png", port=BASE + ["ev=turn:;tick:20000"], exact=False, note=MD)
