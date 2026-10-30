@@ -9,7 +9,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Main window, page Jogo
 
-55 px (0.011 %) · `TPLANTELDLG`
+55 px (0.011 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -17,7 +17,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Main window, page Jogador
 
-25 px (0.005 %) · `TPLANTELDLG`
+25 px (0.005 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -25,7 +25,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Main window, page Finanças
 
-71 px (0.015 %) · `TPLANTELDLG`
+71 px (0.015 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -33,7 +33,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Main window, page Selecção
 
-25 px (0.005 %) · `TPLANTELDLG`
+25 px (0.005 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -41,7 +41,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Main window, page Adversário
 
-33 px (0.007 %) · `TPLANTELDLG`
+33 px (0.007 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -51,7 +51,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Menu Elifoot
 
-50 px (0.010 %) · `TPLANTELDLG`
+50 px (0.010 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -59,7 +59,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Menu Seleccionar
 
-70 px (0.015 %) · `TPLANTELDLG`
+70 px (0.015 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -67,7 +67,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Menu Equipa
 
-166 px (0.035 %) · `TPLANTELDLG` · the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found)
+166 px (0.035 %) · `TPREPAREGAMEDLG` · the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found)
 
 | Original | Port | Difference |
 |---|---|---|
@@ -75,7 +75,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Menu Jogador
 
-185 px (0.039 %) · `TPLANTELDLG` · the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found)
+185 px (0.039 %) · `TPREPAREGAMEDLG` · the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found)
 
 | Original | Port | Difference |
 |---|---|---|
@@ -83,7 +83,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Menu Campeonato
 
-48 px (0.010 %) · `TPLANTELDLG`
+48 px (0.010 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -91,7 +91,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Menu Treinador
 
-236 px (0.049 %) · `TPLANTELDLG` · the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found)
+236 px (0.049 %) · `TPREPAREGAMEDLG` · the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found)
 
 | Original | Port | Difference |
 |---|---|---|
@@ -515,7 +515,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### A player selected, page Jogo
 
-64 px (0.013 %) · `TPLANTELDLG`
+64 px (0.013 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -523,7 +523,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### A player selected, page Jogador
 
-64 px (0.013 %) · `TPLANTELDLG`
+64 px (0.013 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -531,7 +531,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Renovar contrato (the player's page)
 
-342 px (0.071 %) · `TPLANTELDLG`
+342 px (0.071 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -539,7 +539,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Jogador › Vender
 
-42 px (0.009 %) · `TPLANTELDLG`
+42 px (0.009 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -628,4 +628,22 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 | Original | Port | Difference |
 |---|---|---|
 | [![original](img/original/ed_cantsave.png)](img/original/ed_cantsave.png) | [![port](img/port/ed_cantsave.png)](img/port/ed_cantsave.png) | [![difference](img/diff/ed_cantsave.png)](img/diff/ed_cantsave.png) |
+
+## Main window
+
+### Renovar contrato, a low offer typed
+
+335 px (0.070 %) · `TPREPAREGAMEDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/main_contract_low.png)](img/original/main_contract_low.png) | [![port](img/port/main_contract_low.png)](img/port/main_contract_low.png) | [![difference](img/diff/main_contract_low.png)](img/diff/main_contract_low.png) |
+
+### The player refuses the offer (Actualização de Salário)
+
+274 px (0.057 %) · `TASKMORESALARYDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/dlg_askmore.png)](img/original/dlg_askmore.png) | [![port](img/port/dlg_askmore.png)](img/port/dlg_askmore.png) | [![difference](img/diff/dlg_askmore.png)](img/diff/dlg_askmore.png) |
 

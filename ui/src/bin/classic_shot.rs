@@ -345,6 +345,7 @@ fn main() -> Result<(), String> {
                                 "Left" => Key::Left,
                                 "Right" => Key::Right,
                                 "Backspace" => Key::Backspace,
+                                "Delete" => Key::Delete,
                                 f if f.starts_with('F') && f.len() > 1 => {
                                     Key::F(f[1..].parse().unwrap_or(1))
                                 }

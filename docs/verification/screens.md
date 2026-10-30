@@ -7,22 +7,22 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
-| Main window, page Jogo | `TPLANTELDLG` | 55 px (0.011 %) |  |
-| Main window, page Jogador | `TPLANTELDLG` | 25 px (0.005 %) |  |
-| Main window, page Finanças | `TPLANTELDLG` | 71 px (0.015 %) |  |
-| Main window, page Selecção | `TPLANTELDLG` | 25 px (0.005 %) |  |
-| Main window, page Adversário | `TPLANTELDLG` | 33 px (0.007 %) |  |
+| Main window, page Jogo | `TPREPAREGAMEDLG` | 55 px (0.011 %) |  |
+| Main window, page Jogador | `TPREPAREGAMEDLG` | 25 px (0.005 %) |  |
+| Main window, page Finanças | `TPREPAREGAMEDLG` | 71 px (0.015 %) |  |
+| Main window, page Selecção | `TPREPAREGAMEDLG` | 25 px (0.005 %) |  |
+| Main window, page Adversário | `TPREPAREGAMEDLG` | 33 px (0.007 %) |  |
 
 ## Menus
 
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
-| Menu Elifoot | `TPLANTELDLG` | 50 px (0.010 %) |  |
-| Menu Seleccionar | `TPLANTELDLG` | 70 px (0.015 %) |  |
-| Menu Equipa | `TPLANTELDLG` | 166 px (0.035 %) | the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found) |
-| Menu Jogador | `TPLANTELDLG` | 185 px (0.039 %) | the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found) |
-| Menu Campeonato | `TPLANTELDLG` | 48 px (0.010 %) |  |
-| Menu Treinador | `TPLANTELDLG` | 236 px (0.049 %) | the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found) |
+| Menu Elifoot | `TPREPAREGAMEDLG` | 50 px (0.010 %) |  |
+| Menu Seleccionar | `TPREPAREGAMEDLG` | 70 px (0.015 %) |  |
+| Menu Equipa | `TPREPAREGAMEDLG` | 166 px (0.035 %) | the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found) |
+| Menu Jogador | `TPREPAREGAMEDLG` | 185 px (0.039 %) | the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found) |
+| Menu Campeonato | `TPREPAREGAMEDLG` | 48 px (0.010 %) |  |
+| Menu Treinador | `TPREPAREGAMEDLG` | 236 px (0.049 %) | the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not found) |
 
 ## Menu dialogs
 
@@ -113,10 +113,10 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
-| A player selected, page Jogo | `TPLANTELDLG` | 64 px (0.013 %) |  |
-| A player selected, page Jogador | `TPLANTELDLG` | 64 px (0.013 %) |  |
-| Renovar contrato (the player's page) | `TPLANTELDLG` | 342 px (0.071 %) |  |
-| Jogador › Vender | `TPLANTELDLG` | 42 px (0.009 %) |  |
+| A player selected, page Jogo | `TPREPAREGAMEDLG` | 64 px (0.013 %) |  |
+| A player selected, page Jogador | `TPREPAREGAMEDLG` | 64 px (0.013 %) |  |
+| Renovar contrato (the player's page) | `TPREPAREGAMEDLG` | 342 px (0.071 %) |  |
+| Jogador › Vender | `TPREPAREGAMEDLG` | 42 px (0.009 %) |  |
 
 ## Match day
 
@@ -137,3 +137,10 @@ Every screen of the original, captured under js-dos, against the port's render o
 | New team made (the flag's hint) | `TEDITOR_MAIN` | 249 px (0.052 %) |  |
 | Gravar equipa | `TSAVETEAMDLG` | 291 px (0.061 %) |  |
 | The team cannot be saved | `TCANTSAVETEAMDLG` | 232 px (0.048 %) |  |
+
+## Main window
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Renovar contrato, a low offer typed | `TPREPAREGAMEDLG` | 335 px (0.070 %) |  |
+| The player refuses the offer (Actualização de Salário) | `TASKMORESALARYDLG` | 274 px (0.057 %) |  |

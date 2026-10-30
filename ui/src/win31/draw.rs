@@ -878,8 +878,9 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
         pen += text(fb, font, pen, ty, &mid, ink, false);
     }
     text(fb, font, pen, ty, &post, ink, false);
-    // the caret: a black line before character `<name>.caret`, a pixel taller than the font's line
-    if cx.focus == n.name && enabled {
+    // the caret: a black line before character `<name>.caret`, a pixel taller than the font's line (none while its window is
+    // under a dialog)
+    if cx.focus == n.name && enabled && !INACTIVE.with(|a| a.get()) {
         if let Some(c) = num("caret") {
             let before: String = chars[..c.min(chars.len())].iter().collect();
             // (in the team editor's edits, `indent` 3, the caret is where the text ends)

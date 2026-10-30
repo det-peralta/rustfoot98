@@ -30,6 +30,8 @@ pub struct Pages {
     pub sell_focus: bool,
     /// Text of `spinNewSalary`.
     pub spin: String,
+    /// The caret in `spin` (characters before it): the page opens with it at the start, as the original's edit.
+    pub spin_caret: usize,
     /// Text of `textMessage`.
     pub message: String,
     /// A copy of the original's registration state: the squad viewer button of the opponent page is only there in registered copies
@@ -205,6 +207,7 @@ fn change_salary(c: &mut Classic) {
     }
     let (lo, hi) = c.world.wage_bounds();
     c.main.market.spin = s.wage.clamp(lo, hi).to_string();
+    c.main.market.spin_caret = 0;
     c.main.page = Some(Page::Contract);
 }
 
@@ -238,7 +241,7 @@ pub fn page_texts(c: &Classic, page: Page, t: &mut BTreeMap<String, String>) {
         }
         Page::Contract => {
             t.insert("spinNewSalary.value".into(), m.spin.clone());
-            t.insert("spinNewSalary.caret".into(), "0".into());
+            t.insert("spinNewSalary.caret".into(), m.spin_caret.to_string());
             t.insert("@focus".into(), "spinNewSalary".into());
         }
         Page::Message => {
@@ -282,6 +285,7 @@ fn spin_clicked(c: &mut Classic) {
     let v = parse_digits(&c.main.market.spin).unwrap_or(lo);
     let v = if up { v + 1 } else { v - 1 };
     c.main.market.spin = v.clamp(lo, hi).to_string();
+    c.main.market.spin_caret = 0;
 }
 
 /// A key while one of the pages is up; true when it was used.
@@ -316,16 +320,39 @@ pub fn main_key(c: &mut Classic, k: Key) -> bool {
             match k {
                 Key::Enter => propose_clicked(c),
                 Key::Escape => c.main.page = Some(Page::Player),
+                // typing edits at the caret (digits only; the arrows step the value)
                 Key::Backspace => {
-                    c.main.market.spin.pop();
+                    let m = &mut c.main.market;
+                    if m.spin_caret > 0 && m.spin_caret <= m.spin.len() {
+                        m.spin_caret -= 1;
+                        m.spin.remove(m.spin_caret);
+                    }
+                }
+                Key::Delete => {
+                    let m = &mut c.main.market;
+                    if m.spin_caret < m.spin.len() {
+                        m.spin.remove(m.spin_caret);
+                    }
+                }
+                Key::Left => {
+                    let m = &mut c.main.market;
+                    m.spin_caret = m.spin_caret.saturating_sub(1);
+                }
+                Key::Right => {
+                    let m = &mut c.main.market;
+                    m.spin_caret = (m.spin_caret + 1).min(m.spin.len());
                 }
                 Key::Up | Key::Down => {
                     let v = parse_digits(&c.main.market.spin).unwrap_or(lo);
                     let v = if k == Key::Up { v + 1 } else { v - 1 };
                     c.main.market.spin = v.clamp(lo, hi).to_string();
+                    c.main.market.spin_caret = 0;
                 }
                 Key::Char(ch) if ch.is_ascii_digit() && c.main.market.spin.len() < 6 => {
-                    c.main.market.spin.push(ch)
+                    let m = &mut c.main.market;
+                    let at = m.spin_caret.min(m.spin.len());
+                    m.spin.insert(at, ch);
+                    m.spin_caret = at + 1;
                 }
                 _ => return false,
             }
@@ -397,10 +424,11 @@ pub fn ask_more_salary(c: &Classic, slot: usize, amount: i64, can_sell: bool) ->
     d.text("textCoachName.color", fg.clone());
     d.text("textMessage.color", fg);
     let unit = c.world.currency_info().unit;
+    // `1030:330e` modes 2 and 3 (a proposal refused): "Nem pensar! Exijo ", the amount, "!\r" and "\r\rAceita o aumento?" (the
+    // sentence about the auction belongs to the player's own demand, modes 0 and 1), or "!\r\r" and the sentence of a player
+    // who cannot be sold
     let body = if can_sell {
-        format!(
-            "Nem pensar! Exijo {amount} {unit}!\nSe não aceitar o aumento, o jogador será posto à venda em leilão.\n\nAceita o aumento?"
-        )
+        format!("Nem pensar! Exijo {amount} {unit}!\n\n\nAceita o aumento?")
     } else {
         format!(
             "Nem pensar! Exijo {amount} {unit}!\n\nUma vez que este jogador não pode ser vendido, tem de aceitar o aumento."

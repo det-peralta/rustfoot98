@@ -79,7 +79,7 @@ def add(**s):
 # the main window, page by page (the tabs at the bottom right)
 for i, name, x in PAGES:
     add(id="main_%d_%s" % (i, slug(name)), group="Main window", title="Main window, page %s" % name,
-        form="TPLANTELDLG", steps=[("click", x, 511), ("wait", 1500)], back=[("click", 470, 511), ("wait", 1000)],
+        form="TPREPAREGAMEDLG", steps=[("click", x, 511), ("wait", 1500)], back=[("click", 470, 511), ("wait", 1000)],
         port=BASE + (["page=%d" % i] if i else []))
 
 MENU_NOTES = {n: "the drop-down is 1 px narrower than the original's (the menus whose registered-only entries are hidden; cause not "
@@ -87,7 +87,7 @@ MENU_NOTES = {n: "the drop-down is 1 px narrower than the original's (the menus 
 
 # the menus, open
 for top, title, entries in MENUS:
-    add(id="menu_%d_%s" % (top, title.lower()), group="Menus", title="Menu %s" % title, form="TPLANTELDLG",
+    add(id="menu_%d_%s" % (top, title.lower()), group="Menus", title="Menu %s" % title, form="TPREPAREGAMEDLG",
         note=MENU_NOTES.get(top, ""),
         steps=menu_keys(top, 0), back=[("key", "Escape"), ("key", "Escape")],
         port=BASE + ["menu=%d" % top, "hl=0"])
@@ -194,13 +194,13 @@ add(id="hint_gamename", group="Start and new game", title="Hint of the file name
 add(id="dlg_opcoes_jogo", group="Menu dialogs", title="Elifoot › Opções, page Jogo", form="TOPTIONSDLG",
     steps=menu_keys(0, 0) + [("key", "Enter"), ("wait", 2500), ("click", 337, 183), ("wait", 1500)],
     back=[("key", "Escape"), ("wait", 800)], port=BASE + ["dialog=opcoesElifoot", "ev=click:337,183"])
-add(id="main_sel_jogo", group="Main window", title="A player selected, page Jogo", form="TPLANTELDLG",
+add(id="main_sel_jogo", group="Main window", title="A player selected, page Jogo", form="TPREPAREGAMEDLG",
     steps=[("click", 200, 218), ("wait", 1500)], back=[], final=True, port=BASE + ["ev=click:200,218"])
-add(id="main_sel_jogador", group="Main window", title="A player selected, page Jogador", form="TPLANTELDLG",
+add(id="main_sel_jogador", group="Main window", title="A player selected, page Jogador", form="TPREPAREGAMEDLG",
     steps=[("click", 512, 511), ("wait", 1500)], back=[], final=True, port=BASE + ["select=2", "page=1"])
-add(id="main_contract", group="Main window", title="Renovar contrato (the player's page)", form="TPLANTELDLG", steps=None,
+add(id="main_contract", group="Main window", title="Renovar contrato (the player's page)", form="TPREPAREGAMEDLG", steps=None,
     port=BASE + ["ev=click:200,218;click:570,479"])
-add(id="main_sell", group="Main window", title="Jogador › Vender", form="TPLANTELDLG", steps=None,
+add(id="main_sell", group="Main window", title="Jogador › Vender", form="TPREPAREGAMEDLG", steps=None,
     port=BASE + ["ev=click:200,218", "page=sell"])
 add(id="md_roundview", group="Match day", title="Round view during the games", form="TJOURNEYDLG", steps=None,
     capture="probe1/0030_roundview.png", port=BASE + ["ev=turn:;tick:20000"], exact=False, note=MD)
@@ -226,3 +226,8 @@ for sid, cap, title, form, port in [
 ]:
     add(id=sid, group="Team editor", title=title, form=form, steps=None, capture="editor/%s.png" % cap, tool="editor",
         region="window", port=port)
+LOW = "click:200,218;click:570,479;key:Delete;key:Delete;key:Delete;key:Delete;key:1;key:0;key:0;key:0"
+add(id="main_contract_low", group="Main window", title="Renovar contrato, a low offer typed", form="TPREPAREGAMEDLG", steps=None,
+    port=BASE + ["ev=" + LOW])
+add(id="dlg_askmore", group="Main window", title="The player refuses the offer (Actualização de Salário)", form="TASKMORESALARYDLG",
+    steps=None, port=BASE + ["ev=" + LOW + ";click:530,405"])

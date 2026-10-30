@@ -969,7 +969,7 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
         // `<name>.caret` (measured on the contract's new salary)
         let ty = y + (h - font.height()) / 2;
         text(fb, font, x + 4, ty, &value, f.color, false);
-        if cx.focus == n.name {
+        if cx.focus == n.name && !super::draw::INACTIVE.with(|a| a.get()) {
             if let Some(k) = get_num(cx, n, "caret") {
                 let before: String = value.chars().take(k.max(0) as usize).collect();
                 fb.fill(x + 5 + font.width(&before), ty, 2, font.height(), BLACK);
