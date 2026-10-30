@@ -1370,6 +1370,14 @@ pub(super) fn colorgrid(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y
 /// per level). The picture is the original's `PaintBoxStadiumPaint`: up to three rings of stands (grey, 2-pixel light yellow
 /// outline) around an ellipse with a green pitch. Stand fractions: level 1..6 fill the first ring (of 6 parts), 7..14 the second
 /// (of 8), 15..24 the third (of 10). The ring and ellipse geometry were fitted to a capture of a level-2 stadium (approximate).
+///
+/// The original's geometry, decoded (`1030:2a7c`, `1030:2cee`; W, H the paint box, `Round` halves to even): ring `k` (0 the pitch's
+/// ellipse) is an `Ellipse`/`Pie` in the centred box `round(W * (k/6 + 0.4))` x `round(H * (k/6 + 0.4))`, the stands a `Pie` from
+/// the top to the angle `n * 3.14 / cap` (a whole ellipse from 3.14), grey with a 2-pixel `$80FFFF` pen, the pitch's ellipse green;
+/// the pitch a `Rectangle` (0.37 W, 0.37 H)-(0.63 W, 0.63 H) with a 3-pixel white pen, then with 2 pixels the centre circle of
+/// radius `round(0.02 W)` around (W div 2, H div 2), the halfway line from (0.5 W, 0.37 H) to (0.5 W, 0.63 H - 2) and the penalty
+/// areas (0.37 W, 0.45 H)-(0.41 W, 0.55 H) and (0.59 W, 0.45 H)-(0.63 W, 0.55 H). Drawn with these exact boxes, the port's
+/// outline rasteriser (not Windows 3.1's) is further from the capture than the fitted values below, so they stay.
 pub(super) fn paintbox(fb: &mut Fb, cx: &Ctx, n: &Node, x: i32, y: i32) {
     if !n.name.to_lowercase().contains("stadium") {
         return;

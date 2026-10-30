@@ -117,7 +117,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Equipa › Estádio
 
-474 px (0.099 %) · `TSTADIUMDLG` · the stadium picture is drawn from measurements (~400 px of its outline)
+560 px (0.117 %) · `TSTADIUMDLG` · the stadium picture is drawn from measurements (~400 px of its outline)
 
 | Original | Port | Difference |
 |---|---|---|
