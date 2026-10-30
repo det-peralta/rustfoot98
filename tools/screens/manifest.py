@@ -160,3 +160,33 @@ for sid, cap, title, form, port in [
     add(id=sid, group="Team editor", title=title, form=form, steps=None, capture="editor/%s.png" % cap, tool="editor",
         region="window", port=port, exact=sid != "ed_about",
         note=ED_NOTES.get(sid, ""))
+
+# match days: the original's come from recorded seasons (tools/capture/season.sh, analysis/captures/probe*), the port plays from the
+# same save until the dialog opens (`ev=season:N:Kind`). The original seeds its random numbers at start-up, so the games differ:
+# these compare the layout, except the invitation, whose texts are the same.
+MD = "the match differs (the original's random numbers): layout only"
+for sid, cap, title, form, port, exact, note in [
+    ("md_halftime", "probe2/0032_halftime.png", "Half-time", "TSUBSTITUTIONDLG", BASE + ["ev=season:1:Halftime"], False, MD),
+    ("md_standings", "probe3/0012_dialog_over_roundview.png", "Standings after a round", "TCLASSIFICATIONDLG",
+     BASE + ["ev=season:1:Standings"], False, MD),
+    ("md_cupdraw", "probe3/0015_dialog_over_roundview.png", "Cup draw", "TSORTEIODLG", BASE + ["ev=season:2:CupDraw"], False, MD),
+    ("md_shootout", "probe3/0092_dialog_over_roundview.png", "Penalty shoot-out", "TPENALTIESDLG",
+     BASE + ["ev=season:40:Shootout"], False, MD),
+    ("md_penalty", "probe3/0560_dialog_over_roundview.png", "A human's penalty", "TPENALTYDLG", BASE + ["ev=season:40:Penalty"],
+     False, MD),
+    ("md_lashes", "probe3/0570_dialog_over_roundview.png", "Coaches sacked", "TPRINTLISTDLG", BASE + ["ev=season:40:Lashes"],
+     False, MD),
+    ("md_endofseason", "probe3/1019_dialog_over_roundview.png", "End of season", "TENDOFSEASONDLG",
+     BASE + ["ev=season:40:EndOfSeason"], False, MD),
+    ("md_auction", "probe2/0001_auction.png", "Auction", "TSELLPLAYERDLG", BASE + ["ev=season:1:Auction"], False, MD),
+    ("md_invitation", "probe3/0225_dialog_over_roundview.png", "Invitation to coach another club", "TINVITECOACHDLG",
+     ["-", "coach=joga2", "mdopen=invite:GREMIO"], True, ""),
+]:
+    add(id=sid, group="Match day", title=title, form=form, steps=None, capture=cap, port=port, exact=exact, note=note)
+
+# single captures made while working on a screen (analysis/captures/)
+add(id="dlg_balance", group="Menu dialogs", title="Balance sheet (a click on the Finanças list)", form="TBALANCEDLG", steps=None,
+    capture="bal_dlg.png", port=BASE + ["page=2", "ev=click:560,300"])
+add(id="hint_gamename", group="Start and new game", title="Hint of the file name", form="TSELECTGAMEDLG", steps=None,
+    capture="hint4.png", port=["-", START_TEAMS, "saves=ABCDEEEE", "ev=key:Enter;click:196,183;move:440,221;tick:1000"],
+    note="the capture's list shows ABCDEEEE")

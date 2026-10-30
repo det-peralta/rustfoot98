@@ -801,7 +801,12 @@ fn bind_end_of_season(c: &Classic, d: &mut Dialog) {
     );
 }
 
-fn bind_invitation(_c: &Classic, d: &mut Dialog) {
+fn bind_invitation(c: &Classic, d: &mut Dialog) {
+    // `1028:3bf9`: *Plantel...* shows only in a registered copy (feature `0xb` of `1050:30bc`)
+    d.text(
+        "plantelBtn.visible",
+        if c.main.market.registered { "1" } else { "0" },
+    );
     d.text(
         "textCoachName",
         d.st.get("coach").cloned().unwrap_or_default(),
@@ -813,7 +818,7 @@ fn bind_invitation(_c: &Classic, d: &mut Dialog) {
 }
 
 /// The dialog of an invitation to coach `team` (a club whose coach was sacked).
-/// `from` is the club of the human who gets it (his coach's name is the dialog's).
+/// `from` is the club of the human who gets it (their coach's name is the dialog's).
 pub fn invitation(c: &Classic, from: &str, team: &str) -> Dialog {
     let mut d = Dialog::new(Kind::Invitation, "TINVITECOACHDLG");
     let coach =

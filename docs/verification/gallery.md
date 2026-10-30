@@ -231,7 +231,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Countries
 
-86 px (0.018 %) · `TSELECTCOUNTRIESDLG`
+85 px (0.018 %) · `TSELECTCOUNTRIESDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -239,7 +239,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Countries, Brasil chosen
 
-154 px (0.032 %) · `TSELECTCOUNTRIESDLG`
+153 px (0.032 %) · `TSELECTCOUNTRIESDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -406,4 +406,98 @@ not pixel-compared (1882 px) · `TABOUTDLG` · animated: blinking notice, scroll
 | Original | Port | Difference |
 |---|---|---|
 | [![original](img/original/ed_about.png)](img/original/ed_about.png) | [![port](img/port/ed_about.png)](img/port/ed_about.png) | [![difference](img/diff/ed_about.png)](img/diff/ed_about.png) |
+
+## Match day
+
+### Half-time
+
+not pixel-compared (114357 px) · `TSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_halftime.png)](img/original/md_halftime.png) | [![port](img/port/md_halftime.png)](img/port/md_halftime.png) | [![difference](img/diff/md_halftime.png)](img/diff/md_halftime.png) |
+
+### Standings after a round
+
+not pixel-compared (112815 px) · `TCLASSIFICATIONDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_standings.png)](img/original/md_standings.png) | [![port](img/port/md_standings.png)](img/port/md_standings.png) | [![difference](img/diff/md_standings.png)](img/diff/md_standings.png) |
+
+### Cup draw
+
+not pixel-compared (16504 px) · `TSORTEIODLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_cupdraw.png)](img/original/md_cupdraw.png) | [![port](img/port/md_cupdraw.png)](img/port/md_cupdraw.png) | [![difference](img/diff/md_cupdraw.png)](img/diff/md_cupdraw.png) |
+
+### Penalty shoot-out
+
+not pixel-compared (122634 px) · `TPENALTIESDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_shootout.png)](img/original/md_shootout.png) | [![port](img/port/md_shootout.png)](img/port/md_shootout.png) | [![difference](img/diff/md_shootout.png)](img/diff/md_shootout.png) |
+
+### A human's penalty
+
+not pixel-compared (195729 px) · `TPENALTYDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_penalty.png)](img/original/md_penalty.png) | [![port](img/port/md_penalty.png)](img/port/md_penalty.png) | [![difference](img/diff/md_penalty.png)](img/diff/md_penalty.png) |
+
+### Coaches sacked
+
+not pixel-compared (1476 px) · `TPRINTLISTDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_lashes.png)](img/original/md_lashes.png) | [![port](img/port/md_lashes.png)](img/port/md_lashes.png) | [![difference](img/diff/md_lashes.png)](img/diff/md_lashes.png) |
+
+### End of season
+
+not pixel-compared (10517 px) · `TENDOFSEASONDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_endofseason.png)](img/original/md_endofseason.png) | [![port](img/port/md_endofseason.png)](img/port/md_endofseason.png) | [![difference](img/diff/md_endofseason.png)](img/diff/md_endofseason.png) |
+
+### Auction
+
+not pixel-compared (2896 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_auction.png)](img/original/md_auction.png) | [![port](img/port/md_auction.png)](img/port/md_auction.png) | [![difference](img/diff/md_auction.png)](img/diff/md_auction.png) |
+
+### Invitation to coach another club
+
+9 px (0.002 %) · `TINVITECOACHDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/md_invitation.png)](img/original/md_invitation.png) | [![port](img/port/md_invitation.png)](img/port/md_invitation.png) | [![difference](img/diff/md_invitation.png)](img/diff/md_invitation.png) |
+
+## Menu dialogs
+
+### Balance sheet (a click on the Finanças list)
+
+74 px (0.015 %) · `TBALANCEDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/dlg_balance.png)](img/original/dlg_balance.png) | [![port](img/port/dlg_balance.png)](img/port/dlg_balance.png) | [![difference](img/diff/dlg_balance.png)](img/diff/dlg_balance.png) |
+
+## Start and new game
+
+### Hint of the file name
+
+93 px (0.019 %) · `TSELECTGAMEDLG` · the capture's list shows ABCDEEEE
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/hint_gamename.png)](img/original/hint_gamename.png) | [![port](img/port/hint_gamename.png)](img/port/hint_gamename.png) | [![difference](img/diff/hint_gamename.png)](img/diff/hint_gamename.png) |
 

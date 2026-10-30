@@ -49,8 +49,8 @@ Every screen of the original, captured under js-dos, against the port's render o
 | About box at start-up | `TABOUTDLG` | not pixel-compared (1971 px) | animated: the notice blinks and the banner scrolls |
 | Choice of game | `TSELECTGAMEDLG` | 66 px (0.014 %) |  |
 | New game named | `TSELECTGAMEDLG` | 364 px (0.076 %) | the edit's caret blinks |
-| Countries | `TSELECTCOUNTRIESDLG` | 86 px (0.018 %) |  |
-| Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 154 px (0.032 %) |  |
+| Countries | `TSELECTCOUNTRIESDLG` | 85 px (0.018 %) |  |
+| Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 153 px (0.032 %) |  |
 | Currency | `TCURRENCYDLG` | 182 px (0.038 %) |  |
 | Coaches' names | `TGETTEAMSDLG` | 420 px (0.087 %) |  |
 | Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3706 px) | the club is drawn at random |
@@ -76,3 +76,29 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Jogador › Editar | `TEDITPLAYERDLG` | 205 px (0.043 %) |  |
 | Jogador › Transferir | `TTRANSFERPLAYERDLG` | 189 px (0.039 %) |  |
 | Elifoot › Acerca | `TABOUTDLG` | not pixel-compared (1882 px) | animated: blinking notice, scrolling banner |
+
+## Match day
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Half-time | `TSUBSTITUTIONDLG` | not pixel-compared (114357 px) | the match differs (the original's random numbers): layout only |
+| Standings after a round | `TCLASSIFICATIONDLG` | not pixel-compared (112815 px) | the match differs (the original's random numbers): layout only |
+| Cup draw | `TSORTEIODLG` | not pixel-compared (16504 px) | the match differs (the original's random numbers): layout only |
+| Penalty shoot-out | `TPENALTIESDLG` | not pixel-compared (122634 px) | the match differs (the original's random numbers): layout only |
+| A human's penalty | `TPENALTYDLG` | not pixel-compared (195729 px) | the match differs (the original's random numbers): layout only |
+| Coaches sacked | `TPRINTLISTDLG` | not pixel-compared (1476 px) | the match differs (the original's random numbers): layout only |
+| End of season | `TENDOFSEASONDLG` | not pixel-compared (10517 px) | the match differs (the original's random numbers): layout only |
+| Auction | `TSELLPLAYERDLG` | not pixel-compared (2896 px) | the match differs (the original's random numbers): layout only |
+| Invitation to coach another club | `TINVITECOACHDLG` | 9 px (0.002 %) |  |
+
+## Menu dialogs
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Balance sheet (a click on the Finanças list) | `TBALANCEDLG` | 74 px (0.015 %) |  |
+
+## Start and new game
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| Hint of the file name | `TSELECTGAMEDLG` | 93 px (0.019 %) | the capture's list shows ABCDEEEE |

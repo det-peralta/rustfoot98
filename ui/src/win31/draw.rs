@@ -586,6 +586,18 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     } else {
         s.split('\n').map(str::to_string).collect()
     };
+    // the VCL paints a label inside its bounds: a fixed-size label cuts what does not fit (the invitation's coach name, 13 pixels
+    // high in a 16-pixel font, loses its descenders)
+    let old_clip = fb.clip;
+    if !n.flag("AutoSize", true) {
+        let h = n.int("Height", 0);
+        fb.clip = (
+            (x - pad).max(old_clip.0),
+            y.max(old_clip.1),
+            (x + w).min(old_clip.2),
+            (y + h).min(old_clip.3),
+        );
+    }
     for (i, line) in lines.iter().enumerate() {
         let tw = font.width(line);
         let lx = match n.ident("Alignment") {
@@ -602,6 +614,7 @@ fn label(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
             text(fb, font, lx, ly, line, GRAY, f.underline);
         }
     }
+    fb.clip = old_clip;
 }
 
 /// `TMemo`: the lines (`lists[name]`, else `texts[name]` split at newlines, else `Lines.Strings`) with the control's alignment. A bordered

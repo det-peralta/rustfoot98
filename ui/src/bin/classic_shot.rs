@@ -97,7 +97,7 @@ fn main() -> Result<(), String> {
             "ev" => {
                 // a script of events: `click:x,y`, `move:x,y`, `key:F5|Enter|a`, `tick:ms`, separated by `;`
                 app.draw();
-                // `season:N[:Kind]` stands for N rounds of (F5, behave like a user until the main window is back), the whole script
+                // `season:N[:Kind]` stands for N rounds of (A, behave like a user until the main window is back), the whole script
                 // stopping when a dialog of that kind opens
                 let steps: Vec<String> = v
                     .split(';')
@@ -163,8 +163,9 @@ fn main() -> Result<(), String> {
                             }
                         }
                         "turn" | "cupturn" => {
-                            // F5 (a formation) and Enter for every human who takes a turn on the main window now; `cupturn` only
-                            // when the main window is waiting for a cup day
+                            // A (Automático: a formation the squad can play; Jogar needs one) and Enter for every human who takes a
+                            // turn on the main window now, as the recorder does with the original; `cupturn` only when the main
+                            // window is waiting for a cup day
                             let main = matches!(app.screen, rustfoot_ui::classic::Screen::Main)
                                 && app.dialogs.is_empty();
                             let cup = app.world.cup_day_due();
@@ -175,7 +176,7 @@ fn main() -> Result<(), String> {
                                     app.world.human_count()
                                 };
                                 for _ in 0..n.max(1) {
-                                    app.event(Ev::Key(Key::F(5)));
+                                    app.event(Ev::Key(Key::Char('a')));
                                     app.event(Ev::Key(Key::Enter));
                                 }
                             }
@@ -390,10 +391,17 @@ fn main() -> Result<(), String> {
             }
             "mdopen" => {
                 // a dialog of the match day with sample data: `mdopen=invite`, `mdopen=lashes`
-                let d = match v.as_str() {
-                    "invite" => {
-                        rustfoot_ui::classic::dialogs::matchday::invitation(&app, "", "PALMEIRAS")
-                    }
+                // (`invite:CLUB` names the club; with no game `-`, the start-up dialogs are put away first)
+                if game == "-" {
+                    app.dialogs.clear();
+                }
+                let (v, arg) = v.split_once(':').unwrap_or((v.as_str(), ""));
+                let d = match v {
+                    "invite" => rustfoot_ui::classic::dialogs::matchday::invitation(
+                        &app,
+                        "",
+                        if arg.is_empty() { "PALMEIRAS" } else { arg },
+                    ),
                     "lashes" => rustfoot_ui::classic::dialogs::matchday::lashes_dialog(vec![
                         "Fulano foi despedido do SANTOS".into(),
                         "\u{2}Para o seu lugar foi contratado Beltrano".into(),
