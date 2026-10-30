@@ -241,8 +241,9 @@ pub fn draw_open_at(
             (false, false) => SILVER,
         };
         if on && !e.enabled {
-            text_dithered(fb, f, x + 16, top, &e.label, color, 0);
-            text_dithered(fb, f, sc_x, top, &e.shortcut, color, 0);
+            // (the grey pattern is aligned on the drop-down's corner: measured on the game's and the team editor's menus)
+            text_dithered(fb, f, x + 16, top, &e.label, color, (x + y) & 1);
+            text_dithered(fb, f, sc_x, top, &e.shortcut, color, (x + y) & 1);
         } else {
             text(fb, f, x + 16, top, &e.label, color, false);
             text(fb, f, sc_x, top, &e.shortcut, color, false);

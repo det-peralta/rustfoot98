@@ -64,7 +64,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Editor with a team (the flag's hint) | `TEDITOR_MAIN` | 2 px (0.000 %) |  |
 | Editor, a player selected | `TEDITOR_MAIN` | 58 px (0.012 %) |  |
 | Editor menu Ficheiro | `TEDITOR_MAIN` | 0 px (0.000 %) |  |
-| Editor menu Jogador | `TEDITOR_MAIN` | 277 px (0.058 %) |  |
+| Editor menu Jogador | `TEDITOR_MAIN` | 35 px (0.007 %) |  |
 | Editor menu Equipa | `TEDITOR_MAIN` | 329 px (0.069 %) |  |
 | Editor menu Elifoot | `TEDITOR_MAIN` | 2 px (0.000 %) |  |
 | Abrir | `TOPENTEAMDLG` | 30 px (0.006 %) |  |

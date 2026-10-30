@@ -313,7 +313,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Jogador
 
-277 px (0.058 %) · `TEDITOR_MAIN`
+35 px (0.007 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
