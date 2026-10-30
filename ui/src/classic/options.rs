@@ -30,7 +30,8 @@ impl Default for Options {
             lashes: 1,
             save_when: 1,
             cup_draw: 1,
-            sound_off: true,
+            // (the original starts with the sound on: `10c8:2c6c` = 1 at start-up)
+            sound_off: false,
             profile: 1,
             half_time_subs: true,
             view_computer_penalties: true,
