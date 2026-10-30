@@ -1,7 +1,7 @@
 //! Renders the team editor into a BMP: `editor_shot out.bmp [key=value ...]` with `dir=EQUIPAS directory` (default the original's),
 //! `team=FILE.EFT` (open it), `sel=N` (select a player), `menu=N` and `hl=N` (an open menu), then `do=` a `;`-separated script of
 //! menu commands (`TeamColor`), clicks (`@x,y` or `@x,y,r` for the right button), presses of a dialog's control (`!OKBtn`) and keys
-//! (`#Enter`, `#Tab`, `#a`); `save=path` writes the last team file the script saved. Needs the skin
+//! (`#Enter`, `#Tab`, `#a`), pointer rests (`%x,y`: a second, so a hint opens); `save=path` writes the last team file the script saved. Needs the skin
 //! pack in `analysis/out/skin`.
 use rustfoot_ui::classic::Key;
 use rustfoot_ui::editor::{Editor, Ev};
@@ -74,6 +74,14 @@ fn main() -> Result<(), String> {
         } else if let Some(name) = step.strip_prefix('!') {
             e.draw();
             e.press(name);
+        } else if let Some(xy) = step.strip_prefix('%') {
+            // `%x,y`: the pointer rests there for a second (a hint opens)
+            let (x, y) = xy.split_once(',').unwrap_or(("0", "0"));
+            e.draw();
+            e.event(Ev::Move(x.parse().unwrap_or(0), y.parse().unwrap_or(0)));
+            for _ in 0..50 {
+                e.tick(20);
+            }
         } else if let Some(k) = step.strip_prefix('#') {
             let key = match k {
                 "Enter" => Key::Enter,

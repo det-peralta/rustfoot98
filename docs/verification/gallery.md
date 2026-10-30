@@ -287,9 +287,9 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 |---|---|---|
 | [![original](img/original/ed_empty.png)](img/original/ed_empty.png) | [![port](img/port/ed_empty.png)](img/port/ed_empty.png) | [![difference](img/diff/ed_empty.png)](img/diff/ed_empty.png) |
 
-### Editor with a team
+### Editor with a team (the flag's hint)
 
-915 px (0.191 %) · `TEDITOR_MAIN` · the capture shows the flag's hint (the country, set by the program) under the pointer
+165 px (0.034 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -554,4 +554,78 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 | Original | Port | Difference |
 |---|---|---|
 | [![original](img/original/md_roundview.png)](img/original/md_roundview.png) | [![port](img/port/md_roundview.png)](img/port/md_roundview.png) | [![difference](img/diff/md_roundview.png)](img/diff/md_roundview.png) |
+
+## Team editor
+
+### New team: name (the hint of the full name)
+
+55 px (0.011 %) · `TSETTEAMNAMEDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_name.png)](img/original/ed_new_name.png) | [![port](img/port/ed_new_name.png)](img/port/ed_new_name.png) | [![difference](img/diff/ed_new_name.png)](img/diff/ed_new_name.png) |
+
+### New team: colours
+
+93 px (0.019 %) · `TTEAMCOLORDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_color.png)](img/original/ed_new_color.png) | [![port](img/port/ed_new_color.png)](img/port/ed_new_color.png) | [![difference](img/diff/ed_new_color.png)](img/diff/ed_new_color.png) |
+
+### New team: country
+
+315 px (0.066 %) · `TSETCOUNTRYDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_country.png)](img/original/ed_new_country.png) | [![port](img/port/ed_new_country.png)](img/port/ed_new_country.png) | [![difference](img/diff/ed_new_country.png)](img/diff/ed_new_country.png) |
+
+### New team: starting level
+
+51 px (0.011 %) · `TTEAMSKILLDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_level.png)](img/original/ed_new_level.png) | [![port](img/port/ed_new_level.png)](img/port/ed_new_level.png) | [![difference](img/diff/ed_new_level.png)](img/diff/ed_new_level.png) |
+
+### New team: coach
+
+56 px (0.012 %) · `TCOACHNAMEDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_coach.png)](img/original/ed_new_coach.png) | [![port](img/port/ed_new_coach.png)](img/port/ed_new_coach.png) | [![difference](img/diff/ed_new_coach.png)](img/diff/ed_new_coach.png) |
+
+### New team: the first player
+
+176 px (0.037 %) · `TEDITPLAYERDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_player.png)](img/original/ed_new_player.png) | [![port](img/port/ed_new_player.png)](img/port/ed_new_player.png) | [![difference](img/diff/ed_new_player.png)](img/diff/ed_new_player.png) |
+
+### New team made (the flag's hint)
+
+249 px (0.052 %) · `TEDITOR_MAIN`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_new_team.png)](img/original/ed_new_team.png) | [![port](img/port/ed_new_team.png)](img/port/ed_new_team.png) | [![difference](img/diff/ed_new_team.png)](img/diff/ed_new_team.png) |
+
+### Gravar equipa
+
+291 px (0.061 %) · `TSAVETEAMDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_save.png)](img/original/ed_save.png) | [![port](img/port/ed_save.png)](img/port/ed_save.png) | [![difference](img/diff/ed_save.png)](img/diff/ed_save.png) |
+
+### The team cannot be saved
+
+232 px (0.048 %) · `TCANTSAVETEAMDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/ed_cantsave.png)](img/original/ed_cantsave.png) | [![port](img/port/ed_cantsave.png)](img/port/ed_cantsave.png) | [![difference](img/diff/ed_cantsave.png)](img/diff/ed_cantsave.png) |
 

@@ -136,12 +136,11 @@ for sid, title, form, ev, exact, note in [
 ED = ["dir=analysis/screens/jsdos/d/eli98/equipas"]
 ED_NOTES = {
     "ed_about": "animated: blinking notice, scrolling banner",
-    "ed_team": "the capture shows the flag's hint (the country, set by the program) under the pointer",
 }
 ARS = ED + ["team=ARSENAL.EFT"]
 for sid, cap, title, form, port in [
     ("ed_empty", "empty", "Editor without a team", "TEDITOR_MAIN", ED),
-    ("ed_team", "team", "Editor with a team", "TEDITOR_MAIN", ARS),
+    ("ed_team", "team", "Editor with a team (the flag's hint)", "TEDITOR_MAIN", ARS + ["do=%545,228"]),
     ("ed_team_selected", "team_selected", "Editor, a player selected", "TEDITOR_MAIN", ARS + ["sel=2"]),
     ("ed_menu_ficheiro", "menu_ficheiro", "Editor menu Ficheiro", "TEDITOR_MAIN", ARS + ["menu=0", "hl=0"]),
     ("ed_menu_jogador", "menu_jogador", "Editor menu Jogador", "TEDITOR_MAIN", ARS + ["menu=1", "hl=0"]),
@@ -205,3 +204,25 @@ add(id="main_sell", group="Main window", title="Jogador › Vender", form="TPLAN
     port=BASE + ["ev=click:200,218", "page=sell"])
 add(id="md_roundview", group="Match day", title="Round view during the games", form="TJOURNEYDLG", steps=None,
     capture="probe1/0030_roundview.png", port=BASE + ["ev=turn:;tick:20000"], exact=False, note=MD)
+
+# the team editor's new team, step by step (typed TESTE FC / TESTE, Áustria, coach "treinador x"), and saving a team without
+# goalkeepers (the two removed, then Steve Morrow)
+NEW_TEAM = "Novaequipa;#T;#E;#S;#T;#E;# ;#F;#C;#Tab;#T;#E;#S;#T;#E"
+AFTER_LEVEL = NEW_TEAM + ";!OKBtn;!OKBtn;#Down;#Down;!OKBtn;!OKBtn"
+NO_KEEPERS = "JogadorRemover;JogadorRemover;@250,293;JogadorRemover;FicheiroSair"
+for sid, cap, title, form, port in [
+    ("ed_new_name", "new_name", "New team: name (the hint of the full name)", "TSETTEAMNAMEDLG", ED + ["do=" + NEW_TEAM + ";%272,277"]),
+    ("ed_new_color", "new_color", "New team: colours", "TTEAMCOLORDLG", ED + ["do=" + NEW_TEAM + ";!OKBtn"]),
+    ("ed_new_country", "new_country", "New team: country", "TSETCOUNTRYDLG", ED + ["do=" + NEW_TEAM + ";!OKBtn;!OKBtn"]),
+    ("ed_new_level", "new_level", "New team: starting level", "TTEAMSKILLDLG",
+     ED + ["do=" + NEW_TEAM + ";!OKBtn;!OKBtn;#Down;#Down;!OKBtn"]),
+    ("ed_new_coach", "new_coach", "New team: coach", "TCOACHNAMEDLG", ED + ["do=" + AFTER_LEVEL]),
+    ("ed_new_player", "new_player", "New team: the first player", "TEDITPLAYERDLG",
+     ED + ["do=" + AFTER_LEVEL + ";#t;#r;#e;#i;#n;#a;#d;#o;#r;# ;#x;!OKBtn"]),
+    ("ed_new_team", "new_team", "New team made (the flag's hint)", "TEDITOR_MAIN",
+     ED + ["do=" + AFTER_LEVEL + ";#t;#r;#e;#i;#n;#a;#d;#o;#r;# ;#x;!OKBtn;!CancelBtn;%545,245"]),
+    ("ed_save", "dlg_save", "Gravar equipa", "TSAVETEAMDLG", ARS + ["sel=0", "do=" + NO_KEEPERS]),
+    ("ed_cantsave", "dlg_cantsave", "The team cannot be saved", "TCANTSAVETEAMDLG", ARS + ["sel=0", "do=" + NO_KEEPERS + ";!OKBtn"]),
+]:
+    add(id=sid, group="Team editor", title=title, form=form, steps=None, capture="editor/%s.png" % cap, tool="editor",
+        region="window", port=port)

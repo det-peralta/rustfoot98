@@ -183,6 +183,8 @@ impl Editor {
         if let Some(d) = dialogs.last() {
             self.hits = d.hits.clone();
             self.hover.draw(&mut self.fb, &self.skin, &d.form);
+        } else {
+            self.hover.draw(&mut self.fb, &self.skin, "TEDITOR_MAIN");
         }
         self.dialogs = dialogs;
         if let (Some((open, hl)), true) = (self.menu, self.dialogs.is_empty()) {
@@ -274,6 +276,8 @@ impl Editor {
             t.insert(format!("{n}.color"), fg.clone());
         }
         t.insert("flagDraw.image".into(), format!("FLAGS/{}", team.country));
+        // the flag's hint is the country's name (set by the program; the form shows hints)
+        t.insert("flagDraw.hint".into(), self.country_name(&team.country));
         // the rows of `WritePlayer`: name, the country of a foreigner, the position, in the club's colours
         let rows: Vec<String> = team
             .players

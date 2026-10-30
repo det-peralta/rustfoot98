@@ -5,6 +5,7 @@ use super::draw::{hint_window, Hit};
 use super::fb::Fb;
 use super::form::Node;
 use super::skin::Skin;
+use std::collections::BTreeMap;
 
 pub const PAUSE: u32 = 800;
 
@@ -23,14 +24,38 @@ pub struct Hover {
 impl Hover {
     /// The pointer moved to `(x, y)` over the controls `hits` of the form `form` (named `name`); true when the picture changes.
     pub fn moved(&mut self, name: &str, form: Option<&Node>, hits: &[Hit], x: i32, y: i32) -> bool {
+        self.moved_with(name, form, hits, None, x, y)
+    }
+
+    /// `moved` where the program set some hints itself: `texts["<control>.hint"]` (the team editor's flag shows its country).
+    /// A control without its own `ShowHint` takes the form's (`ParentShowHint`, the default).
+    pub fn moved_with(
+        &mut self,
+        name: &str,
+        form: Option<&Node>,
+        hits: &[Hit],
+        texts: Option<&BTreeMap<String, String>>,
+        x: i32,
+        y: i32,
+    ) -> bool {
         let found = form.and_then(|f| {
             hits.iter()
                 .rev()
                 .filter(|h| h.contains(x, y))
                 .find_map(|h| {
                     let n = f.find(&h.name)?;
-                    let text = n.str("Hint").filter(|t| !t.is_empty())?;
-                    (h.enabled && n.flag("ShowHint", false)).then_some((h, text))
+                    let text = texts
+                        .and_then(|t| t.get(&format!("{}.hint", h.name)))
+                        .map(String::as_str)
+                        .or(n.str("Hint"))
+                        .filter(|t| !t.is_empty())?;
+                    let show =
+                        if n.props.contains_key("ShowHint") || !n.flag("ParentShowHint", true) {
+                            n.flag("ShowHint", false)
+                        } else {
+                            f.flag("ShowHint", false)
+                        };
+                    (h.enabled && show).then_some((h, text))
                 })
         });
         match found {

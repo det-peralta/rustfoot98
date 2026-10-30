@@ -29,8 +29,16 @@ impl Editor {
                 self.hover
                     .moved(&d.form, self.forms.get(&d.form), &d.hits, x, y);
             }
-            (Ev::Move(..), None) => {
-                self.hover.clear();
+            (Ev::Move(x, y), None) => {
+                let texts = self.view().0;
+                self.hover.moved_with(
+                    "TEDITOR_MAIN",
+                    self.forms.get("TEDITOR_MAIN"),
+                    &self.hits,
+                    Some(&texts),
+                    x,
+                    y,
+                );
             }
             (Ev::Down(..) | Ev::DblClick(..) | Ev::Key(_), _) => {
                 self.hover.cancel();

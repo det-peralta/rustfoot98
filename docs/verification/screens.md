@@ -61,7 +61,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
 | Editor without a team | `TEDITOR_MAIN` | 688 px (0.143 %) |  |
-| Editor with a team | `TEDITOR_MAIN` | 915 px (0.191 %) | the capture shows the flag's hint (the country, set by the program) under the pointer |
+| Editor with a team (the flag's hint) | `TEDITOR_MAIN` | 165 px (0.034 %) |  |
 | Editor, a player selected | `TEDITOR_MAIN` | 224 px (0.047 %) |  |
 | Editor menu Ficheiro | `TEDITOR_MAIN` | 151 px (0.031 %) |  |
 | Editor menu Jogador | `TEDITOR_MAIN` | 437 px (0.091 %) |  |
@@ -123,3 +123,17 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
 | Round view during the games | `TJOURNEYDLG` | not pixel-compared (3917 px) | the match differs (the original's random numbers): layout only |
+
+## Team editor
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| New team: name (the hint of the full name) | `TSETTEAMNAMEDLG` | 55 px (0.011 %) |  |
+| New team: colours | `TTEAMCOLORDLG` | 93 px (0.019 %) |  |
+| New team: country | `TSETCOUNTRYDLG` | 315 px (0.066 %) |  |
+| New team: starting level | `TTEAMSKILLDLG` | 51 px (0.011 %) |  |
+| New team: coach | `TCOACHNAMEDLG` | 56 px (0.012 %) |  |
+| New team: the first player | `TEDITPLAYERDLG` | 176 px (0.037 %) |  |
+| New team made (the flag's hint) | `TEDITOR_MAIN` | 249 px (0.052 %) |  |
+| Gravar equipa | `TSAVETEAMDLG` | 291 px (0.061 %) |  |
+| The team cannot be saved | `TCANTSAVETEAMDLG` | 232 px (0.048 %) |  |
