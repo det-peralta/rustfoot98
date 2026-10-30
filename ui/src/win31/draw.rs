@@ -1123,7 +1123,7 @@ fn editor_players(
     let fit = ((h - 4) / ROW) as usize;
     let old = fb.clip;
     fb.clip = (rx, y + 2, rx + rw, y + h - 2);
-    if rows.is_empty() {
+    if rows.is_empty() && !INACTIVE.with(|a| a.get()) {
         // (as on a row: a pixel outside it on the left, right and top)
         let inner = fb.clip;
         fb.clip = (rx - 1, y + 1, rx + rw + 1, y + h - 1);
@@ -1154,7 +1154,8 @@ fn editor_players(
         // the focus rectangle: on the selected row, or on the first one before any is chosen
         // (a pixel outside the row on the left, right and top, over the list's inner border; over a row that is not selected the
         // dots between are XORed with the team's ink: cyan on a red team, measured)
-        if sel.map_or(k == top, |s| s == k as i64) {
+        // (none while the window is under a dialog)
+        if sel.map_or(k == top, |s| s == k as i64) && !INACTIVE.with(|a| a.get()) {
             let inner = fb.clip;
             fb.clip = (rx - 1, y + 1, rx + rw + 1, y + h - 1);
             if on {
