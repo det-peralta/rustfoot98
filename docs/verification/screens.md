@@ -41,3 +41,17 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Treinador › História | `TPRINTLISTDLG` | 51 px (0.011 %) |  |
 | Treinador › Ranking | `TPRINTLISTDLG` | 222 px (0.046 %) |  |
 | Treinador › Perfil | `TCOACHOPTIONSDLG` | 227 px (0.047 %) |  |
+
+## Start and new game
+
+| Screen | Form | Differing pixels | Notes |
+|---|---|---|---|
+| About box at start-up | `TABOUTDLG` | not pixel-compared (1971 px) | animated: the notice blinks and the banner scrolls |
+| Choice of game | `TSELECTGAMEDLG` | 66 px (0.014 %) |  |
+| New game named | `TSELECTGAMEDLG` | 364 px (0.076 %) | the edit's caret blinks |
+| Countries | `TSELECTCOUNTRIESDLG` | 86 px (0.018 %) |  |
+| Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 154 px (0.032 %) |  |
+| Currency | `TCURRENCYDLG` | 182 px (0.038 %) |  |
+| Coaches' names | `TGETTEAMSDLG` | 420 px (0.087 %) |  |
+| Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3706 px) | the club is drawn at random |
+| A new game's main window | `TPLANTELDLG` | not pixel-compared (2322 px) | the club is drawn at random |

@@ -1,0 +1,64 @@
+site_name: rustfoot98
+site_description: Elifoot 98 reverse-engineered and rebuilt in Rust and WebAssembly, pixel for pixel
+repo_url: https://github.com/det-peralta/rustfoot98
+repo_name: det-peralta/rustfoot98
+docs_dir: docs
+site_dir: site
+strict: false
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: green
+      accent: yellow
+      toggle: {icon: material/weather-night, name: Dark mode}
+    - scheme: slate
+      primary: green
+      accent: yellow
+      toggle: {icon: material/weather-sunny, name: Light mode}
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc: {permalink: true}
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.arithmatex: {generic: true}
+nav:
+  - Home: index.md
+  - How the game works:
+      - game/index.md
+      - Randomness: game/random.md
+      - Match engine: game/match-engine.md
+      - Season and cup: game/season.md
+      - Economy: game/economy.md
+      - Transfer market: game/market.md
+      - Coaches and referees: game/coaches.md
+      - Files: game/files.md
+  - Verification:
+      - Screen by screen: verification/screens.md
+      - Gallery: verification/gallery.md
+      - Pixel-exact interface: pixel-exact-ui.md
+  - Reverse engineering:
+      - Method and tools: installation.md
+      - Findings: findings.md
+      - Decompilation map: decompilation-map.md
+      - Delphi classes: classes.md
+      - Save format (.e98): e98-format.md
+      - Match engine notes: match-engine.md
+      - Season notes: season.md
+      - Finance and market notes: finance.md
+      - References: references.md
+  - The port:
+      - Architecture: architecture.md
+      - Classic interface: classic-dialogs.md
+      - Match day: matchday.md
+      - UI strategy: ui-strategy.md
+      - Roadmap: roadmap.md
+      - Analysis plan: analysis-plan.md

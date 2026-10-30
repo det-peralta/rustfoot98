@@ -2,11 +2,12 @@
 """Renders the port's side of every screen of tools/screens/manifest.py and compares it with the original's capture.
 
   cargo build --release -p rustfoot-ui --bin classic_shot --bin editor_shot
-  analysis/captures/venv/bin/python tools/screens/compare.py [--publish DIR]
+  analysis/captures/venv/bin/python tools/screens/compare.py [--publish]
 
 Writes analysis/screens/{port,diff}/<id>.png, the side-by-side report analysis/screens/index.html (all git-ignored: the pictures are
 drawn with the game's own fonts and bitmaps) and the table of pixel counts docs/verification/screens.md (numbers only).
-`--publish DIR` also copies the three pictures of every screen to DIR (the docs site's gallery, when you choose to publish them).
+It also writes docs/verification/gallery.md, whose pictures `--publish` copies to docs/verification/img/ (git-ignored: the docs site
+shows them when it is built locally by tools/site/build.sh).
 The captures are 6 bits per channel, so both sides are compared on the top 5 bits."""
 import html, os, shutil, subprocess, sys
 import numpy as np
@@ -64,7 +65,7 @@ def original_of(s):
 
 
 def main():
-    publish = sys.argv[sys.argv.index('--publish') + 1] if '--publish' in sys.argv else None
+    publish = 'docs/verification/img' if '--publish' in sys.argv else None
     for d in ('port', 'diff'):
         os.makedirs(os.path.join(ROOT, d), exist_ok=True)
     rows = []
@@ -91,6 +92,7 @@ def main():
         print('%-36s %s' % (s['id'], err or (n if n is not None else 'no capture')), flush=True)
     write_report(rows)
     write_table(rows)
+    write_gallery(rows)
     if publish:
         for s, has, port, n, err in rows:
             for kind, src in (('original', original_of(s)), ('port', port), ('diff', os.path.join(ROOT, 'diff', s['id'] + '.png'))):
@@ -119,6 +121,25 @@ def write_report(rows):
         for kind in ('original', 'port', 'diff'):
             out.append('<img src="%s/%s.png" alt="%s">' % (kind, s['id'], kind))
     open(os.path.join(ROOT, 'index.html'), 'w').write('\n'.join(out))
+
+
+def write_gallery(rows):
+    out = ['# Gallery', '',
+           'Each screen three times: the original under js-dos, the port\'s render of the same state, and the difference (the '
+           'port faded, differing pixels in red). The counts are in [Screen by screen](screens.md).', '',
+           '!!! note "Where the pictures come from"',
+           '    They are drawn with the game\'s own fonts and bitmaps, so they are not stored in the repository: '
+           '`tools/site/build.sh` renders and compares them from your own copy and puts them in `docs/verification/img/` '
+           'before building the site.', '']
+    group = None
+    for s, has, port, n, err in rows:
+        if s['group'] != group:
+            group = s['group']
+            out += ['## ' + group, '']
+        out += ['### ' + s['title'], '', '%s · `%s`%s' % (verdict(s, n), s['form'], (' · ' + s['note']) if s.get('note') else ''), '',
+                '| Original | Port | Difference |', '|---|---|---|',
+                '| [![original](img/original/{0}.png)](img/original/{0}.png) | [![port](img/port/{0}.png)](img/port/{0}.png) | [![difference](img/diff/{0}.png)](img/diff/{0}.png) |'.format(s['id']), '']
+    open('docs/verification/gallery.md', 'w').write('\n'.join(out) + '\n')
 
 
 def write_table(rows):

@@ -819,12 +819,12 @@ pub(super) fn sunken_box(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, interior: 
 }
 
 fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
-    let (w, h) = (n.int("Width", 0), n.int("Height", 0));
-    let enabled = is_enabled(cx, n);
-    sunken_box(fb, x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(WHITE));
     let Some(font) = cx.font(f) else {
         return;
     };
+    let (w, h) = (n.int("Width", 0), edit_height(n, font));
+    let enabled = is_enabled(cx, n);
+    sunken_box(fb, x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(WHITE));
     let s = caption_or(cx, n, "Text");
     // (`<name>.indent`: the text's distance from the left edge, 3 in the team editor's edits)
     let indent = widgets::get_num(cx, n, "indent").unwrap_or(2);
@@ -1160,7 +1160,15 @@ fn countries(
     let sel = num("sel").unwrap_or(-1);
     let scroll = rows.len() > fit;
     let (rx, rw) = (x + 2, w - 4 - if scroll { 16 } else { 0 });
-    for (k, row) in rows.iter().enumerate().skip(top).take(fit) {
+    // a row that does not fit shows its top part (the original's list is not of integral height: France peeks out under the 12)
+    let old_clip = fb.clip;
+    fb.clip = (
+        rx.max(old_clip.0),
+        (y + 2).max(old_clip.1),
+        (rx + rw).min(old_clip.2),
+        (y + h - 2).min(old_clip.3),
+    );
+    for (k, row) in rows.iter().enumerate().skip(top).take(fit + 1) {
         let c: Vec<&str> = row.split('|').collect();
         // (the rows start one pixel above the list's client area: measured)
         let ry = y + 1 + (k - top) as i32 * ROW;
@@ -1197,11 +1205,12 @@ fn countries(
         } else {
             format!("{count} equipas")
         };
-        // placed as if it were always plural: "1 equipa" ends one letter short of the others
+        // placed as if it were always plural and regular: "1 equipa" ends one letter short of the others, a chosen (bold) row
+        // further right (measured)
         text(
             fb,
             font,
-            rx + rw - 20 - font.width(&format!("{count} equipas")),
+            rx + rw - 20 - reg.width(&format!("{count} equipas")),
             ty,
             &label,
             BLACK,
@@ -1216,18 +1225,20 @@ fn countries(
             x: rx,
             y: ry,
             w: rw,
-            h: ROW,
+            h: ROW.min(y + h - 2 - ry),
             enabled: true,
         });
     }
+    fb.clip = old_clip;
     if scroll {
+        // (over the list's inner border, as a standard list's: measured on the original's countries)
         widgets::vscroll(
             fb,
             cx,
             &n.name,
-            x + w - 16,
-            y + 2,
-            h - 4,
+            x + w - 17,
+            y + 1,
+            h - 2,
             top,
             rows.len(),
             fit,
@@ -1895,6 +1906,18 @@ pub fn focus_rect(fb: &mut Fb, x: i32, y: i32, w: i32, h: i32, wx: i32, wy: i32)
 
 /// The desktop colour of the original install.
 pub const DESKTOP: Rgb = GREEN;
+
+/// The height of a `TEdit`: with `AutoSize` (the default) Delphi 1 sets it when the form loads (`TCustomEdit.AdjustHeight` without
+/// the new-style controls): the font's `tmHeight` plus a quarter of the smaller of it and the System font's (16) plus 4 border
+/// pixels. The forms keep that height, except the new game's name fields (17 stored, 20 shown).
+fn edit_height(n: &Node, font: &Font) -> i32 {
+    if n.flag("AutoSize", true) {
+        let tm = font.tm_height;
+        tm + tm.min(16) / 4 + 4
+    } else {
+        n.int("Height", 0)
+    }
+}
 
 /// The colour of hint windows (Delphi 1's `Application.HintColor`, `$80FFFF`).
 pub const HINT_BG: Rgb = Rgb(255, 255, 128);

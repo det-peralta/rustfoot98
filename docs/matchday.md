@@ -51,9 +51,9 @@ matter for the order of things:
   *that has a game that day*, interleaved with the main windows. So a dialog of a day's market appears before the main window of that day
   (clubs earlier in the list than the human's game) or after *Jogar* and before the round view (clubs later in the list); in the captures the cup
   day shows auctions right after *Jogar* and, after the cup view, the auctions (and "Vendido ao X por Y") of the *next* league day before its main window.
-  The port approximates this: the market of a day is computed with the league round before it (`World::market_round`, "clubs of the next round's
-  games") and the auction dialogs open at the end of the previous sequence, i.e. **after the cup day when a cup day follows the league day**,
-  otherwise after the classification. The cup day itself has no market in the port (the original's `3e9c` also runs for the cup clubs).
+  The port runs the same market before every match day (`World::market_before_day`): for the next league round's games by division, or,
+  before a cup day, for the drawn ties (pool clubs included), with the day counter gating sales as `2b40` does. The auction dialogs open
+  at the end of the previous sequence.
 
 In the port: `World::play_round_ctl` plays the league day and, on an even round, ends with `World::draw_cup` (the shuffle and the pairing, the
 random state is checkpointed first, so a replay of the league day gives the same draw); the result is `World::cup_draw: Option<CupDraw>`
@@ -77,7 +77,7 @@ Jogo page has no mini standings table. Referee, squad, formation, market work as
 
 Verified against the binary: the order league view -> classification -> draw dialog -> main window -> cup view, no main window without a tie
 (by the structure of `13e1`/`3e9c`), the point where the draw's random numbers are used. Approximated: the order of the humans' windows (seat order),
-auction timing as described above, no market on the cup day, the autosave happens when the main window of the cup day appears.
+auction timing as described above, the autosave happens when the main window of the cup day appears.
 
 ## How the user's decisions are applied: replay
 The core computes a round in one go. The interface plays it on a copy of the world and shows it; when the user decides something at a

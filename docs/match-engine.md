@@ -96,7 +96,7 @@ Stage 1 (candidate): `Random(90) < T - (own.shots(+0x4f) + own.goals?(+0x59))` *
 Stage 2 (warm-up gate): the candidate stands only if `Random(45) < minute` — early minutes are suppressed
 and from minute 45 on it always passes. At minute 45 a half-time hook (`44a1`) also runs; `44a1` picks the shooter
 via `1010:100b` (weights) into `shooterOut`.
-Stage 3: needs a shooter (`*shooterOut != nil`). Then `8c67` is checked twice and `1068:11c7` runs (side effect, unknown).
+Stage 3: needs a shooter (`*shooterOut != nil`). Then `8c67` is checked twice and `1068:11c7` runs (the game's `MessageBeep`, see `docs/matchday.md`).
 
 ## Per-fixture bonus values — `1010:c95c` (decoded)
 The match constructor `1010:8db2` takes the game's **referee** (`+0x48`, `1a66` on the referee list `2706`) and stores
@@ -142,7 +142,7 @@ pick one random squad member (`Random(squad.count)`, home team first); if it is 
 otherwise (bench or not in the matchday squad) **+1**. Starters therefore drift negative and reserves positive.
 
 **Evolution** runs after **every round**, not only at season end: `1020:0c41` (end-of-round routine, also updates a
-global `Real` random walk at `10c8:2b46` clamped to [lo, hi] — role not decoded) -> `1010:0d9c` (the 4 divisions)
+global `Real` random walk at `10c8:2b46` clamped to [lo, hi]: the economy index) -> `1010:0d9c` (the 4 divisions)
 -> `6fb8` (each team, in list order) -> `4a41(team, level)` with **`level = round(division.base − 2 × rank)`**
 (`rank` = index of the team in the division's list, 0 = best; `division.base` = division object `+4`).
 For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)` (`1068:1079`, threshold 0.0):
@@ -162,11 +162,12 @@ For every slot of the squad (starters and bench), with `rating = sign(slot+0x0c)
 - **Season end** (`038e`): the first division's champion gets `K += 1.0`, the cup winner `K += 0.5`.
 - It scales the goal threshold by `(K/2)^(1/4)`: a team on a winning run scores more, a team on a losing run much less.
 
-## Still unknown
-- Role of the global `Real` at `10c8:2b46` that `0c41` random-walks every round (likely a finance/economy index).
-- Half-time (minute 45) and extra-time (minute 90 -> 120) routines; the penalty shoot-out UI path; human-controlled chance path (`1038:328b`).
-- Where `division.base` (division `+4`) comes from.
-- Season calendar generation, standings, finances (`1010:6e48` and the `+0x71..+0x79` team fields), transfers.
+## Resolved since (see the other notes)
+- The global `Real` at `10c8:2b46` is the economy index (`docs/finance.md`).
+- `division.base` (division `+4`) is set by `1010:0b60` at the start of a game (`docs/season.md`).
+- The side effect of `1068:11c7` in stage 3 is the game's `MessageBeep` (`docs/matchday.md`).
+- Half-time, extra time, the shoot-outs and the human's chance dialog are decoded in `docs/matchday.md`; the calendar,
+  standings, finances and transfers in `docs/season.md` and `docs/finance.md`.
 
 ## Minute loop — `1048:069b`
 Per minute (`match+0x18e`), for every game of the round in turn: `a6eb` (goal chances); if no goal, `aa11`

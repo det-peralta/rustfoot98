@@ -131,6 +131,14 @@ fn players_bind(c: &Classic, d: &mut Dialog) {
             format!("playerName{i}.enabled"),
             if drawn { "0" } else { "1" },
         );
+        // `playerName1Enter` (`1028:0fb1`): the name field with the focus is yellow, the others white (`Button1Enter`, `1028:1064`:
+        // all white); after the draw they are all yellow
+        let name = format!("playerName{i}");
+        let yellow = drawn || d.focus == name;
+        d.text(
+            format!("{name}.bgcolor"),
+            if yellow { "255,255,0" } else { "255,255,255" },
+        );
     }
     if drawn {
         d.text("Button1", "OK");

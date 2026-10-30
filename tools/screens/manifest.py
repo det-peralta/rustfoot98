@@ -106,3 +106,27 @@ for top, title, entries in MENUS:
             steps=menu_keys(top, nth(top, index)) + [("key", "Enter"), ("wait", 2500)],
             back=CLOSE.get(control, [("key", "Enter" if form in ("TPRINTLISTDLG", "TCLASSIFICATIONDLG") else "Escape"), ("wait", 800)]),
             port=BASE + ["dialog=%s" % control])
+
+# the start of the program and a new game, captured once from a fresh boot (About, then: the new-game radio, the name NOVO, Brasil,
+# the currency, the gauge, the coach "joga", the draw). The port gets the emulator's own team files and saved games.
+START_TEAMS = "teams=analysis/screens/jsdos/d/eli98/equipas"  # unzip d/eli98/equipas/* of analysis/jsdos/game.jsdos there
+NEW = "key:Enter;click:196,183;key:n;key:o;key:v;key:o"
+for sid, title, form, ev, exact, note in [
+    ("start_0_about", "About box at start-up", "TABOUTDLG", "", False,
+     "animated: the notice blinks and the banner scrolls"),
+    ("start_1_select", "Choice of game", "TSELECTGAMEDLG", "key:Enter", True, ""),
+    ("start_3_named", "New game named", "TSELECTGAMEDLG", NEW, True, "the edit's caret blinks"),
+    ("start_4_next", "Countries", "TSELECTCOUNTRIESDLG", NEW + ";key:Enter", True, ""),
+    ("start_5_brasil", "Countries, Brasil chosen", "TSELECTCOUNTRIESDLG", NEW + ";key:Enter;click:165,269", True, ""),
+    ("start_6_next", "Currency", "TCURRENCYDLG", NEW + ";key:Enter;click:165,269;click:600,130", True, ""),
+    ("start_8_next", "Coaches' names", "TGETTEAMSDLG",
+     NEW + ";key:Enter;click:165,269;click:600,130;key:Enter;tick:20000", True, ""),
+    ("start_12_drawn", "Clubs drawn", "TGETTEAMSDLG",
+     NEW + ";key:Enter;click:165,269;click:600,130;key:Enter;tick:20000;key:j;key:o;key:g;key:a;click:400,418", False,
+     "the club is drawn at random"),
+    ("start_13_main", "A new game's main window", "TPLANTELDLG",
+     NEW + ";key:Enter;click:165,269;click:600,130;key:Enter;tick:20000;key:j;key:o;key:g;key:a;click:400,418;key:Enter", False,
+     "the club is drawn at random"),
+]:
+    add(id=sid, group="Start and new game", title=title, form=form, steps=None, exact=exact, note=note,
+        port=["-", START_TEAMS, "saves=ABCDEEEE"] + (["ev=" + ev] if ev else []))

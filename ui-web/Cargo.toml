@@ -2,7 +2,8 @@
 name = "rustfoot-ui-web"
 version = "0.1.0"
 edition = "2021"
-description = "WebAssembly build of the shared UI: frames come out as a command list that web/canvas.js replays on a <canvas>"
+description = "WebAssembly host of the interface for the browser (the game and the team editor)"
+license = "MIT"
 
 [lib]
 crate-type = ["cdylib"]

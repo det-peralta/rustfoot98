@@ -1,5 +1,5 @@
 //! Renders the classic interface from a saved game into a BMP: `classic_shot game.e98 out.bmp [key=value ...]`
-//! (`human=CLUB` (makes the human of that club the active one; any other club becomes the active human's), `seat=N` (the N-th human, from 0), `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first). Needs the skin pack in `analysis/out/skin`.
+//! (`human=CLUB` (makes the human of that club the active one; any other club becomes the active human's), `seat=N` (the N-th human, from 0), `page=0..4`, `select=N`, `plan=0..11`, `dialog=MENUENTRY`, `play=ROUNDS`); `-` instead of the game starts with no game (About box first; `teams=DIR` the `.EFT` files of a new game, `saves=A,B` the saved games listed). Needs the skin pack in `analysis/out/skin`.
 use rustfoot_ui::classic::{Classic, Data, Ev, Key, Page};
 use rustfoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
@@ -22,13 +22,24 @@ fn main() -> Result<(), String> {
         &std::fs::read_to_string(root.join("analysis/out/skin/forms.json"))
             .map_err(|e| e.to_string())?,
     )?;
-    let data = Data::from_txe(
+    let mut data = Data::from_txe(
         &std::fs::read(root.join("original/elifoot98/COUNTRY.TXE")).map_err(|e| e.to_string())?,
         &std::fs::read(root.join("original/elifoot98/REFEREE.TXE")).map_err(|e| e.to_string())?,
     );
+    // `saves=A,B`: the saved games the choice of game lists
+    if let Some((_, v)) = kv.iter().find(|(k, _)| k == "saves") {
+        data.set_saves(&v.replace(',', "\n"));
+    }
     let mut app = if game == "-" {
         // no game: the interface as it starts (About, choice of game...), with the teams of the original's EQUIPAS directory
-        let mut files: Vec<_> = std::fs::read_dir(root.join("original/elifoot98/EQUIPAS"))
+        // (`teams=DIR`: another directory of `.EFT` files)
+        let dir = kv
+            .iter()
+            .find(|(k, _)| k == "teams")
+            .map_or(root.join("original/elifoot98/EQUIPAS"), |(_, v)| {
+                PathBuf::from(v)
+            });
+        let mut files: Vec<_> = std::fs::read_dir(dir)
             .map_err(|e| e.to_string())?
             .filter_map(|e| e.ok().map(|e| e.path()))
             .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("eft")))
@@ -418,7 +429,7 @@ fn main() -> Result<(), String> {
                 };
                 app.open(d);
             }
-            "pick" => {}
+            "pick" | "teams" | "saves" => {}
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }

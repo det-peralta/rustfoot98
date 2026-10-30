@@ -1,0 +1,38 @@
+name: pages
+# Builds the documentation site with the game at /play/ and deploys it to GitHub Pages. Started by hand only (Actions > pages >
+# Run workflow), once Pages is enabled for the repository. The site has no third-party files: the game asks players for their
+# own copy, and the verification gallery's pictures are only in sites built locally (tools/site/build.sh with GALLERY=1).
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mkdocs-material
+      - run: MKDOCS=mkdocs bash tools/site/build.sh
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

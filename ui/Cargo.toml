@@ -2,7 +2,8 @@
 name = "rustfoot-ui"
 version = "0.1.0"
 edition = "2021"
-description = "Backend-independent immediate-mode UI for the Elifoot 98 port, with an optional SDL2 front end"
+description = "The Elifoot 98 interface rebuilt pixel for pixel: a Windows 3.1 / Delphi VCL renderer, the game's windows and dialogs, and the team editor"
+license = "MIT"
 
 [dependencies]
 rustfoot-core = { path = "../core" }
