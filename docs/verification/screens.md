@@ -144,3 +144,26 @@ Every screen of the original, captured under js-dos, against the port's render o
 |---|---|---|---|
 | Renovar contrato, a low offer typed | `TPREPAREGAMEDLG` | 335 px (0.070 %) |  |
 | The player refuses the offer (Actualização de Salário) | `TASKMORESALARYDLG` | 274 px (0.057 %) |  |
+
+## Coverage
+
+77 screens, 63 of them compared pixel for pixel (median 121 differing pixels); 33 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
+
+| Form | Why it has no screen |
+|---|---|
+| `TADDINSDLG` | "Extras": not shown by the unregistered game in any recorded session; the port does not use it |
+| `TASSIGNNACDLG` | "Abreviatura Inexistente": asks for a country when a team's code is unknown; no team of the packs has one |
+| `TCHECKPLAYERDLG` | registered copy only (Jogador › Procurar jogadores); hidden in the unregistered game and the port |
+| `TCLOCKDLG` | "Relógio" (a gauge): not shown in any recorded session; the port does not use it |
+| `TCOACHMANAGERDLG` | registered copy only (Treinador › Gestão de treinadores) |
+| `TCODEDLG` | the registration code dialog: no key check is implemented, by decision |
+| `TFORCEDSUBSTITUTIONDLG` | an injury in a human's game with substitutes left: random, not in the recordings yet |
+| `TFORM1` | an empty form left in the program; never shown |
+| `TINPUTDLG` | not shown in any recorded session; the port does not use it |
+| `TJANELACOR` | not shown in any recorded session (the editor's colours use TTeamColorDlg) |
+| `TLOANDLG` | offered only to a club in debt or with a loan (Equipa › Pedir / pagar empréstimo); not reached in the recordings |
+| `TMAINWINDOW` | an empty form captioned "Elifoot 97", left in the program; never shown |
+| `TOBSERVEDPLAYERSDLG` | registered copy only (Jogadores sob observação) |
+| `TPROGRESSDLG` | the start-up gauge (captured as start_7_next, animated): not compared |
+| `TREFEREEAIDDLG` | registered copy only: the referee's name opens it only with features 0x23 / 0x0a (1008:2427, 1018:3416); checked: a click at half-time does nothing |
+| `TWAITDLG` | not shown in any recorded session; the port does not use it |

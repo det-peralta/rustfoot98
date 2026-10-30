@@ -231,3 +231,26 @@ add(id="main_contract_low", group="Main window", title="Renovar contrato, a low 
     port=BASE + ["ev=" + LOW])
 add(id="dlg_askmore", group="Main window", title="The player refuses the offer (Actualização de Salário)", form="TASKMORESALARYDLG",
     steps=None, port=BASE + ["ev=" + LOW + ";click:530,405"])
+
+# the forms of the two programs that have no screen in the catalogue, and why
+NOT_COVERED = {
+    "TCHECKPLAYERDLG": "registered copy only (Jogador › Procurar jogadores); hidden in the unregistered game and the port",
+    "TOBSERVEDPLAYERSDLG": "registered copy only (Jogadores sob observação)",
+    "TCOACHMANAGERDLG": "registered copy only (Treinador › Gestão de treinadores)",
+    "TPLANTELDLG": "registered copy only (the squad viewer behind the Plantel... buttons)",
+    "TREFEREEAIDDLG": "registered copy only: the referee's name opens it only with features 0x23 / 0x0a (1008:2427, 1018:3416); "
+                      "checked: a click at half-time does nothing",
+    "TCODEDLG": "the registration code dialog: no key check is implemented, by decision",
+    "TLOANDLG": "offered only to a club in debt or with a loan (Equipa › Pedir / pagar empréstimo); not reached in the recordings",
+    "TFORCEDSUBSTITUTIONDLG": "an injury in a human's game with substitutes left: random, not in the recordings yet",
+    "TPROGRESSDLG": "the start-up gauge (captured as start_7_next, animated): not compared",
+    "TJOURNEYDLG": "the round view: compared as md_roundview",
+    "TADDINSDLG": "\"Extras\": not shown by the unregistered game in any recorded session; the port does not use it",
+    "TCLOCKDLG": "\"Relógio\" (a gauge): not shown in any recorded session; the port does not use it",
+    "TFORM1": "an empty form left in the program; never shown",
+    "TINPUTDLG": "not shown in any recorded session; the port does not use it",
+    "TMAINWINDOW": "an empty form captioned \"Elifoot 97\", left in the program; never shown",
+    "TWAITDLG": "not shown in any recorded session; the port does not use it",
+    "TJANELACOR": "not shown in any recorded session (the editor's colours use TTeamColorDlg)",
+    "TASSIGNNACDLG": "\"Abreviatura Inexistente\": asks for a country when a team's code is unknown; no team of the packs has one",
+}

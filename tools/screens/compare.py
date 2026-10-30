@@ -15,7 +15,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'capture'))
-from manifest import SCREENS  # noqa: E402
+from manifest import NOT_COVERED, SCREENS  # noqa: E402
 from mouse import find_arrow  # noqa: E402
 
 ROOT = 'analysis/screens'
@@ -162,6 +162,20 @@ def write_table(rows):
             group = s['group']
             out += ['', '## ' + group, '', '| Screen | Form | Differing pixels | Notes |', '|---|---|---|---|']
         out.append('| %s | `%s` | %s | %s |' % (s['title'], s['form'], err or verdict(s, n), s.get('note', '')))
+    # the forms of the two programs: which are covered
+    import glob
+    forms = sorted(os.path.basename(p)[:-5] for p in glob.glob('analysis/out/forms/*.json'))
+    covered = {s['form'] for s, *_ in rows}
+    exact = [r for r in rows if r[0]['exact'] and r[3] is not None]
+    out += ['', '## Coverage', '',
+            '%d screens, %d of them compared pixel for pixel (median %d differing pixels); %d of the %d forms of `ELIFOOT.EXE` and '
+            '`EDITEQ.EXE` appear in them. The others:' % (
+                len(rows), len(exact), sorted(r[3] for r in exact)[len(exact) // 2] if exact else 0,
+                len([f for f in forms if f in covered]), len(forms)), '',
+            '| Form | Why it has no screen |', '|---|---|']
+    for f in forms:
+        if f not in covered:
+            out.append('| `%s` | %s |' % (f, NOT_COVERED.get(f, 'not captured yet')))
     open('docs/verification/screens.md', 'w').write('\n'.join(out) + '\n')
 
 
