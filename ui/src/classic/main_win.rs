@@ -411,9 +411,10 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
             .iter()
             .filter(|s| s.starter() && s.position == 0)
             .count();
+        // (a loaded game has no line-up until a formation is chosen: the original's Jogar stays grey)
         t(
             "OKBtn.enabled",
-            ((starters == 11 && keepers == 1) as u8).to_string(),
+            ((c.main.lineup_shown && starters == 11 && keepers == 1) as u8).to_string(),
         );
     }
     if let Some((o, _)) = opp {

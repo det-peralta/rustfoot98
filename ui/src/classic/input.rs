@@ -303,11 +303,12 @@ impl Classic {
 
     /// Whether the line-up is complete (the Jogar button is enabled).
     pub fn play_enabled(&self) -> bool {
-        main_win::human_club(self).is_some_and(|(_, club)| {
-            let s = &club.slots;
-            s.iter().filter(|p| p.starter()).count() == 11
-                && s.iter().filter(|p| p.starter() && p.position == 0).count() == 1
-        })
+        self.main.lineup_shown
+            && main_win::human_club(self).is_some_and(|(_, club)| {
+                let s = &club.slots;
+                s.iter().filter(|p| p.starter()).count() == 11
+                    && s.iter().filter(|p| p.starter() && p.position == 0).count() == 1
+            })
     }
 
     /// A menu command (the control name of the menu entry in the form).

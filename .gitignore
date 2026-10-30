@@ -44,3 +44,5 @@ web/skin/
 # captures of the widgets work (local goldens for tools/ui/check.py)
 analysis/shots/w/
 analysis/captures/
+# the screen catalogue (captures of the original and renders drawn with its fonts)
+analysis/screens/

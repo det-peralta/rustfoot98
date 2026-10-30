@@ -64,6 +64,9 @@ pub struct Club {
     /// The `.EFT` team's long name (`FIGUEIRENSE F.C.`) and its coach's name, shown in the windows.
     pub full_name: String,
     pub coach_name: String,
+    /// The coach's place in the original's list of coaches (`TCoach` id, in creation order; 0 = not known: the club's
+    /// `master` place stands in). It travels with the coach and orders the coach ranking's ties.
+    pub coach_id: u32,
     pub fin: Finance,
     /// The club's country code (`team+4` object `+0x4a`); compared with the players' nationalities.
     pub country: [u8; 3],
@@ -80,6 +83,16 @@ pub const SACK_MIN_GAMES: u16 = 10;
 pub const SACK_MORALE: f64 = 0.65;
 
 impl Club {
+    /// The coach's place in the list of coaches: `coach_id`, or after a new game's computer coaches (created in the clubs'
+    /// master-list order) the club's `master` place.
+    pub fn coach_key(&self) -> u32 {
+        if self.coach_id > 0 {
+            self.coach_id
+        } else {
+            self.master as u32 + 1
+        }
+    }
+
     /// `1010:8b5d` + `4f40` for a division played on its own ([`play_round`]): replaces the coach when the results were bad
     /// for long enough; the new coach starts with `K = 1.0` and zero games. The game itself swaps the coach with another
     /// club's (`5343`, `World::replace_coach`), which needs the other divisions.
@@ -119,6 +132,7 @@ impl Club {
             colors: ([0, 0, 0], [255, 255, 255]),
             full_name: name.to_string(),
             coach_name: String::new(),
+            coach_id: 0,
             fin: Finance::default(),
             country: *b"???",
             master: 0,

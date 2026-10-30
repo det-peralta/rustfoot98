@@ -923,7 +923,19 @@ impl World {
             h.coach = coach.to_string();
         }
         if !coach.is_empty() {
-            self.divisions[division][club].coach_name = coach.to_string();
+            let next = self
+                .divisions
+                .iter()
+                .flatten()
+                .chain(self.pool.iter())
+                .map(Club::coach_key)
+                .max()
+                .unwrap_or(0)
+                + 1;
+            let c = &mut self.divisions[division][club];
+            c.coach_name = coach.to_string();
+            // the human's coach is a new record, the last of the list (`joga1`, `joga2` come after every computer coach)
+            c.coach_id = next;
         }
         seat
     }
@@ -1972,6 +1984,7 @@ impl World {
         let (t_score, t_games) = (t.coach_score, 0u16);
         let (p_score, p_games) = (p.coach_score, 0u16);
         cur[i].k = 1.0;
+        cur[i].coach_id = p.coach_id;
         cur[i].coach_score = p_score;
         cur[i].coach_games = p_games;
         cur[i].coach_name = p.coach_name.clone();
@@ -1982,6 +1995,7 @@ impl World {
                 self.club_mut(ploc)
             };
             pc.k = 1.0;
+            pc.coach_id = t.coach_id;
             pc.coach_score = t_score;
             pc.coach_games = t_games;
             pc.coach_name = t.coach_name.clone();

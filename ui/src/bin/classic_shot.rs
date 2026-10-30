@@ -347,6 +347,20 @@ fn main() -> Result<(), String> {
             }
             "open" => rustfoot_ui::classic::dialogs::market::open_by_name(&mut app, v)?,
             "registered" => app.main.market.registered = v != "0",
+            "dump" if v == "menus" => {
+                // prints the main window's menus (`top|entry name|label|enabled`, separators left out) and stops
+                if let Some((_, club)) = rustfoot_ui::classic::main_win::human_club(&app) {
+                    for (i, t) in rustfoot_ui::classic::menu::model(&app, &club)
+                        .iter()
+                        .enumerate()
+                    {
+                        for (j, e) in t.entries.iter().enumerate().filter(|(_, e)| !e.separator) {
+                            println!("{i}|{}|{j}|{}|{}|{}", t.label, e.name, e.label, e.enabled);
+                        }
+                    }
+                }
+                return Ok(());
+            }
             "dialog" => {
                 // opens a dialog by the control name of its menu entry (`CampeonatoClassificao`, `menuCalendrio`...)
                 if let Some(d) = rustfoot_ui::classic::dialogs::open_for_menu(&app, v)

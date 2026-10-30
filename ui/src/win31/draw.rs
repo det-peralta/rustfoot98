@@ -707,6 +707,10 @@ fn bevel(fb: &mut Fb, n: &Node, x: i32, y: i32) {
 /// `TPanel`: face colour, an optional bevel and a centred caption.
 fn panel(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let (w, h) = (n.int("Width", 0), n.int("Height", 0));
+    // an empty panel (the stadium's, 0 pixels high) draws nothing, not even its bevel
+    if w <= 0 || h <= 0 {
+        return;
+    }
     let color = cx.color_of(n, "bgcolor").unwrap_or_else(|| {
         if n.flag("ParentColor", false) {
             cx.bg
@@ -957,13 +961,14 @@ fn roster(
         text(
             fb,
             font,
-            x + 330,
+            x + 328,
             ty,
             c.get(4).copied().unwrap_or(""),
             color,
             false,
         );
-        if focus == Some(i) {
+        // the list has the focus only while its window is the active one (not under a dialog)
+        if focus == Some(i) && !INACTIVE.with(|a| a.get()) {
             focus_rect(fb, x + 1, ty, w - 2, 16, x + 1, y + 1);
         }
         cx.hits.borrow_mut().push(Hit {

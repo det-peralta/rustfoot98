@@ -178,6 +178,20 @@ impl Dialog {
         controls(fb, &cx, form);
         fb.clip = old_clip;
         self.hits = hits.into_inner();
+        // a form without `ActiveControl` gives the focus to its first tab stop when it shows (`TCustomForm.SetActive`): drawn again
+        // with it
+        if self.focus.is_empty() && form.ident("ActiveControl").is_none() {
+            let first = self
+                .hits
+                .iter()
+                .filter(|h| tab_stop(h, &self.texts))
+                .min_by_key(|h| tab_path(form, &h.name))
+                .map(|h| h.name.clone());
+            if let Some(name) = first {
+                self.focus = name;
+                self.render(fb, skin, forms);
+            }
+        }
     }
 
     fn num_text(&self, k: &str) -> i32 {
@@ -255,6 +269,29 @@ pub fn cancel_button_in(forms: &crate::win31::Forms, d: &Dialog) -> Option<Strin
     forms.get(&d.form).and_then(|f| find_button(f, false))
 }
 
+/// Whether the control can take the focus: an enabled button, edit, list... (a radio button only while it is the chosen one: Delphi
+/// sets `TabStop` with `Checked`).
+fn tab_stop(h: &Hit, texts: &BTreeMap<String, String>) -> bool {
+    h.enabled
+        && (h.class != "TRadioButton"
+            || texts
+                .get(&format!("{}.checked", h.name))
+                .is_some_and(|v| v == "1"))
+        && matches!(
+            h.class.as_str(),
+            "TBitBtn"
+                | "TButton"
+                | "TEdit"
+                | "TRadioButton"
+                | "TCheckBox"
+                | "TListBox"
+                | "TComboBox"
+                | "TSpinEdit"
+                | "TTabbedNotebook"
+                | "TRadioGroup"
+        )
+}
+
 /// The `TabOrder` of a control and of its containers, from the form down (controls the form does not know sort last).
 fn tab_path(form: &Node, name: &str) -> Vec<i32> {
     fn walk(n: &Node, name: &str, path: &mut Vec<i32>) -> bool {
@@ -317,27 +354,7 @@ pub fn generic_key(c: &Classic, d: &mut Dialog, key: Key) -> KeyAct {
 
 /// `generic_key` for a dialog of any program (the game or the team editor), with its forms.
 pub fn generic_key_in(forms: &crate::win31::Forms, d: &mut Dialog, key: Key) -> KeyAct {
-    // a radio button is a tab stop only while it is the chosen one (Delphi sets `TabStop` with `Checked`)
-    let focusable = |h: &Hit, texts: &std::collections::BTreeMap<String, String>| {
-        h.enabled
-            && (h.class != "TRadioButton"
-                || texts
-                    .get(&format!("{}.checked", h.name))
-                    .is_some_and(|v| v == "1"))
-            && matches!(
-                h.class.as_str(),
-                "TBitBtn"
-                    | "TButton"
-                    | "TEdit"
-                    | "TRadioButton"
-                    | "TCheckBox"
-                    | "TListBox"
-                    | "TComboBox"
-                    | "TSpinEdit"
-                    | "TTabbedNotebook"
-                    | "TRadioGroup"
-            )
-    };
+    let focusable = tab_stop;
     let is_edit = d
         .hits
         .iter()

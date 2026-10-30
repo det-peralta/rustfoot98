@@ -165,7 +165,7 @@ impl World {
         self.save_history(&mut out);
         let mut write_club = |division: usize, c: &Club| {
             out.push_str(&format!(
-                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}\n",
+                "club|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{}|{:?}|{}|{}|{}|{}|{}|{}|{}|{}|{}\n",
                 division,
                 clean(&c.name),
                 c.k,
@@ -209,7 +209,8 @@ impl World {
                     .map(|v| v.to_string())
                     .collect::<Vec<_>>()
                     .join(","),
-                clean(&c.short_name)
+                clean(&c.short_name),
+                c.coach_id
             ));
             for (slot, name) in c.slots.iter().zip(&c.names) {
                 out.push_str(&format!(
@@ -579,6 +580,7 @@ impl World {
                     if let Some(v) = f.get(32) {
                         c.short_name = v.to_string();
                     }
+                    c.coach_id = f.get(33).and_then(|x| x.parse().ok()).unwrap_or(0);
                     if let Some(v) = f.get(28) {
                         let n: Vec<u8> = v.split(',').filter_map(|t| t.parse().ok()).collect();
                         if n.len() == 6 {

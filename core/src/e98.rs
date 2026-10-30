@@ -612,6 +612,7 @@ fn club_of(t: &E98Team, name: String, rank: usize) -> Club {
     c.full_name = t.full_name.clone();
     c.short_name = t.short_name.clone();
     c.coach_name = t.coach_name.clone();
+    c.coach_id = t.coach as u32;
     c.fin = Finance::new_game(base, DEFAULT_SCALE); // stadium level: the save's stadium object was not located
     c.fin.cash = t.cash;
     c.fin.loan = t.loan;

@@ -351,18 +351,23 @@ impl World {
             .add_coach_event(&picked.coach_name, 7, year, &sacked.name);
     }
 
-    /// `1050:1d59` applied with the bubble sort `1068:0e0d` (stable): the coaches by league titles, cup titles and score,
-    /// best first.
+    /// `1050:1d59` applied with the bubble sort `1068:0e0d` (stable) to the list of coaches: by league titles, cup titles and
+    /// score, best first; ties keep the list's order (`coach_key`, checked on the original's ranking). Every human's row is marked.
     pub fn coach_ranking(&self) -> Vec<CoachRank> {
-        let mut v: Vec<CoachRank> = self
+        let humans: Vec<String> = self.humans().map(|h| h.club.clone()).collect();
+        let mut clubs: Vec<&Club> = self
             .divisions
             .iter()
             .flatten()
             .chain(self.pool.iter())
+            .collect();
+        clubs.sort_by_key(|c| c.coach_key());
+        let mut v: Vec<CoachRank> = clubs
+            .into_iter()
             .map(|c| CoachRank {
                 coach: c.coach_name.clone(),
                 club: c.name.clone(),
-                human: self.human.as_ref().is_some_and(|h| h.club == c.name),
+                human: humans.contains(&c.name),
                 titles: self
                     .history
                     .coach_titles
@@ -455,6 +460,24 @@ mod tests {
             first.titles.0 + first.titles.1 > 0,
             "the coach with titles heads the ranking"
         );
+    }
+
+    /// The ranking's ties keep the order of the list of coaches, where the humans' coaches come last (checked on the original's
+    /// ranking of `snap2.e98`); every human's row is marked, and the order survives a save.
+    #[test]
+    fn ranking_ties_follow_the_list_of_coaches() {
+        let mut w = World::synthetic(3);
+        for c in w.divisions.iter_mut().flatten().chain(w.pool.iter_mut()) {
+            c.coach_score = 0;
+        }
+        w.name_humans(&["joga1".into(), "joga2".into()]);
+        let rank = w.coach_ranking();
+        let names: Vec<String> = rank.iter().map(|r| r.coach.clone()).collect();
+        assert_eq!(names[names.len() - 2..], ["joga1", "joga2"]);
+        assert_eq!(rank.iter().filter(|r| r.human).count(), 2);
+        let back = World::load(&w.save()).unwrap();
+        let again: Vec<String> = back.coach_ranking().into_iter().map(|r| r.coach).collect();
+        assert_eq!(again, names);
     }
 
     fn rich_world(seed: u32) -> World {
