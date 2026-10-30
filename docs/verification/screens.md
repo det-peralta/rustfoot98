@@ -73,7 +73,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Equipa › País | `TSETCOUNTRYDLG` | 97 px (0.020 %) |  |
 | Equipa › Nível inicial | `TTEAMSKILLDLG` | 2 px (0.000 %) |  |
 | Equipa › Treinador | `TCOACHNAMEDLG` | 2 px (0.000 %) |  |
-| Jogador › Editar | `TEDITPLAYERDLG` | 176 px (0.037 %) |  |
+| Jogador › Editar | `TEDITPLAYERDLG` | 34 px (0.007 %) |  |
 | Jogador › Transferir | `TTRANSFERPLAYERDLG` | 18 px (0.004 %) |  |
 | Elifoot › Acerca | `TABOUTDLG` | not pixel-compared (1820 px) | animated: blinking notice, scrolling banner |
 
@@ -133,7 +133,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | New team: country | `TSETCOUNTRYDLG` | 97 px (0.020 %) |  |
 | New team: starting level | `TTEAMSKILLDLG` | 2 px (0.000 %) |  |
 | New team: coach | `TCOACHNAMEDLG` | 30 px (0.006 %) |  |
-| New team: the first player | `TEDITPLAYERDLG` | 176 px (0.037 %) |  |
+| New team: the first player | `TEDITPLAYERDLG` | 34 px (0.007 %) |  |
 | New team made (the flag's hint) | `TEDITOR_MAIN` | 0 px (0.000 %) |  |
 | Gravar equipa | `TSAVETEAMDLG` | 32 px (0.007 %) |  |
 | The team cannot be saved | `TCANTSAVETEAMDLG` | 16 px (0.003 %) |  |

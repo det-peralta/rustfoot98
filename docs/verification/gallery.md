@@ -385,7 +385,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Jogador › Editar
 
-176 px (0.037 %) · `TEDITPLAYERDLG`
+34 px (0.007 %) · `TEDITPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -599,7 +599,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: the first player
 
-176 px (0.037 %) · `TEDITPLAYERDLG`
+34 px (0.007 %) · `TEDITPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|

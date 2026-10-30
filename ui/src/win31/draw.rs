@@ -1769,7 +1769,8 @@ fn bitbtn_glyph_left(
     }
     if margin == -1 {
         if spacing == -1 {
-            margin = (cw - (gw + tw)) / 3;
+            // (Delphi's client width here is a pixel more than the face's: measured on the editor's Alterar)
+            margin = (cw + 1 - (gw + tw)) / 3;
             spacing = margin;
         } else {
             margin = (cw - (gw + spacing + tw) + 1) / 2;
@@ -1786,7 +1787,14 @@ fn bitbtn_glyph_left(
         glyph_image(fb, b, gx, gy, gw, glyphs, key, enabled);
     }
     if let Some(font) = font {
-        let (mut tx, ty) = (gx + gw + spacing, y + 2 + (ch - th + 1) / 2);
+        // (centred on the caption's line height: for TrueType a pixel more than tmHeight, measured on the editor's Alterar)
+        // (a plain TButton keeps tmHeight: measured on "Renovar contrato...")
+        let line = if n.class == "TButton" {
+            th
+        } else {
+            font.height()
+        };
+        let (mut tx, ty) = (gx + gw + spacing, y + 2 + (ch - line + 1) / 2);
         // a plain `TButton` centres its caption on the text extent, an emboldened raster font's overhang included (measured on
         // "Renovar contrato..." in Arial and "Sortear equipas" in bold MS Sans Serif)
         if n.class == "TButton" && bmp.is_none() {
