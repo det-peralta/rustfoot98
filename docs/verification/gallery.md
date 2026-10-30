@@ -467,7 +467,7 @@ not pixel-compared (10517 px) · `TENDOFSEASONDLG` · the match differs (the ori
 
 ### Auction
 
-not pixel-compared (2896 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (2789 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -528,4 +528,20 @@ not pixel-compared (2896 px) · `TSELLPLAYERDLG` · the match differs (the origi
 | Original | Port | Difference |
 |---|---|---|
 | [![original](img/original/main_sel_jogador.png)](img/original/main_sel_jogador.png) | [![port](img/port/main_sel_jogador.png)](img/port/main_sel_jogador.png) | [![difference](img/diff/main_sel_jogador.png)](img/diff/main_sel_jogador.png) |
+
+### Renovar contrato (the player's page)
+
+342 px (0.071 %) · `TPLANTELDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/main_contract.png)](img/original/main_contract.png) | [![port](img/port/main_contract.png)](img/port/main_contract.png) | [![difference](img/diff/main_contract.png)](img/diff/main_contract.png) |
+
+### Jogador › Vender
+
+42 px (0.009 %) · `TPLANTELDLG`
+
+| Original | Port | Difference |
+|---|---|---|
+| [![original](img/original/main_sell.png)](img/original/main_sell.png) | [![port](img/port/main_sell.png)](img/port/main_sell.png) | [![difference](img/diff/main_sell.png)](img/diff/main_sell.png) |
 

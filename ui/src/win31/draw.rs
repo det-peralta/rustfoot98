@@ -1684,7 +1684,7 @@ fn glyph_margin(cx: &Ctx, n: &Node, h: i32, gh: i32, f: &FontSpec) -> i32 {
     if m >= 0 {
         return m;
     }
-    let th = cx.font(f).map_or(0, |t| t.tm_height);
+    let th = cx.font(f).map_or(0, |t| t.height());
     (h - 4 - (gh + n.int("Spacing", 4) + th) + 1) / 2
 }
 

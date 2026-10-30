@@ -262,10 +262,13 @@ pub fn view(c: &Classic, club: &Club, page: Page) -> View {
     lists.insert("ListBoxOfPlayers".to_string(), rows);
     t("ListBoxOfPlayers.color", col(fg));
     t("ListBoxOfPlayers.bg", col(bg));
-    t(
-        "ListBoxOfPlayers.focus",
-        c.main.selected.unwrap_or(0).to_string(),
-    );
+    // (the Vender and Contrato pages take the focus from the list: no focus rectangle on it)
+    if !matches!(c.main.page, Some(Page::Sell | Page::Contract)) {
+        t(
+            "ListBoxOfPlayers.focus",
+            c.main.selected.unwrap_or(0).to_string(),
+        );
+    }
     if let Some(s) = c.main.selected {
         t("ListBoxOfPlayers.sel", s.to_string());
     }

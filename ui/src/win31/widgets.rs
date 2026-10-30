@@ -965,15 +965,16 @@ pub(super) fn spinedit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     if let Some(font) = cx.font(f) {
         let old = fb.clip;
         fb.clip = (x + 1, y + 1, bx, y + h - 1);
-        text(
-            fb,
-            font,
-            x + 2,
-            y + (h - font.height()) / 2,
-            &value,
-            f.color,
-            false,
-        );
+        // the value 4 pixels in, and while focused the edit's caret: 2 pixels wide, as high as the font, before character
+        // `<name>.caret` (measured on the contract's new salary)
+        let ty = y + (h - font.height()) / 2;
+        text(fb, font, x + 4, ty, &value, f.color, false);
+        if cx.focus == n.name {
+            if let Some(k) = get_num(cx, n, "caret") {
+                let before: String = value.chars().take(k.max(0) as usize).collect();
+                fb.fill(x + 5 + font.width(&before), ty, 2, font.height(), BLACK);
+            }
+        }
         fb.clip = old;
     }
     push_hit(cx, format!("{}#up", n.name), "SpinUp", bx, y + 1, 16, bh);

@@ -26,6 +26,8 @@ const RESULT_MS: i64 = 3500;
 pub struct Pages {
     /// Text of `textSellPrice` (thousands of the currency, digits only).
     pub sell_price: String,
+    /// Whether the price field has the focus (a click on it or a digit typed; the page opens with the focus on the squad list).
+    pub sell_focus: bool,
     /// Text of `spinNewSalary`.
     pub spin: String,
     /// Text of `textMessage`.
@@ -181,6 +183,7 @@ pub fn vender(c: &mut Classic) {
     match c.world.sale_blocker_text(slot) {
         None => {
             c.main.market.sell_price.clear();
+            c.main.market.sell_focus = false;
             c.main.page = Some(Page::Sell);
         }
         Some(why) => show_message_page(c, why),
@@ -214,15 +217,28 @@ pub fn page_texts(c: &Classic, page: Page, t: &mut BTreeMap<String, String>) {
     let m = &c.main.market;
     match page {
         Page::Sell => {
+            // the label is made at run time: "Preço de venda", a line break, "(milhares de " and the currency (two spaces before
+            // it, as the original shows)
+            t.insert(
+                "labelSellPrice".into(),
+                format!(
+                    "Preço de venda\n(milhares de  {}):",
+                    c.world.currency_info().unit
+                ),
+            );
             t.insert("textSellPrice".into(), m.sell_price.clone());
             t.insert(
                 "textSellPrice.caret".into(),
                 m.sell_price.chars().count().to_string(),
             );
-            t.insert("@focus".into(), "textSellPrice".into());
+            // (opened from the menu, the page leaves the focus on the squad list: the field shows no caret until clicked)
+            if m.sell_focus {
+                t.insert("@focus".into(), "textSellPrice".into());
+            }
         }
         Page::Contract => {
             t.insert("spinNewSalary.value".into(), m.spin.clone());
+            t.insert("spinNewSalary.caret".into(), "0".into());
             t.insert("@focus".into(), "spinNewSalary".into());
         }
         Page::Message => {
@@ -244,6 +260,7 @@ pub fn main_click(c: &mut Classic, name: &str) -> bool {
         "ChangeSalaryBtn" => change_salary(c),
         "cancelSellBtn" | "cancelNewSalaryBtn" => c.main.page = Some(Page::Player),
         "sellBtn" => sell_clicked(c),
+        "textSellPrice" => c.main.market.sell_focus = true,
         "newSalaryBtn" => propose_clicked(c),
         "spinNewSalary" => spin_clicked(c),
         _ => return false,
@@ -284,9 +301,11 @@ pub fn main_key(c: &mut Classic, k: Key) -> bool {
                 Key::Escape => c.main.page = Some(Page::Player),
                 Key::Backspace => {
                     c.main.market.sell_price.pop();
+                    c.main.market.sell_focus = true;
                 }
                 Key::Char(ch) if ch.is_ascii_digit() && c.main.market.sell_price.len() < 6 => {
-                    c.main.market.sell_price.push(ch)
+                    c.main.market.sell_price.push(ch);
+                    c.main.market.sell_focus = true;
                 }
                 _ => return false,
             }

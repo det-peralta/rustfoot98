@@ -88,7 +88,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | A human's penalty | `TPENALTYDLG` | not pixel-compared (195729 px) | the match differs (the original's random numbers): layout only |
 | Coaches sacked | `TPRINTLISTDLG` | not pixel-compared (1476 px) | the match differs (the original's random numbers): layout only |
 | End of season | `TENDOFSEASONDLG` | not pixel-compared (10517 px) | the match differs (the original's random numbers): layout only |
-| Auction | `TSELLPLAYERDLG` | not pixel-compared (2896 px) | the match differs (the original's random numbers): layout only |
+| Auction | `TSELLPLAYERDLG` | not pixel-compared (2789 px) | the match differs (the original's random numbers): layout only |
 | Invitation to coach another club | `TINVITECOACHDLG` | 9 px (0.002 %) |  |
 
 ## Menu dialogs
@@ -115,3 +115,5 @@ Every screen of the original, captured under js-dos, against the port's render o
 |---|---|---|---|
 | A player selected, page Jogo | `TPLANTELDLG` | 64 px (0.013 %) |  |
 | A player selected, page Jogador | `TPLANTELDLG` | 64 px (0.013 %) |  |
+| Renovar contrato (the player's page) | `TPLANTELDLG` | 342 px (0.071 %) |  |
+| Jogador › Vender | `TPLANTELDLG` | 42 px (0.009 %) |  |

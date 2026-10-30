@@ -199,3 +199,7 @@ add(id="main_sel_jogo", group="Main window", title="A player selected, page Jogo
     steps=[("click", 200, 218), ("wait", 1500)], back=[], final=True, port=BASE + ["ev=click:200,218"])
 add(id="main_sel_jogador", group="Main window", title="A player selected, page Jogador", form="TPLANTELDLG",
     steps=[("click", 512, 511), ("wait", 1500)], back=[], final=True, port=BASE + ["select=2", "page=1"])
+add(id="main_contract", group="Main window", title="Renovar contrato (the player's page)", form="TPLANTELDLG", steps=None,
+    port=BASE + ["ev=click:200,218;click:570,479"])
+add(id="main_sell", group="Main window", title="Jogador › Vender", form="TPLANTELDLG", steps=None,
+    port=BASE + ["ev=click:200,218", "page=sell"])
