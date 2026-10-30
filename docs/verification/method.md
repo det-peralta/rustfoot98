@@ -41,6 +41,15 @@ pressing keys blindly in a dialog could change the game (an `Enter` in the stadi
 the table [Screen by screen](screens.md) and the [gallery](gallery.md). The mouse pointer is part of the original's picture
 only, so its box is left out of the count. `tools/screens/where.py <id>` lists where a screen still differs.
 
+## Glyph corrections from the captures
+
+Windows 3.1 draws a TrueType glyph of a given size always with the same bitmap, so the captures hold the original's exact
+glyphs. `tools/ui/glyphfix.py harvest` renders every exact screen with a log of the glyphs the port draws (`GLYPHLOG`), and
+where a glyph differs from the original's pixels in the same place (nothing else drawn there, the same background around it)
+takes the original's bitmap; a correction is kept only when every place the glyph was seen agrees. `glyphfix.py apply` writes
+them into the skin pack (`analysis/out/skin/fonts.bin` and `web/skin/fonts.bin`, local files built from your copy). 33 glyphs
+were corrected this way; on the independent checks of `tools/ui/check.py` too the differing pixels went down.
+
 ## What the remaining pixels are
 
 Most screens differ in a few dozen to a few hundred pixels out of 480 000. Almost all of them are single pixels of TrueType

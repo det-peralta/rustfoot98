@@ -43,6 +43,7 @@ and of the Windows 3.1 disks (where the fonts come from), placed as described in
 # once: the skin pack (fonts, forms, bitmaps, teams) from YOUR copy, kept out of git
 pip install freetype-py
 python3 tools/ui/skin.py && python3 tools/ui/webpack.py
+python3 tools/ui/glyphfix.py apply   # optional: the glyph corrections taken from captures of the original (see docs/verification/method.md)
 rustup target add wasm32-unknown-unknown
 
 # build the WebAssembly and serve the game

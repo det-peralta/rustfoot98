@@ -5,6 +5,18 @@ use rustfoot_ui::win31::{Forms, Skin};
 use std::path::PathBuf;
 
 fn main() -> Result<(), String> {
+    // `GLYPHLOG=path`: the glyphs of the last frame drawn, one per line (`draw::GLYPH_LOG`)
+    let glyph_log = std::env::var("GLYPHLOG").ok();
+    let r = run();
+    if let Some(path) = glyph_log {
+        let lines =
+            rustfoot_ui::win31::draw::GLYPH_LOG.with(|l| l.borrow_mut().take().unwrap_or_default());
+        std::fs::write(path, lines.join("\n")).map_err(|e| e.to_string())?;
+    }
+    r
+}
+
+fn run() -> Result<(), String> {
     let mut args = std::env::args().skip(1);
     let game = args
         .next()
@@ -442,6 +454,9 @@ fn main() -> Result<(), String> {
             "noplan" => app.world.set_plan(Default::default()),
             _ => return Err(format!("unknown option {k}")),
         }
+    }
+    if std::env::var("GLYPHLOG").is_ok() {
+        rustfoot_ui::win31::draw::GLYPH_LOG.with(|l| *l.borrow_mut() = Some(Vec::new()));
     }
     app.draw();
     std::fs::write(&out, app.fb.bmp()).map_err(|e| e.to_string())?;

@@ -101,7 +101,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Elifoot › Opções
 
-140 px (0.029 %) · `TOPTIONSDLG`
+137 px (0.029 %) · `TOPTIONSDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -109,7 +109,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Elifoot › Acerca
 
-not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every 500 ms and the banner scrolls, so the capture's moment decides
+not pixel-compared (3031 px) · `TABOUTDLG` · animated: the notice blinks every 500 ms and the banner scrolls, so the capture's moment decides
 
 | Original | Port | Difference |
 |---|---|---|
@@ -117,7 +117,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Equipa › Estádio
 
-474 px (0.099 %) · `TSTADIUMDLG` · the stadium picture is drawn from measurements (~400 px of its outline)
+460 px (0.096 %) · `TSTADIUMDLG` · the stadium picture is drawn from measurements (~400 px of its outline)
 
 | Original | Port | Difference |
 |---|---|---|
@@ -141,7 +141,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Campeonato › Classificação
 
-82 px (0.017 %) · `TCLASSIFICATIONDLG`
+72 px (0.015 %) · `TCLASSIFICATIONDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -149,7 +149,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Campeonato › Melhores marcadores
 
-286 px (0.060 %) · `TPRINTLISTDLG`
+22 px (0.005 %) · `TPRINTLISTDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -173,7 +173,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Campeonato › Melhores marcadores de sempre
 
-286 px (0.060 %) · `TPRINTLISTDLG`
+22 px (0.005 %) · `TPRINTLISTDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -189,7 +189,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Treinador › Ranking
 
-222 px (0.046 %) · `TPRINTLISTDLG`
+50 px (0.010 %) · `TPRINTLISTDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -197,7 +197,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Treinador › Perfil
 
-227 px (0.047 %) · `TCOACHOPTIONSDLG`
+226 px (0.047 %) · `TCOACHOPTIONSDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -207,7 +207,7 @@ not pixel-compared (3035 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### About box at start-up
 
-not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and the banner scrolls
+not pixel-compared (1967 px) · `TABOUTDLG` · animated: the notice blinks and the banner scrolls
 
 | Original | Port | Difference |
 |---|---|---|
@@ -215,7 +215,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Choice of game
 
-66 px (0.014 %) · `TSELECTGAMEDLG`
+45 px (0.009 %) · `TSELECTGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -223,7 +223,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### New game named
 
-364 px (0.076 %) · `TSELECTGAMEDLG` · the edit's caret blinks
+276 px (0.058 %) · `TSELECTGAMEDLG` · the edit's caret blinks
 
 | Original | Port | Difference |
 |---|---|---|
@@ -231,7 +231,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Countries
 
-85 px (0.018 %) · `TSELECTCOUNTRIESDLG`
+34 px (0.007 %) · `TSELECTCOUNTRIESDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -239,7 +239,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Countries, Brasil chosen
 
-153 px (0.032 %) · `TSELECTCOUNTRIESDLG`
+111 px (0.023 %) · `TSELECTCOUNTRIESDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -247,7 +247,7 @@ not pixel-compared (1971 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Currency
 
-182 px (0.038 %) · `TCURRENCYDLG`
+57 px (0.012 %) · `TCURRENCYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -281,7 +281,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor without a team
 
-688 px (0.143 %) · `TEDITOR_MAIN`
+0 px (0.000 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -289,7 +289,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor with a team (the flag's hint)
 
-165 px (0.034 %) · `TEDITOR_MAIN`
+164 px (0.034 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -297,7 +297,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor, a player selected
 
-224 px (0.047 %) · `TEDITOR_MAIN`
+223 px (0.046 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -313,7 +313,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Jogador
 
-437 px (0.091 %) · `TEDITOR_MAIN`
+436 px (0.091 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -321,7 +321,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Equipa
 
-494 px (0.103 %) · `TEDITOR_MAIN`
+493 px (0.103 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -329,7 +329,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Editor menu Elifoot
 
-168 px (0.035 %) · `TEDITOR_MAIN`
+167 px (0.035 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -337,7 +337,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Abrir
 
-34 px (0.007 %) · `TOPENTEAMDLG`
+35 px (0.007 %) · `TOPENTEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -345,7 +345,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Nome
 
-121 px (0.025 %) · `TSETTEAMNAMEDLG`
+120 px (0.025 %) · `TSETTEAMNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -353,7 +353,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Cores
 
-348 px (0.072 %) · `TTEAMCOLORDLG`
+347 px (0.072 %) · `TTEAMCOLORDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -361,7 +361,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › País
 
-186 px (0.039 %) · `TSETCOUNTRYDLG`
+185 px (0.039 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -369,7 +369,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Nível inicial
 
-118 px (0.025 %) · `TTEAMSKILLDLG`
+115 px (0.024 %) · `TTEAMSKILLDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -377,7 +377,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › Treinador
 
-95 px (0.020 %) · `TCOACHNAMEDLG`
+94 px (0.020 %) · `TCOACHNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -385,7 +385,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Jogador › Editar
 
-205 px (0.043 %) · `TEDITPLAYERDLG`
+203 px (0.042 %) · `TEDITPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -393,7 +393,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Jogador › Transferir
 
-189 px (0.039 %) · `TTRANSFERPLAYERDLG`
+182 px (0.038 %) · `TTRANSFERPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -401,7 +401,7 @@ not pixel-compared (2012 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Elifoot › Acerca
 
-not pixel-compared (1882 px) · `TABOUTDLG` · animated: blinking notice, scrolling banner
+not pixel-compared (1878 px) · `TABOUTDLG` · animated: blinking notice, scrolling banner
 
 | Original | Port | Difference |
 |---|---|---|
@@ -411,7 +411,7 @@ not pixel-compared (1882 px) · `TABOUTDLG` · animated: blinking notice, scroll
 
 ### Half-time
 
-not pixel-compared (113850 px) · `TSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (113854 px) · `TSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -419,7 +419,7 @@ not pixel-compared (113850 px) · `TSUBSTITUTIONDLG` · the match differs (the o
 
 ### Standings after a round
 
-not pixel-compared (123945 px) · `TCLASSIFICATIONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (123944 px) · `TCLASSIFICATIONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -427,7 +427,7 @@ not pixel-compared (123945 px) · `TCLASSIFICATIONDLG` · the match differs (the
 
 ### Cup draw
 
-not pixel-compared (16504 px) · `TSORTEIODLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (16506 px) · `TSORTEIODLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -443,7 +443,7 @@ not pixel-compared (122602 px) · `TPENALTIESDLG` · the match differs (the orig
 
 ### A human's penalty
 
-not pixel-compared (190978 px) · `TPENALTYDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (190980 px) · `TPENALTYDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -459,7 +459,7 @@ not pixel-compared (1543 px) · `TPRINTLISTDLG` · the match differs (the origin
 
 ### End of season
 
-not pixel-compared (19401 px) · `TENDOFSEASONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (19396 px) · `TENDOFSEASONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -467,7 +467,7 @@ not pixel-compared (19401 px) · `TENDOFSEASONDLG` · the match differs (the ori
 
 ### Auction
 
-not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (2811 px) · `TSELLPLAYERDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -475,7 +475,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Invitation to coach another club
 
-9 px (0.002 %) · `TINVITECOACHDLG`
+8 px (0.002 %) · `TINVITECOACHDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -485,7 +485,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Balance sheet (a click on the Finanças list)
 
-74 px (0.015 %) · `TBALANCEDLG`
+68 px (0.014 %) · `TBALANCEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -495,7 +495,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Hint of the file name
 
-93 px (0.019 %) · `TSELECTGAMEDLG` · the capture's list shows ABCDEEEE
+72 px (0.015 %) · `TSELECTGAMEDLG` · the capture's list shows ABCDEEEE
 
 | Original | Port | Difference |
 |---|---|---|
@@ -505,7 +505,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Elifoot › Opções, page Jogo
 
-78 px (0.016 %) · `TOPTIONSDLG`
+76 px (0.016 %) · `TOPTIONSDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -515,7 +515,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### A player selected, page Jogo
 
-64 px (0.013 %) · `TPREPAREGAMEDLG`
+62 px (0.013 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -523,7 +523,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### A player selected, page Jogador
 
-64 px (0.013 %) · `TPREPAREGAMEDLG`
+62 px (0.013 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -531,7 +531,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Renovar contrato (the player's page)
 
-342 px (0.071 %) · `TPREPAREGAMEDLG`
+239 px (0.050 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -549,7 +549,7 @@ not pixel-compared (2819 px) · `TSELLPLAYERDLG` · the match differs (the origi
 
 ### Round view during the games
 
-not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (3890 px) · `TJOURNEYDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|
@@ -559,7 +559,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: name (the hint of the full name)
 
-55 px (0.011 %) · `TSETTEAMNAMEDLG`
+56 px (0.012 %) · `TSETTEAMNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -567,7 +567,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: colours
 
-93 px (0.019 %) · `TTEAMCOLORDLG`
+94 px (0.020 %) · `TTEAMCOLORDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -575,7 +575,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: country
 
-315 px (0.066 %) · `TSETCOUNTRYDLG`
+316 px (0.066 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -583,7 +583,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: starting level
 
-51 px (0.011 %) · `TTEAMSKILLDLG`
+50 px (0.010 %) · `TTEAMSKILLDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -591,7 +591,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: coach
 
-56 px (0.012 %) · `TCOACHNAMEDLG`
+57 px (0.012 %) · `TCOACHNAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -599,7 +599,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: the first player
 
-176 px (0.037 %) · `TEDITPLAYERDLG`
+175 px (0.036 %) · `TEDITPLAYERDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -607,7 +607,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team made (the flag's hint)
 
-249 px (0.052 %) · `TEDITOR_MAIN`
+248 px (0.052 %) · `TEDITOR_MAIN`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -615,7 +615,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### Gravar equipa
 
-291 px (0.061 %) · `TSAVETEAMDLG`
+290 px (0.060 %) · `TSAVETEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -623,7 +623,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### The team cannot be saved
 
-232 px (0.048 %) · `TCANTSAVETEAMDLG`
+231 px (0.048 %) · `TCANTSAVETEAMDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -633,7 +633,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### Renovar contrato, a low offer typed
 
-335 px (0.070 %) · `TPREPAREGAMEDLG`
+247 px (0.051 %) · `TPREPAREGAMEDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -641,7 +641,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### The player refuses the offer (Actualização de Salário)
 
-274 px (0.057 %) · `TASKMORESALARYDLG`
+183 px (0.038 %) · `TASKMORESALARYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -651,7 +651,7 @@ not pixel-compared (3917 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### An injured player must be replaced
 
-not pixel-compared (131013 px) · `TFORCEDSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
+not pixel-compared (131006 px) · `TFORCEDSUBSTITUTIONDLG` · the match differs (the original's random numbers): layout only
 
 | Original | Port | Difference |
 |---|---|---|

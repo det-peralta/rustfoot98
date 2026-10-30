@@ -123,6 +123,12 @@ impl Ctx<'_> {
     }
 }
 
+thread_local! {
+    /// When `Some`, `text` records every glyph it draws: `face|px|bold|italic|code|x|y|w|h|r,g,b|clip` (the glyph's box on the
+    /// screen; `tools/ui/glyphfix.py` compares them with captures of the original).
+    pub static GLYPH_LOG: RefCell<Option<Vec<String>>> = const { RefCell::new(None) };
+}
+
 /// Draws `s` with the top-left corner of its cell at (x, y); returns the advance.
 pub fn text(fb: &mut Fb, font: &Font, x: i32, y: i32, s: &str, color: Rgb, underline: bool) -> i32 {
     let base = y + font.ascent;
@@ -131,6 +137,27 @@ pub fn text(fb: &mut Fb, font: &Font, x: i32, y: i32, s: &str, color: Rgb, under
         let Some(g) = font.glyph(ansi(c)) else {
             continue;
         };
+        GLYPH_LOG.with(|l| {
+            if let Some(v) = l.borrow_mut().as_mut() {
+                let Rgb(r, gr, b) = color;
+                v.push(format!(
+                    "{}|{}|{}|{}|{}|{}|{}|{}|{}|{r},{gr},{b}|{},{},{},{}",
+                    font.face,
+                    font.px,
+                    font.bold as u8,
+                    font.italic as u8,
+                    ansi(c),
+                    pen + g.left,
+                    base - g.top,
+                    g.w,
+                    g.rows.len(),
+                    fb.clip.0,
+                    fb.clip.1,
+                    fb.clip.2,
+                    fb.clip.3
+                ));
+            }
+        });
         for (r, bits) in g.rows.iter().enumerate() {
             for k in 0..g.w {
                 if bits >> (g.w - 1 - k) & 1 == 1 {
@@ -1097,7 +1124,11 @@ fn editor_players(
     let old = fb.clip;
     fb.clip = (rx, y + 2, rx + rw, y + h - 2);
     if rows.is_empty() {
-        focus_rect(fb, rx, y + 2, rw, ROW, rx, y + 2);
+        // (as on a row: a pixel outside it on the left, right and top)
+        let inner = fb.clip;
+        fb.clip = (rx - 1, y + 1, rx + rw + 1, y + h - 1);
+        focus_rect(fb, rx - 1, y + 1, rw + 2, ROW, rx, y + 2);
+        fb.clip = inner;
     }
     for (k, row) in rows.iter().enumerate().skip(top).take(fit + 1) {
         let c: Vec<&str> = row.split('|').collect();
