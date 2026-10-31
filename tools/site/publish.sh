@@ -1,11 +1,11 @@
 #!/bin/bash
 # Publishes the site to GitHub Pages (the gh-pages branch, which Pages serves): builds it with the verification gallery
-# (GALLERY=1: the pictures come from your own captures in analysis/screens) and without the game's files (no SKIN), then
-# force-pushes site/ as the only commit of gh-pages. Run from the repository root after tools/screens/compare.py has run.
+# (GALLERY=1: the pictures come from your own captures in analysis/screens) and with the game's files (SKIN=1: web/skin/, so
+# the game plays at once without asking for a copy), then force-pushes site/ as the only commit of gh-pages. Run from the repository root after tools/screens/compare.py has run.
 set -e
 cd "$(dirname "$0")/../.."
-GALLERY=1 bash tools/site/build.sh
-test ! -d site/play/skin || { echo "site/play/skin present: the game's files must not be published" >&2; exit 1; }
+test -f web/skin/index.json || { echo "web/skin/ missing: build it first (tools/ui/skin.py, tools/ui/webpack.py)" >&2; exit 1; }
+GALLERY=1 SKIN=1 bash tools/site/build.sh
 name=$(git config user.name); email=$(git config user.email || echo "$name@users.noreply.github.com")
 origin=$(git remote get-url origin)
 tmp=$(mktemp -d)

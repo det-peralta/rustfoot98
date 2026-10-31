@@ -17,10 +17,10 @@ binary and rebuilt in **Rust** and **WebAssembly**. It runs in a browser with th
   stadium and loans, coaches sacked and swapped, the end of season, saved games. The team editor (`EDITEQ.EXE`) is ported too.
 
 **Docs:** <https://det-peralta.github.io/rustfoot98/> · **Play:** <https://det-peralta.github.io/rustfoot98/play/classic.html>
-(the page asks for the folder of a skin pack built from your own copy of the game, see [Quick start](#quick-start)).
+(plays at once: the site carries the game's data; a local build makes it from your own copy, see [Quick start](#quick-start)).
 
 > This is an independent study and preservation project, not affiliated with the authors of Elifoot. No file of the original game
-> or of Windows 3.1 is in this repository: you bring your own copy. See [NOTICE.md](NOTICE.md).
+> or of Windows 3.1 is in this repository; the published site carries the game's data so it plays at once. See [NOTICE.md](NOTICE.md).
 
 ## Documentation
 
