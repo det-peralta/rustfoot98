@@ -101,7 +101,7 @@ Each screen three times: the original under js-dos, the port's render of the sam
 
 ### Elifoot › Opções
 
-82 px (0.017 %) · `TOPTIONSDLG`
+14 px (0.003 %) · `TOPTIONSDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -197,7 +197,7 @@ not pixel-compared (2971 px) · `TABOUTDLG` · animated: the notice blinks every
 
 ### Treinador › Perfil
 
-181 px (0.038 %) · `TCOACHOPTIONSDLG`
+31 px (0.006 %) · `TCOACHOPTIONSDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -239,7 +239,7 @@ not pixel-compared (1909 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Countries, Brasil chosen
 
-96 px (0.020 %) · `TSELECTCOUNTRIESDLG`
+81 px (0.017 %) · `TSELECTCOUNTRIESDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -361,7 +361,7 @@ not pixel-compared (1979 px) · `TPLANTELDLG` · the club is drawn at random
 
 ### Equipa › País
 
-97 px (0.020 %) · `TSETCOUNTRYDLG`
+17 px (0.004 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|
@@ -575,7 +575,7 @@ not pixel-compared (3892 px) · `TJOURNEYDLG` · the match differs (the original
 
 ### New team: country
 
-97 px (0.020 %) · `TSETCOUNTRYDLG`
+2 px (0.000 %) · `TSETCOUNTRYDLG`
 
 | Original | Port | Difference |
 |---|---|---|

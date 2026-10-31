@@ -763,7 +763,7 @@ pub(super) fn combobox(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y:
     let focused = cx.focus == n.name && enabled && !flag(cx, n, "open");
     if get(cx, n, "draw") == Some("flag") {
         // the owner-drawn field: the item 3 pixels in, a navy frame and the focus rectangle around it while focused
-        let (rx, ry, rw, rh) = (x + 3, y + 3, w - 3 - 20, h - 6);
+        let (rx, ry, rw, rh) = (x + 3, y + 3, w - 3 - 19, h - 6);
         let old = fb.clip;
         fb.clip = (x + 1, y + 1, x + w - 17, y + h - 1);
         flag_row(fb, cx, (rx, ry, rw, rh), &shown);

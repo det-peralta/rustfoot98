@@ -1232,8 +1232,9 @@ fn countries(
         // (the rows start one pixel above the list's client area: measured)
         let ry = y + 1 + (k - top) as i32 * ROW;
         let on = c.get(3) == Some(&"1");
+        // (the chosen row's band and the focus rectangle reach a pixel further right than the text's column: measured)
         if on {
-            fb.fill(rx, ry, rw, ROW, Rgb(248, 252, 0));
+            fb.fill(rx, ry, rw + 1, ROW, Rgb(248, 252, 0));
         }
         if let Some(b) = cx.skin.bitmap("FLAGS", c.first().copied().unwrap_or("")) {
             for r in 0..b.h {
@@ -1276,7 +1277,7 @@ fn countries(
             false,
         );
         if k as i64 == sel {
-            focus_rect(fb, rx, ry, rw, ROW, rx, ry);
+            focus_rect(fb, rx, ry, rw + 1, ROW, rx, ry);
         }
         cx.hits.borrow_mut().push(Hit {
             name: format!("{}#{k}", n.name),

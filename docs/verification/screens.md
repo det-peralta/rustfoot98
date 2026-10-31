@@ -28,7 +28,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 | Screen | Form | Differing pixels | Notes |
 |---|---|---|---|
-| Elifoot › Opções | `TOPTIONSDLG` | 82 px (0.017 %) |  |
+| Elifoot › Opções | `TOPTIONSDLG` | 14 px (0.003 %) |  |
 | Elifoot › Acerca | `TABOUTDLG` | not pixel-compared (2971 px) | animated: the notice blinks every 500 ms and the banner scrolls, so the capture's moment decides |
 | Equipa › Estádio | `TSTADIUMDLG` | 459 px (0.096 %) | the stadium picture is drawn from measurements (~400 px of its outline) |
 | Equipa › Historial | `TPRINTLISTDLG` | 12 px (0.003 %) |  |
@@ -40,7 +40,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Campeonato › Melhores marcadores de sempre | `TPRINTLISTDLG` | 12 px (0.003 %) |  |
 | Treinador › História | `TPRINTLISTDLG` | 12 px (0.003 %) |  |
 | Treinador › Ranking | `TPRINTLISTDLG` | 22 px (0.005 %) |  |
-| Treinador › Perfil | `TCOACHOPTIONSDLG` | 181 px (0.038 %) |  |
+| Treinador › Perfil | `TCOACHOPTIONSDLG` | 31 px (0.006 %) |  |
 
 ## Start and new game
 
@@ -50,7 +50,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Choice of game | `TSELECTGAMEDLG` | 3 px (0.001 %) |  |
 | New game named | `TSELECTGAMEDLG` | 183 px (0.038 %) | the edit's caret blinks |
 | Countries | `TSELECTCOUNTRIESDLG` | 19 px (0.004 %) |  |
-| Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 96 px (0.020 %) |  |
+| Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 81 px (0.017 %) |  |
 | Currency | `TCURRENCYDLG` | 54 px (0.011 %) |  |
 | Coaches' names | `TGETTEAMSDLG` | 4 px (0.001 %) |  |
 | Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3713 px) | the club is drawn at random |
@@ -70,7 +70,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 | Abrir | `TOPENTEAMDLG` | 2 px (0.000 %) |  |
 | Equipa › Nome | `TSETTEAMNAMEDLG` | 30 px (0.006 %) |  |
 | Equipa › Cores | `TTEAMCOLORDLG` | 16 px (0.003 %) |  |
-| Equipa › País | `TSETCOUNTRYDLG` | 97 px (0.020 %) |  |
+| Equipa › País | `TSETCOUNTRYDLG` | 17 px (0.004 %) |  |
 | Equipa › Nível inicial | `TTEAMSKILLDLG` | 2 px (0.000 %) |  |
 | Equipa › Treinador | `TCOACHNAMEDLG` | 2 px (0.000 %) |  |
 | Jogador › Editar | `TEDITPLAYERDLG` | 34 px (0.007 %) |  |
@@ -130,7 +130,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 |---|---|---|---|
 | New team: name (the hint of the full name) | `TSETTEAMNAMEDLG` | 29 px (0.006 %) |  |
 | New team: colours | `TTEAMCOLORDLG` | 2 px (0.000 %) |  |
-| New team: country | `TSETCOUNTRYDLG` | 97 px (0.020 %) |  |
+| New team: country | `TSETCOUNTRYDLG` | 2 px (0.000 %) |  |
 | New team: starting level | `TTEAMSKILLDLG` | 2 px (0.000 %) |  |
 | New team: coach | `TCOACHNAMEDLG` | 30 px (0.006 %) |  |
 | New team: the first player | `TEDITPLAYERDLG` | 34 px (0.007 %) |  |
@@ -153,7 +153,7 @@ Every screen of the original, captured under js-dos, against the port's render o
 
 ## Coverage
 
-78 screens, 63 of them compared pixel for pixel (median 17 differing pixels); 34 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
+78 screens, 63 of them compared pixel for pixel (median 16 differing pixels); 34 of the 49 forms of `ELIFOOT.EXE` and `EDITEQ.EXE` appear in them. The others:
 
 | Form | Why it has no screen |
 |---|---|
