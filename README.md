@@ -16,16 +16,16 @@ binary and rebuilt in **Rust** and **WebAssembly**. It runs in a browser with th
   four divisions and the cup, match days with half-time decisions and penalties, the transfer market and auctions, finances,
   stadium and loans, coaches sacked and swapped, the end of season, saved games. The team editor (`EDITEQ.EXE`) is ported too.
 
-**Docs:** <https://det-peralta.github.io/rustfoot98/> · **Play:** <https://det-peralta.github.io/rustfoot98/play/classic.html>
-(plays at once: the site carries the game's data; a local build makes it from your own copy, see [Quick start](#quick-start)).
+The docs and the game build into one static site to serve yourself (see [Documentation](#documentation)).
 
 > This is an independent study and preservation project, not affiliated with the authors of Elifoot. No file of the original game
-> or of Windows 3.1 is in this repository; the published site carries the game's data so it plays at once. See [NOTICE.md](NOTICE.md).
+> or of Windows 3.1 is in this repository: you bring your own copy. See [NOTICE.md](NOTICE.md).
 
 ## Documentation
 
-The docs are a site (mkdocs-material, `docs/`), published at <https://det-peralta.github.io/rustfoot98/> by `tools/site/publish.sh`
-(build only: `tools/site/build.sh`).
+The docs are a site (mkdocs-material, `docs/`). `tools/site/build.sh` builds it into `site/` with the game at `site/play/`, ready
+to copy to any static web server (`GALLERY=1` adds the verification gallery, `SKIN=1` the game's data from `web/skin/` so the
+game plays at once).
 
 | | |
 |---|---|

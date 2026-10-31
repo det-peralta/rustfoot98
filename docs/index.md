@@ -9,9 +9,9 @@ fonts, dialogs and rules, recovered from the program itself rather than imitated
 [Screen-by-screen verification](verification/screens.md){ .md-button }
 
 !!! note "The game's data"
-    The game page plays at once: the site carries the original's team files, forms and bitmaps and the Windows 3.1 fonts as
-    pre-drawn glyphs, as Elifoot 98's free distribution allows (see [NOTICE](https://github.com/det-peralta/rustfoot98/blob/main/NOTICE.md)).
-    The source repository holds none of them; a local build makes them from your own copy (see [Method and tools](installation.md)).
+    The game's data and the Windows 3.1 fonts are not part of the source. A site built with `SKIN=1` carries the skin pack made
+    from your own copy and plays at once; without it, the game page asks for the folder of a skin pack
+    (see [Method and tools](installation.md)).
 
 ## What is here
 
