@@ -48,12 +48,12 @@ Every screen of the original, captured under js-dos, against the port's render o
 |---|---|---|---|
 | About box at start-up | `TABOUTDLG` | not pixel-compared (1909 px) | animated: the notice blinks and the banner scrolls |
 | Choice of game | `TSELECTGAMEDLG` | 3 px (0.001 %) |  |
-| New game named | `TSELECTGAMEDLG` | 183 px (0.038 %) | the edit's caret blinks |
+| New game named | `TSELECTGAMEDLG` | 37 px (0.008 %) | the edit's caret blinks |
 | Countries | `TSELECTCOUNTRIESDLG` | 19 px (0.004 %) |  |
 | Countries, Brasil chosen | `TSELECTCOUNTRIESDLG` | 81 px (0.017 %) |  |
 | Currency | `TCURRENCYDLG` | 54 px (0.011 %) |  |
 | Coaches' names | `TGETTEAMSDLG` | 4 px (0.001 %) |  |
-| Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3713 px) | the club is drawn at random |
+| Clubs drawn | `TGETTEAMSDLG` | not pixel-compared (3700 px) | the club is drawn at random |
 | A new game's main window | `TPLANTELDLG` | not pixel-compared (1979 px) | the club is drawn at random |
 
 ## Team editor

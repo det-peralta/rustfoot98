@@ -866,9 +866,12 @@ fn edit(fb: &mut Fb, cx: &Ctx, n: &Node, f: &FontSpec, x: i32, y: i32) {
     let enabled = is_enabled(cx, n);
     sunken_box(fb, x, y, w, h, cx.color_of(n, "bgcolor").unwrap_or(WHITE));
     let s = caption_or(cx, n, "Text");
-    // (`<name>.indent`: the text's distance from the left edge, 3 in the team editor's edits)
-    let indent = widgets::get_num(cx, n, "indent").unwrap_or(2);
-    let (tx, ty) = (x + indent, y + (h - font.height()) / 2);
+    // Windows 3.1's single-line edit (USER `10e0:0000`) insets its text by half the average character width and a quarter of
+    // the line height, each at most the system font's (8 and 16); the average is GetCharDimensions' (`1008:03a4`), the extent
+    // of "a..zA..Z" over 26, halved and rounded. (`<name>.indent` overrides the left inset: 3 in the team editor's edits.)
+    let ave = (font.width("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") / 26 + 1) / 2;
+    let indent = widgets::get_num(cx, n, "indent").unwrap_or(ave.min(8) / 2);
+    let (tx, ty) = (x + indent, y + font.height().min(16) / 4);
     let old = fb.clip;
     fb.clip = (x + 1, y + 1, x + w - 1, y + h - 1);
     // selected characters: `<name>.selstart` and `<name>.sellen` are character positions

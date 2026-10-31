@@ -223,7 +223,7 @@ not pixel-compared (1909 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### New game named
 
-183 px (0.038 %) · `TSELECTGAMEDLG` · the edit's caret blinks
+37 px (0.008 %) · `TSELECTGAMEDLG` · the edit's caret blinks
 
 | Original | Port | Difference |
 |---|---|---|
@@ -263,7 +263,7 @@ not pixel-compared (1909 px) · `TABOUTDLG` · animated: the notice blinks and t
 
 ### Clubs drawn
 
-not pixel-compared (3713 px) · `TGETTEAMSDLG` · the club is drawn at random
+not pixel-compared (3700 px) · `TGETTEAMSDLG` · the club is drawn at random
 
 | Original | Port | Difference |
 |---|---|---|

@@ -99,7 +99,11 @@ own files (SDL: a directory; web: a file the user picks, kept in IndexedDB).
 * **Focus on show**: a form without `ActiveControl` gives the focus to its first tab stop (the stadium's *Fechar*); a list under
   a dialog (an inactive window) shows no focus rectangle, and an edit there no caret.
 * **Edits**: `TEdit` with `AutoSize` (the default) is `tmHeight + min(tmHeight, 16) / 4 + 4` high (Delphi 1's `AdjustHeight`
-  without the new-style controls). `TSpinEdit` writes its value 4 pixels in, with a 2-pixel caret as high as the font.
+  without the new-style controls). Its text is inset by Windows 3.1's single-line edit rule (USER `10e0:0000`): half the
+  average character width and a quarter of the line height, at most 4 and 4 (the system font's 8 and 16), where the average
+  is the extent of `a..zA..Z` over 26, halved and rounded (`1008:03a4`). The inset is measured from the black frame: Ctl3d
+  takes away the edit's border after the edit has made its inset, so the frame is inside the client area (the caret reaches
+  its bottom row). The new-game file name, Arial 13 bold in a 21-pixel edit, went from 183 to 37 pixels with it. `TSpinEdit` writes its value 4 pixels in, with a 2-pixel caret as high as the font.
 * **Labels** that are not `AutoSize` are clipped to their bounds (descenders can be cut).
 * **Buttons**: a plain `TButton` centres its caption on the text extent including a bold raster font's overhang; a
   glyph-on-top `TBitBtn` with `Margin = -1` centres glyph, spacing and caption using the caption's line height (for TrueType a
