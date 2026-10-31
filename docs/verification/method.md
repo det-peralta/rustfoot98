@@ -47,8 +47,9 @@ Windows 3.1 draws a TrueType glyph of a given size always with the same bitmap, 
 glyphs. `tools/ui/glyphfix.py harvest` renders every exact screen with a log of the glyphs the port draws (`GLYPHLOG`), and
 where a glyph differs from the original's pixels in the same place (nothing else drawn there, the same background around it)
 takes the original's bitmap; a correction is kept when one version clearly dominates the places it was seen. `glyphfix.py apply` writes
-them into the skin pack (`analysis/out/skin/fonts.bin` and `web/skin/fonts.bin`, local files built from your copy). 70 glyphs
-were corrected this way, bringing most exact screens to 10 to 30 differing pixels; the independent checks of
+them into the skin pack (`analysis/out/skin/fonts.bin` and `web/skin/fonts.bin`, local files built from your copy). 67 glyphs
+were corrected this way (a correction is only as good as the port's placement of the text: a text drawn two pixels off
+once produced three wrong glyphs, so the table is rebuilt from scratch after a layout fix), bringing most exact screens to 10 to 30 differing pixels; the independent checks of
 `tools/ui/check.py` went down too (the options dialog from 59 to 4).
 
 ## What the remaining pixels are
