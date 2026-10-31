@@ -4,6 +4,20 @@ use super::{dialogs, main_win, menu, Classic, Ev, Key, Page, Request, Screen};
 use rustfoot_core::season::FORMATIONS;
 
 impl Classic {
+    /// Whether the control with the keyboard focus takes typed text (an edit or a spin edit of the top dialog, the Vender page's
+    /// price, the Contrato page's wage): the browser host shows a phone's on-screen keyboard while it does.
+    pub fn wants_text(&self) -> bool {
+        if let Some(d) = self.dialogs.last() {
+            return dialog::focus_takes_text(&self.forms, d);
+        }
+        matches!(self.screen, Screen::Main)
+            && match self.main.page {
+                Some(Page::Sell) => self.main.market.sell_focus,
+                Some(Page::Contract) => true,
+                _ => false,
+            }
+    }
+
     pub fn event(&mut self, ev: Ev) {
         self.dirty = true;
         if let Ev::Move(x, y) | Ev::Down(x, y) | Ev::Up(x, y) = ev {

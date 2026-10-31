@@ -137,6 +137,12 @@ pub extern "C" fn ed_event(kind: u32, a: i32, b: i32) {
     })
 }
 
+/// 1 while the control with the keyboard focus takes typed text (`Editor::wants_text`): the page opens a phone's keyboard then.
+#[no_mangle]
+pub extern "C" fn ed_wants_text() -> i32 {
+    HOST.with(|h| i32::from(h.borrow().app.as_ref().is_some_and(Editor::wants_text)))
+}
+
 /// Time passes (milliseconds since the last call): the *Acerca* box's banner.
 #[no_mangle]
 pub extern "C" fn ed_tick(ms: u32) {

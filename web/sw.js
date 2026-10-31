@@ -2,10 +2,10 @@
 // Network first: a page that can reach the server always gets the current files (no stale copy hides an update); what it fetched is
 // kept, and answers when the network does not. That includes the skin pack in skin/ (the user's own files, kept in this browser only).
 // Bump VERSION when the precached list changes; old caches are removed on activation.
-const VERSION = "v3";
+const VERSION = "v4";
 const CACHE = `elifoot98-rs-${VERSION}`;
 const SHELL = [
-  "./", "index.html", "classic.html", "classic.js", "editor.html", "editor.js", "pack.js", "rustfoot_ui.wasm",
+  "./", "index.html", "classic.html", "classic.js", "editor.html", "editor.js", "pack.js", "softkb.js", "rustfoot_ui.wasm",
   "legacy.html", "style.css", "app.js", "rustfoot_wasm.wasm", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png",
 ];
 

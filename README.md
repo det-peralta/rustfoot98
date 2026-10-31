@@ -52,6 +52,8 @@ web/build.sh serve            # http://localhost:8080 (the team editor is at /ed
 
 The game opens with the About box, then the choice of game. It saves in the browser (every three rounds and on *Sair*) and works
 offline after the first visit. Without `web/skin/`, the page asks for the folder of a skin pack and keeps it in the browser.
+On a phone or tablet the on-screen keyboard opens by itself when a text field has the focus (a tap on it), in the game and in
+the team editor (`web/softkb.js`; tested by `tools/capture/mobile_keyboard.mjs`).
 
 Native tools render any screen to a bitmap, which is how the port is compared with the original:
 

@@ -19,6 +19,13 @@ pub enum Ev {
 }
 
 impl Editor {
+    /// Whether the control with the keyboard focus takes typed text: the browser host shows a phone's keyboard while it does.
+    pub fn wants_text(&self) -> bool {
+        self.dialogs
+            .last()
+            .is_some_and(|d| dialog::focus_takes_text(&self.forms, d))
+    }
+
     pub fn event(&mut self, ev: Ev) {
         self.dirty = true;
         if let Ev::Move(x, y) = ev {

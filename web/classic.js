@@ -1,6 +1,7 @@
 // Host of the pixel-exact classic interface (ui/src/classic) compiled to WebAssembly (ui-web/src/classic_host.rs).
 // The skin pack and the teams (with those saved by the team editor) come from pack.js.
 import { allTeams, offline, start } from "./pack.js";
+import { softKeyboard } from "./softkb.js";
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 const msg = document.getElementById("msg");
@@ -65,6 +66,9 @@ canvas.addEventListener("pointermove", (e) => { if (w) { const [x, y] = pos(e); 
 canvas.addEventListener("pointerdown", (e) => { if (w && e.button === 0) { canvas.focus(); const [x, y] = pos(e); w.cl_event(0, x, y); w.cl_event(1, x, y); } e.preventDefault(); });
 canvas.addEventListener("pointerup", (e) => { if (w && e.button === 0) { const [x, y] = pos(e); w.cl_event(2, x, y); } });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+// a phone's keyboard while a text field has the focus (after the handlers above, so the tap has reached the game)
+const kb = softKeyboard(canvas, () => !!w && w.cl_wants_text() === 1,
+  (k) => w && w.cl_event(3, k, 0), (ch) => w && w.cl_event(4, ch.codePointAt(0), 0));
 
 const KEYS = { Enter: 0, Escape: 1, Tab: 2, Backspace: 3, ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7 };
 addEventListener("keydown", (e) => {
@@ -122,6 +126,7 @@ function loop(now) {
   last = now;
   w.cl_tick(Math.round(dt));
   requests();
+  if (w) kb.check();
   if (w && w.cl_frame()) {
     const img = new ImageData(new Uint8ClampedArray(w.memory.buffer, w.cl_fb_ptr(), 800 * 600 * 4), 800, 600);
     ctx.putImageData(img, 0, 0);

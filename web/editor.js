@@ -1,6 +1,7 @@
 // Host of the team editor (ui/src/editor, the original's EDITEQ.EXE) compiled to WebAssembly (ui-web/src/editor_host.rs).
 // The teams are the pack's (pack.js) with the ones saved here, which are kept in this browser and used by new games.
 import { allTeams, offline, saveTeam, start } from "./pack.js";
+import { softKeyboard } from "./softkb.js";
 
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
@@ -56,6 +57,9 @@ canvas.addEventListener("pointerdown", (e) => {
 });
 canvas.addEventListener("dblclick", (e) => { if (w) { const [x, y] = pos(e); w.ed_event(5, x, y); } });
 canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+// a phone's keyboard while a text field has the focus
+const kb = softKeyboard(canvas, () => !!w && w.ed_wants_text() === 1,
+  (k) => w && w.ed_event(3, k, 0), (ch) => w && w.ed_event(4, ch.codePointAt(0), 0));
 
 const KEYS = { Enter: 0, Escape: 1, Tab: 2, Backspace: 3, ArrowUp: 4, ArrowDown: 5, ArrowLeft: 6, ArrowRight: 7, Insert: 9, Delete: 10 };
 addEventListener("keydown", (e) => {
@@ -111,6 +115,7 @@ function loop(now) {
   w.ed_tick(Math.round(Math.min(now - (last || now), 250)));
   last = now;
   requests();
+  if (w) kb.check();
   if (w && w.ed_frame()) {
     ctx.putImageData(new ImageData(new Uint8ClampedArray(w.memory.buffer, w.ed_fb_ptr(), 800 * 600 * 4), 800, 600), 0, 0);
   }

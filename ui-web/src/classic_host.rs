@@ -186,6 +186,15 @@ pub extern "C" fn cl_tick(ms: u32) {
     })
 }
 
+/// 1 while the control with the keyboard focus takes typed text (`Classic::wants_text`): the page opens a phone's keyboard then.
+#[no_mangle]
+pub extern "C" fn cl_wants_text() -> i32 {
+    HOST.with(|h| {
+        let h = h.borrow();
+        i32::from(h.app.as_ref().is_some_and(Classic::wants_text))
+    })
+}
+
 /// Draws a frame if something changed; 1 when the RGBA picture at `cl_fb_ptr()` is new.
 #[no_mangle]
 pub extern "C" fn cl_frame() -> i32 {

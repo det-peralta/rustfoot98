@@ -257,6 +257,14 @@ pub fn default_button(c: &Classic, d: &Dialog) -> Option<String> {
     default_button_in(&c.forms, d)
 }
 
+/// Whether the control with the focus in `d` takes typed text (an edit or a spin edit).
+pub fn focus_takes_text(forms: &crate::win31::Forms, d: &Dialog) -> bool {
+    forms
+        .get(&d.form)
+        .and_then(|f| f.find(&d.focus))
+        .is_some_and(|n| matches!(n.class.as_str(), "TEdit" | "TSpinEdit"))
+}
+
 pub fn default_button_in(forms: &crate::win31::Forms, d: &Dialog) -> Option<String> {
     forms.get(&d.form).and_then(|f| find_button(f, true))
 }
