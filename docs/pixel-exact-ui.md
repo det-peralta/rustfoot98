@@ -105,4 +105,8 @@ own files (SDL: a directory; web: a file the user picks, kept in IndexedDB).
   glyph-on-top `TBitBtn` with `Margin = -1` centres glyph, spacing and caption using the caption's line height (for TrueType a
   pixel more than `tmHeight`).
 * **Panels** of zero height draw nothing. **List boxes** that are not of integral height show the top of the next row.
-* **Menus**: three drop-downs (those whose registered-only entries are hidden) are a pixel narrower in the port; not explained.
+* **Menus**: four drop-downs (*Equipa*, *Jogador*, *Treinador*, the editor's *Equipa*) are a pixel narrower in the port. Windows
+  3.1's `USER.EXE` (decompiled with Ghidra from the install's own copy) sizes a drop-down linearly: an item is the `GetTextExtent` of
+  its text up to the tab (`1000:1292`, the `&` removed) plus a constant (`1080:0268`, `1080:03ff`), the drop-down the widest item
+  plus constants and the shortcut column (`1048:0127`). So the difference lies in the extent Windows measures for those labels,
+  although the drawn text matches pixel for pixel; not explained yet.
