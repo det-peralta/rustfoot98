@@ -25,7 +25,7 @@ The docs and the game build into one static site to serve yourself (see [Documen
 
 The docs are a site (mkdocs-material, `docs/`). `tools/site/build.sh` builds it into `site/` with the game at `site/play/`, ready
 to copy to any static web server (`GALLERY=1` adds the verification gallery, `SKIN=1` the game's data from `web/skin/` so the
-game plays at once).
+game plays at once); `tools/site/deploy.sh user@host` copies it to a server running Caddy and serves it on port 80.
 
 | | |
 |---|---|
