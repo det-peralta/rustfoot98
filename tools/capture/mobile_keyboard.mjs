@@ -1,7 +1,7 @@
 // The phone keyboard of the game page (web/softkb.js) on an emulated phone: a tap on "Quero começar um jogo do início" gives
 // the focus to the file name field, so the hidden input must take the focus (a phone then shows its keyboard); text typed the
 // way an on-screen keyboard sends it (input events, an Android-style composition, a deletion) reaches the game; Enter goes on
-// to the countries dialog and the input lets the focus go.
+// to the countries dialog and the input lets the focus go; the ⌨ button opens and closes the keyboard by hand.
 //   node tools/capture/mobile_keyboard.mjs [out.png]
 import { createRequire } from 'module';
 import http from 'http';
@@ -58,6 +58,11 @@ await p.keyboard.press('Enter');
 await p.waitForTimeout(500);
 expect('focus after Enter (the countries dialog)', await focused(), 'CANVAS:Elifoot 98');
 await p.locator('canvas').screenshot({ path: out.replace(/\.png$/, '_next.png') });
+// the ⌨ button opens the keyboard whatever has the focus, and closes it again
+await p.locator('button[aria-label="Mostrar o teclado"]').tap();
+expect('focus after the keyboard button', await focused(), 'INPUT:Teclado');
+await p.locator('button[aria-label="Mostrar o teclado"]').tap();
+expect('focus after the keyboard button again', await focused(), 'CANVAS:Elifoot 98');
 await b.close();
 srv.close();
 if (errors.length) fail.push('page errors: ' + errors.join('; '));

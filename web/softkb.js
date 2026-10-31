@@ -1,6 +1,6 @@
 // The phone's on-screen keyboard for the game and the team editor. A touch screen has no keyboard of its own, and a browser only
 // shows the on-screen one for a focused text field: a hidden input takes the focus after a tap when the interface's focused
-// control takes text (`wantsText`), and gives it back when it no longer does. What is typed is sent on as keys and characters.
+// control takes text (`wantsText`), and gives it back when it no longer does; a ⌨ button opens it by hand. What is typed is sent on as keys and characters.
 // A physical keyboard keeps going through the page's own keydown handler (which cancels the key, so nothing reaches the input).
 const SENTINEL = "  "; // kept in the input so the keyboard's backspace has something to delete
 
@@ -46,12 +46,32 @@ export function softKeyboard(canvas, wantsText, sendKey, sendChar) {
     e.stopPropagation();
   });
 
-  const check = () => {
-    const want = wantsText();
-    if (want && document.activeElement !== input) { reset(); input.focus({ preventScroll: true }); }
-    else if (!want && document.activeElement === input) { input.blur(); canvas.focus({ preventScroll: true }); }
+  // ⌨: a button that opens (or closes) the keyboard whatever has the focus, for a browser that will not open it from a tap on
+  // the picture; a tap on a real button is the one gesture every browser accepts
+  let forced = false;
+  const btn = document.createElement("button");
+  btn.textContent = "⌨";
+  btn.setAttribute("aria-label", "Mostrar o teclado");
+  btn.style.cssText = "position:fixed;right:8px;bottom:8px;width:48px;height:48px;font-size:26px;line-height:1;border-radius:8px;" +
+    "border:2px outset #fff;background:#c0c0c0;color:#000;opacity:.85;z-index:2;touch-action:manipulation;";
+  // (pointerdown would take the focus from the input before the click decides)
+  btn.addEventListener("pointerdown", (e) => e.preventDefault());
+  btn.addEventListener("click", () => {
+    if (document.activeElement === input) { forced = false; input.blur(); canvas.focus({ preventScroll: true }); }
+    else { forced = true; reset(); input.focus({ preventScroll: true }); }
+  });
+  document.body.appendChild(btn);
+  input.addEventListener("blur", () => { forced = false; });
+
+  // opens the keyboard when the interface's focused control takes text: only from a tap's own handler, since a browser shows
+  // its keyboard only for a focus given while handling the gesture (Safari: touchend or click, Chrome: pointerup too)
+  const open = () => {
+    if (wantsText() && document.activeElement !== input) { reset(); input.focus({ preventScroll: true }); }
   };
-  // a browser opens its keyboard only for a focus given while handling the tap itself
-  canvas.addEventListener("pointerup", check);
+  for (const ev of ["pointerup", "touchend", "click"]) canvas.addEventListener(ev, open);
+  // closes it when the focus leaves the text field (Enter closed the dialog, Tab went on to a button...); called every frame
+  const check = () => {
+    if (!forced && !wantsText() && document.activeElement === input) { input.blur(); canvas.focus({ preventScroll: true }); }
+  };
   return { check };
 }
